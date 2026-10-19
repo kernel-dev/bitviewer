@@ -107,6 +107,8 @@ export interface CardEvents {
   others(card: ValueCard): ValueCard[];
   /** The drag handle was pressed: start reordering. */
   dragStart(card: ValueCard, e: PointerEvent): void;
+  /** Group the following changes into one undo step (true) / end the group (false). */
+  batch(on: boolean): void;
 }
 
 function baseSeg(base: Base, onPick: (b: Base) => void, cls = "sm"): Segmented<Base> {
@@ -146,6 +148,10 @@ export class ValueCard implements StripHost {
   private cmpReadouts = new Map<number, HTMLElement>();
   private cmpBases = new Map<number, HTMLElement>();
   private fieldUis: FieldUi[] = [];
+  private rowsEl: HTMLElement | null = null;
+  private static nextUid = 1;
+  private readonly uid = ValueCard.nextUid++;
+  cursor: number | null = null;
   /** Field names matching the current search, highlighted in the fields panel. */
   private fieldMatches = new Set<string>();
   private baseEdits = new Map<Base, NumberInput>();
@@ -240,7 +246,14 @@ export class ValueCard implements StripHost {
       return;
     }
 
-    const rows = h("div", { class: `rows ${this.line ? "line" : "grid"}` });
+    const rows = h("div", {
+      class: `rows ${this.line ? "line" : "grid"}`,
+      tabindex: 0,
+      role: "group",
+      "aria-label": `Bits of ${m.name || "value"}. Arrow keys move, Space flips, 0 and 1 set, Shift+arrows select.`,
+    });
+    rows.addEventListener("keydown", (e) => this.onBitKey(e));
+    this.rowsEl = rows;
     for (const lo of m.rowLos()) {
       if (this.line) {
         rows.append(this.buildLineRow(lo));
@@ -295,7 +308,7 @@ export class ValueCard implements StripHost {
         copyBtn,
       ),
     );
-    const more = button({ icon: Ellipsis, cls: "ghost", tip: "More" });
+    const more = button({ icon: Ellipsis, cls: "ghost more-btn", tip: "More" });
     more.addEventListener("click", () =>
       openMenu(
         [
@@ -864,6 +877,85 @@ export class ValueCard implements StripHost {
       this.model.setValue(v);
       play("op");
     }
+  }
+
+  // ------------------------------------------------------------ keyboard & paint
+  bitId(bit: number): string {
+    return `v${this.uid}-bit${bit}`;
+  }
+
+  setCursor(bit: number, focus = true) {
+    const m = this.model;
+    this.cursor = Math.max(0, Math.min(m.width - 1, bit));
+    this.repaintStrips();
+    this.rowsEl?.setAttribute("aria-activedescendant", this.bitId(this.cursor));
+    if (focus) this.rowsEl?.focus({ preventScroll: true });
+    document.getElementById(this.bitId(this.cursor))?.scrollIntoView({ block: "nearest" });
+  }
+
+  /** How many bits "up" moves the cursor (rows or wrapped lines above have higher bits when MSB comes first). */
+  private verticalStep(): number {
+    const m = this.model;
+    const strip = this.strips.values().next().value;
+    const per = strip?.lineBits ?? m.rowWidth;
+    const higherAbove = this.line ? S.get("msb_left") : m.msbFirst;
+    return higherAbove ? per : -per;
+  }
+
+  private onBitKey(e: KeyboardEvent) {
+    const m = this.model;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const cur = this.cursor ?? m.width - 1;
+    const left = S.get("msb_left") ? 1 : -1; // moving left goes to a higher bit when the MSB is on the left
+    const moves: Record<string, number> = {
+      ArrowLeft: left,
+      ArrowRight: -left,
+      ArrowUp: this.verticalStep(),
+      ArrowDown: -this.verticalStep(),
+    };
+    let next: number | null = null;
+    if (e.key in moves) next = cur + moves[e.key];
+    else if (e.key === "Home") next = m.width - 1;
+    else if (e.key === "End") next = 0;
+    if (next !== null) {
+      e.preventDefault();
+      // up/down past the first/last line stays put; left/right stop at the ends
+      const vertical = e.key === "ArrowUp" || e.key === "ArrowDown";
+      if (vertical && (next < 0 || next >= m.width)) next = cur;
+      next = Math.max(0, Math.min(m.width - 1, next));
+      if (e.shiftKey) {
+        if (this.anchor === null) this.anchor = this.sel ? (this.sel[0] === cur ? this.sel[1] : this.sel[0]) : cur;
+        this.setSelection(this.anchor, next);
+        play("select");
+      } else if (this.cursor === null) next = cur;
+      this.setCursor(next);
+      return;
+    }
+    if (this.cursor === null) return;
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      void this.flipBit(this.cursor);
+    } else if (e.key === "0" || e.key === "1") {
+      e.preventDefault();
+      if (m.bit(this.cursor) !== Number(e.key)) void this.flipBit(this.cursor);
+    }
+  }
+
+  paintStart() {
+    this.events.batch(true);
+    this.clearSelection();
+  }
+
+  paintBit(bit: number, on: boolean) {
+    const g = this.model.groupAt(bit);
+    if (g?.protected && !this.unlocked.has(g)) return; // painting never touches protected fields
+    if (this.model.bit(bit) === (on ? 1 : 0)) return;
+    this.model.setBitsValue(bit, 1, on ? 1n : 0n);
+    play(on ? "bitOn" : "bitOff");
+  }
+
+  paintEnd() {
+    this.events.batch(false);
   }
 
   /** Highlights fields that match a search (empty set clears). */

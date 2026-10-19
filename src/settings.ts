@@ -13,7 +13,7 @@ const MAX_RECENT = 10;
 
 export interface Settings {
   zoom: number;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "contrast";
   msb_left: boolean; // bit order inside a row: MSB on the left
   show_readouts: boolean; // per-row hex/dec/oct readout
   show_interp: boolean; // signed / float interpretation chips
@@ -27,6 +27,8 @@ export interface Settings {
   readout_chips: string[]; // which readout chips show under each value (stats.ts CHIPS ids)
   templates: Template[]; // the user's own field layout templates
   compact: boolean; // tighter spacing everywhere
+  accent: string; // "#rrggbb", or "" for the theme's red
+  tour_done: boolean; // the first-run tour was finished or skipped
 }
 
 const DEFAULTS: Settings = {
@@ -45,6 +47,8 @@ const DEFAULTS: Settings = {
   readout_chips: ["u", "s", "pop", "float"],
   templates: [],
   compact: false,
+  accent: "",
+  tour_done: false,
 };
 
 const FILE = "settings.json";
@@ -73,10 +77,11 @@ function merge(into: Settings, raw: unknown) {
 
 function sanitize(v: Settings) {
   v.zoom = clampZoom(v.zoom);
-  if (!["dark", "light"].includes(v.theme)) v.theme = "dark";
+  if (!["dark", "light", "contrast"].includes(v.theme)) v.theme = "dark";
   if (!BASE_ORDER.includes(v.default_base)) v.default_base = 16;
   if (!["line", "byte", "nibble"].includes(v.default_view)) v.default_view = "line";
   v.sound_volume = Math.min(1, Math.max(0, v.sound_volume));
+  if (v.accent && !/^#[0-9a-f]{6}$/i.test(v.accent)) v.accent = "";
   v.recent_files = v.recent_files.slice(0, MAX_RECENT);
 }
 

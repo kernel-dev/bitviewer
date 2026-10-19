@@ -50,7 +50,10 @@ export function button(opts: {
   if (opts.icon) b.append(icon(opts.icon, opts.size ?? 16));
   if (opts.label) b.append(h("span", {}, opts.label));
   if (opts.onClick) b.addEventListener("click", opts.onClick);
-  if (!opts.label) b.classList.add("icon-only");
+  if (!opts.label) {
+    b.classList.add("icon-only");
+    if (opts.tip) b.setAttribute("aria-label", opts.tip.replace(/\s*\(.*\)$/, "")); // drop "(Ctrl+X)"
+  }
   return b;
 }
 
@@ -75,11 +78,22 @@ export function segmented<T>(
     value: opts.value,
     set(v: T) {
       api.value = v;
-      if (checkable) for (const [k, b] of buttons) b.classList.toggle("on", k === v);
+      if (checkable) {
+        for (const [k, b] of buttons) {
+          b.classList.toggle("on", k === v);
+          b.setAttribute("aria-checked", k === v ? "true" : "false");
+        }
+      }
     },
   };
   for (const o of options) {
-    const b = h("button", { type: "button", class: "seg-btn", tip: o.tip });
+    const b = h("button", {
+      type: "button",
+      class: "seg-btn",
+      tip: o.tip,
+      role: checkable ? "radio" : undefined,
+      "aria-label": o.label ? undefined : o.tip,
+    });
     if (o.icon) b.append(icon(o.icon, 14));
     if (o.label) b.append(h("span", {}, o.label));
     b.addEventListener("click", () => {

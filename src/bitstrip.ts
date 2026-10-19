@@ -18,6 +18,15 @@ export interface StripHost {
   clearSelection(): void;
   /** Flips a bit of the value (the host may ask first for protected fields). */
   flipBit(bit: number): void;
+  /** Keyboard cursor position (a bit index), or null. */
+  cursor: number | null;
+  setCursor(bit: number): void;
+  /** Alt+drag "paint": start / set one bit / end (one undo step). */
+  paintStart(): void;
+  paintBit(bit: number, on: boolean): void;
+  paintEnd(): void;
+  /** DOM id for a bit cell (for aria-activedescendant). */
+  bitId(bit: number): string;
   bitTip(bit: number, lo: number, compare: boolean): string;
   openRowMenu(lo: number, compare: boolean, bit: number | null, at: { x: number; y: number }): void;
   root: HTMLElement;
@@ -33,6 +42,11 @@ export class BitStrip {
   el: HTMLElement;
   private cells = new Map<number, HTMLElement>();
   private perLine = 0;
+
+  /** Bits per visual line (for moving the keyboard cursor up/down). */
+  get lineBits(): number {
+    return this.flex ? this.perLine : this.host.model.rowWidth;
+  }
   private ro?: ResizeObserver;
   private lines: HTMLElement[] = [];
 
@@ -126,7 +140,18 @@ export class BitStrip {
           line.append(h("div", { class: "bit pad", style }, idx, h("div", { class: "cell" })));
           return;
         }
-        const cell = h("div", { class: "bit", dataset: { bit: String(b) }, style }, idx, h("div", { class: "cell" }));
+        const cell = h(
+          "div",
+          {
+            class: "bit",
+            dataset: { bit: String(b) },
+            style,
+            role: "checkbox",
+            id: this.compare ? undefined : this.host.bitId(b),
+          },
+          idx,
+          h("div", { class: "cell" }),
+        );
         setTip(cell, () => this.host.bitTip(b, this.lo, this.compare));
         this.cells.set(b, cell);
         line.append(cell);
@@ -186,6 +211,9 @@ export class BitStrip {
       el.classList.toggle("locked", !!g?.protected);
       if (g) el.style.setProperty("--g", g.color);
       el.classList.toggle("sel", !!sel && sel[0] <= b && b <= sel[1]);
+      el.classList.toggle("cursor", !this.compare && this.host.cursor === b);
+      el.setAttribute("aria-checked", on ? "true" : "false");
+      el.setAttribute("aria-label", `${this.compare ? "Compare bit" : "Bit"} ${b}${g ? `, field ${g.name}` : ""}`);
       if (this.compare) el.classList.toggle("diff", on !== Number((parentRow >> BigInt(b - this.lo)) & 1n));
     }
   }
@@ -196,12 +224,37 @@ export class BitStrip {
     return cell && this.el.contains(cell) ? Number(cell.dataset.bit) : null;
   }
 
+  /** Alt+drag: every bit the pointer passes over becomes `on`. */
+  private paint(first: number, on: boolean) {
+    const host = this.host;
+    host.paintStart();
+    host.paintBit(first, on);
+    document.body.classList.add("painting");
+    const move = (ev: PointerEvent) => {
+      const under = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>(".strip:not(.cmp) .bit");
+      if (under && host.root.contains(under) && under.dataset.bit) host.paintBit(Number(under.dataset.bit), on);
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.body.classList.remove("painting");
+      host.paintEnd();
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  }
+
   private onDown(e: PointerEvent) {
     if (e.button !== 0) return;
     const b = this.bitOf(e.target);
     if (b === null) return;
     e.preventDefault();
     const host = this.host;
+    if (!this.compare && e.altKey) {
+      this.paint(b, !e.shiftKey);
+      return;
+    }
+    if (!this.compare) host.setCursor(b);
     if (!this.compare && e.shiftKey) {
       host.extendSelection(b);
       return;

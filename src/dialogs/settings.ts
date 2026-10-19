@@ -1,5 +1,6 @@
 // The Settings dialog. Every change applies immediately.
-import { Moon, SlidersHorizontal, Sun, Volume2 } from "lucide";
+import { Contrast, Moon, SlidersHorizontal, Sun, Volume2 } from "lucide";
+import { ACCENTS } from "../accent";
 import { BASE_NAMES, BASE_ORDER } from "../numfmt";
 import { S, ZOOM_MAX, ZOOM_MIN } from "../settings";
 import { play } from "../sound";
@@ -27,6 +28,51 @@ function slider(min: number, max: number, step: number, value: number): HTMLInpu
   return s;
 }
 
+/** Swatches for the accent presets plus a custom colour. */
+function accentPicker(): HTMLElement {
+  const wrap = h("div", { class: "accent-pick", role: "radiogroup", "aria-label": "Accent colour" });
+  const current = () => S.get("accent") || ACCENTS[0].color;
+  const render = () => {
+    const cur = current().toLowerCase();
+    const isPreset = ACCENTS.some((a) => a.color === cur);
+    wrap.replaceChildren(
+      ...ACCENTS.map((a) => {
+        const b = h("button", {
+          type: "button",
+          class: `accent-swatch${a.color === cur ? " on" : ""}`,
+          style: `--sw:${a.color}`,
+          tip: a.name,
+          role: "radio",
+          "aria-checked": a.color === cur ? "true" : "false",
+          "aria-label": a.name,
+        });
+        b.addEventListener("click", () => {
+          S.set("accent", a.color === ACCENTS[0].color ? "" : a.color);
+          render();
+        });
+        return b;
+      }),
+      (() => {
+        const input = h("input", {
+          type: "color",
+          class: "accent-custom-input",
+          value: cur,
+          "aria-label": "Custom colour",
+        });
+        input.addEventListener("input", () => S.set("accent", input.value.toLowerCase()));
+        input.addEventListener("change", render);
+        return h(
+          "label",
+          { class: `accent-swatch custom${isPreset ? "" : " on"}`, style: `--sw:${cur}`, tip: "Custom colour…" },
+          input,
+        );
+      })(),
+    );
+  };
+  render();
+  return wrap;
+}
+
 export function openSettings(): Promise<void> {
   return modal<void>({
     title: "Settings",
@@ -38,6 +84,7 @@ export function openSettings(): Promise<void> {
         [
           { value: "dark" as const, label: "Dark", icon: Moon },
           { value: "light" as const, label: "Light", icon: Sun },
+          { value: "contrast" as const, label: "High contrast", icon: Contrast },
         ],
         { value: S.get("theme"), onPick: (v) => S.set("theme", v) },
       );
@@ -90,6 +137,7 @@ export function openSettings(): Promise<void> {
         section(
           "Appearance",
           row("Theme", theme.el),
+          row("Accent colour", accentPicker(), "Red by default; used for bits that are 1, buttons and highlights"),
           row(
             "Compact mode",
             toggleSwitch(S.get("compact"), (v) => S.set("compact", v)),

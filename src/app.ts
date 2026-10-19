@@ -26,6 +26,7 @@ import {
   Search,
   Settings as SettingsIcon,
   SlidersHorizontal,
+  Sparkles,
   Square,
   SquareFunction,
   Sun,
@@ -36,9 +37,10 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide";
+import { applyAccent } from "./accent";
 import { ValueCard } from "./card";
 import { CommandRegistry } from "./commands";
-import { showAbout, showControls } from "./dialogs/help";
+import { showAbout, showHelp } from "./dialogs/help";
 import { newValueFromExpression } from "./dialogs/newvalue";
 import { openSettings } from "./dialogs/settings";
 import { pickTemplate } from "./dialogs/templates";
@@ -53,6 +55,7 @@ import { SearchBar } from "./search";
 import { loadSession, type Session, saveSessionNow, saveSessionSoon } from "./session";
 import { S, ZOOM_STEP } from "./settings";
 import { play } from "./sound";
+import { startTour, tourRunning } from "./tour";
 import { ask, button, h, icon, type MenuItem, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
 
 const FILE_VERSION = 1;
@@ -106,9 +109,14 @@ export class App {
     this.syncMaxButton();
 
     const initial = await P.initialFile();
-    if (initial && (await this.loadPath(initial))) return;
-    if (await this.restoreSession()) return;
-    this.startFresh();
+    if (!(initial && (await this.loadPath(initial))) && !(await this.restoreSession())) this.startFresh();
+    if (!S.get("tour_done")) setTimeout(() => this.runTour(), 700);
+  }
+
+  private async runTour() {
+    if (modalOpen()) return;
+    await startTour();
+    S.set("tour_done", true);
   }
 
   get dirty(): boolean {
@@ -300,9 +308,17 @@ export class App {
         label: "Controls & shortcuts",
         icon: CircleQuestionMark,
         keys: ["F1"],
-        run: () => showControls(this.commands),
+        run: () => showHelp(this.commands, () => this.runTour()),
       },
       { id: "help.about", group: "Help", label: "About Bit Viewer", icon: Info, run: () => showAbout() },
+      {
+        id: "help.tour",
+        group: "Help",
+        label: "Take the tour",
+        icon: Sparkles,
+        keywords: "introduction guide first",
+        run: () => this.runTour(),
+      },
       // swallow browser shortcuts that make no sense in an app window
       {
         id: "noop.browser",
@@ -469,7 +485,7 @@ export class App {
           "app.settings",
         ],
       ],
-      ["Help", ["app.palette", "help.controls", "help.about"]],
+      ["Help", ["app.palette", "help.controls", "help.tour", "sep", "help.about"]],
     ];
   }
 
@@ -669,10 +685,11 @@ export class App {
   private applyTheme() {
     document.documentElement.dataset.theme = S.get("theme");
     document.body.classList.toggle("compact", S.get("compact"));
+    applyAccent(S.get("accent"), S.get("theme") === "contrast");
   }
 
   private onSetting(key: string) {
-    if (key === "theme" || key === "compact") {
+    if (key === "theme" || key === "compact" || key === "accent") {
       this.applyTheme();
       this.syncThemeButton();
     } else if (key === "zoom") {
@@ -691,6 +708,7 @@ export class App {
   }
 
   private toggleTheme() {
+    // Ctrl+T switches dark ↔ light; high contrast is chosen in Settings
     S.set("theme", S.get("theme") === "dark" ? "light" : "dark");
   }
 
@@ -803,6 +821,7 @@ export class App {
       lookup: (_c, name) => this.valueByName(name),
       others: (c) => this.cards.filter((x) => x !== c),
       dragStart: (c, e) => this.dragCard(c, e),
+      batch: (on) => (on ? this.history.hold() : this.history.release()),
     });
     model.subscribe(() => this.history.touch());
     this.cards.splice(index ?? this.cards.length, 0, card);
@@ -1221,7 +1240,7 @@ export class App {
     document.addEventListener("focusin", track);
 
     document.addEventListener("keydown", (e) => {
-      if (modalOpen() || menusOpen() || paletteOpen()) return;
+      if (modalOpen() || menusOpen() || paletteOpen() || tourRunning()) return;
       // Esc inside a field reverts that field instead of clearing the selection
       if (e.key === "Escape" && document.activeElement instanceof HTMLInputElement) return;
       this.commands.handleKey(e);

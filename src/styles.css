@@ -146,7 +146,7 @@ button { cursor: pointer; }
 }
 .brand { display: flex; align-items: center; padding: 0 8px 0 12px; height: 100%; }
 .logo-bg { fill: #0e0e11; stroke: #2c2c33; stroke-width: 1.5; }
-.logo-on { fill: #e5383b; }
+.logo-on { fill: var(--accent, #e5383b); }
 .logo-off { fill: #2a2a31; }
 .menubar { display: flex; gap: 2px; }
 .menubar-item {
@@ -201,7 +201,7 @@ button { cursor: pointer; }
 .btn.primary {
   background: linear-gradient(180deg, var(--accent-hover), var(--accent));
   color: var(--on-accent); font-weight: 600; border-color: var(--accent-press);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 10px rgba(229, 56, 59, 0.25);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 10px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .btn.primary:hover { background: var(--accent-hover); }
 .btn.primary:active { background: var(--accent-press); }
@@ -745,3 +745,114 @@ body.compact .toolbar { padding: 6px 12px; }
 }
 .palette-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-empty { padding: 14px; text-align: center; }
+
+/* ------------------------------------------------------------ keyboard cursor & paint */
+.rows:focus { outline: none; }
+.rows:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 4px; border-radius: 10px; }
+.bit.cursor .cell { outline: 2px solid var(--text); outline-offset: 1px; }
+.rows:not(:focus-within) .bit.cursor .cell { outline-color: var(--faint); outline-style: dashed; }
+body.painting, body.painting * { cursor: crosshair !important; }
+
+/* ------------------------------------------------------------ high contrast theme */
+:root[data-theme="contrast"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #000000;
+  --surface-2: #0a0a0a;
+  --surface-3: #262626;
+  --elevated: #000000;
+  --track: #000000;
+  --seg-on: #ffffff;
+  --input: #000000;
+  --border: #8a8a8a;
+  --border-strong: #ffffff;
+  --text: #ffffff;
+  --muted: #e6e6e6;
+  --faint: #bdbdbd;
+  --accent: #ff6b6b;
+  --accent-hover: #ff8a8a;
+  --accent-press: #ff4d4d;
+  --accent-soft: rgba(255, 107, 107, 0.25);
+  --accent-line: #ff6b6b;
+  --on-accent: #000000;
+  --bit-on: #ff6b6b;
+  --bit-on-2: #ff6b6b;
+  --bit-on-text: #000000;
+  --bit-off: #000000;
+  --bit-off-text: #e6e6e6;
+  --bit-glow: none;
+  --cmp-bg: #000000;
+  --cmp-on: #ffb3b3;
+  --cmp-on-text: #000000;
+  --cmp-off: #000000;
+  --cmp-off-text: #bdbdbd;
+  --row-linked: #000000;
+  --link: #ffb3b3;
+  --select: #ffd400;
+  --select-soft: rgba(255, 212, 0, 0.3);
+  --diff: #00e5ff;
+  --error: #ff8080;
+  --error-bg: #330000;
+  --ok: #4cff9f;
+  --float: #ffd400;
+  --shadow: 0 0 0 1px #ffffff;
+}
+:root[data-theme="contrast"] .cell { box-shadow: inset 0 0 0 1px #8a8a8a; }
+:root[data-theme="contrast"] .bit.on .cell { box-shadow: inset 0 0 0 1px #ffffff; }
+:root[data-theme="contrast"] .seg-btn.on { color: #000000; }
+:root[data-theme="contrast"] .seg-btn.on .ico { color: #000000; }
+:root[data-theme="contrast"] :focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
+:root[data-theme="contrast"] .card { border-color: #8a8a8a; box-shadow: none; }
+
+/* ------------------------------------------------------------ reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------ accent picker */
+.accent-pick { display: flex; gap: 6px; align-items: center; }
+.accent-swatch {
+  width: 22px; height: 22px; border-radius: 50%; padding: 0; border: 2px solid var(--surface-2);
+  background: var(--sw); box-shadow: 0 0 0 1px var(--border-strong); cursor: pointer; position: relative; flex: none;
+}
+.accent-swatch.on { box-shadow: 0 0 0 2px var(--text); }
+.accent-swatch.custom {
+  background: conic-gradient(#e5383b, #f59f00, #2fb344, #0ca678, #3b82f6, #8b5cf6, #e64980, #e5383b);
+  display: grid; place-items: center; overflow: hidden;
+}
+.accent-swatch.custom.on { background: var(--sw); }
+.accent-custom-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------ help & tour */
+.help-search-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.help-search { flex: 1; height: 32px; }
+.help { max-height: 52vh; overflow: auto; padding-right: 4px; }
+.tour-layer { position: fixed; inset: 0; z-index: 980; }
+.tour-ring {
+  position: fixed; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  transition: left 0.2s, top 0.2s, width 0.2s, height 0.2s;
+}
+.tour-pop {
+  position: fixed; padding: 14px 16px 12px; border-radius: 14px; background: var(--elevated);
+  border: 1px solid var(--border-strong); box-shadow: var(--shadow); color: var(--text);
+}
+.tour-pop h3 { margin: 0 0 6px; font-size: 15px; }
+.tour-pop p { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+.tour-actions { display: flex; align-items: center; gap: 6px; }
+/* protected bits that are 1 keep their "on" colour under the hatching */
+.bit.on.locked .cell {
+  background-image:
+    repeating-linear-gradient(135deg, transparent 0 4px, rgba(0, 0, 0, 0.18) 4px 6px),
+    linear-gradient(180deg, var(--bit-on), var(--bit-on-2));
+}
+:root[data-theme="light"] .bit.on.locked .cell {
+  background-image:
+    repeating-linear-gradient(135deg, transparent 0 4px, rgba(255, 255, 255, 0.22) 4px 6px),
+    linear-gradient(180deg, var(--bit-on), var(--bit-on-2));
+}
