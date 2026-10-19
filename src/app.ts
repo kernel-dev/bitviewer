@@ -1,5 +1,6 @@
-// Main window: title bar, menus, toolbar, workspace, status bar, save/load.
-// Actions live in the command registry (commands.ts); this file wires them up.
+// Main window: title bar, menus, toolbar, workspace, status bar, save/load,
+// undo history and session auto-save. Actions live in the command registry
+// (commands.ts); this file wires them up.
 import {
   CircleQuestionMark,
   FilePlus,
@@ -11,6 +12,7 @@ import {
   Minus,
   Moon,
   Plus,
+  Redo2,
   RotateCcw,
   Ruler,
   Save,
@@ -19,6 +21,7 @@ import {
   SlidersHorizontal,
   Square,
   Sun,
+  Undo2,
   Volume2,
   VolumeX,
   X,
@@ -30,28 +33,39 @@ import { CommandRegistry } from "./commands";
 import { showAbout, showControls } from "./dialogs/help";
 import { openSettings } from "./dialogs/settings";
 import { pickWidth } from "./dialogs/width";
+import { History } from "./history";
 import { logoSvg } from "./logo";
 import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "./model";
 import { BASE_NAMES, BASE_ORDER, type Base } from "./numfmt";
 import * as P from "./platform";
+import { loadSession, type Session, saveSessionNow, saveSessionSoon } from "./session";
 import { S, ZOOM_STEP } from "./settings";
 import { play } from "./sound";
 import { ask, button, h, icon, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
 
 const FILE_VERSION = 1;
+const UNTITLED = "Untitled";
 
 export class App {
   readonly commands = new CommandRegistry();
   cards: ValueCard[] = [];
   private path: string | null = null;
-  private fileName = "Untitled";
-  private dirty = false;
+  private fileName = UNTITLED;
+  /** Snapshot of the workspace as last saved/opened; null = never saved. */
+  private savedSnapshot: string | null = null;
+  private history = new History(
+    () => this.snapshot(),
+    (s) => this.restore(s),
+    () => this.onHistoryChange(),
+  );
   private workspace!: HTMLElement;
   private empty!: HTMLElement;
   private titleFile!: HTMLElement;
   private zoomLabel!: HTMLElement;
   private themeBtn!: HTMLButtonElement;
   private maxBtn!: HTMLButtonElement;
+  private undoBtn!: HTMLButtonElement;
+  private redoBtn!: HTMLButtonElement;
   private wheelAcc = 0;
 
   constructor(private root: HTMLElement) {}
@@ -63,15 +77,21 @@ export class App {
     this.root.replaceChildren(this.buildTitlebar(), this.buildToolbar(), this.buildWorkspace(), this.buildStatusbar());
     this.installInput();
     S.onChange((k) => this.onSetting(k));
-    await P.guardClose(() => this.maybeSave());
+    await P.guardClose(
+      () => this.beforeClose(),
+      () => void saveSessionNow(this.sessionData()),
+    );
     await P.onResized(() => this.syncMaxButton());
     this.syncMaxButton();
 
     const initial = await P.initialFile();
-    if (!initial || !(await this.loadPath(initial))) {
-      this.addValue(32);
-      this.setDirty(false);
-    }
+    if (initial && (await this.loadPath(initial))) return;
+    if (await this.restoreSession()) return;
+    this.startFresh();
+  }
+
+  get dirty(): boolean {
+    return this.history.snapshot !== this.savedSnapshot;
   }
 
   // ================================================================ commands
@@ -106,6 +126,24 @@ export class App {
       },
       { id: "file.quit", group: "File", label: "Quit", icon: LogOut, run: () => P.closeWindow() },
       // Edit
+      {
+        id: "edit.undo",
+        group: "Edit",
+        label: "Undo",
+        icon: Undo2,
+        keys: ["Ctrl+Z"],
+        enabled: () => this.history.canUndo,
+        run: () => this.undo(),
+      },
+      {
+        id: "edit.redo",
+        group: "Edit",
+        label: "Redo",
+        icon: Redo2,
+        keys: ["Ctrl+Y", "Ctrl+Shift+Z"],
+        enabled: () => this.history.canRedo,
+        run: () => this.redo(),
+      },
       {
         id: "value.add32",
         group: "Edit",
@@ -215,7 +253,20 @@ export class App {
   private menus(): [string, (string | "sep")[]][] {
     return [
       ["File", ["file.new", "file.open", "sep", "file.save", "file.saveAs", "sep", "file.quit"]],
-      ["Edit", ["value.add32", "value.add64", "value.addCustom", "sep", "sel.group", "sel.clear"]],
+      [
+        "Edit",
+        [
+          "edit.undo",
+          "edit.redo",
+          "sep",
+          "value.add32",
+          "value.add64",
+          "value.addCustom",
+          "sep",
+          "sel.group",
+          "sel.clear",
+        ],
+      ],
       [
         "View",
         ["view.zoomIn", "view.zoomOut", "view.zoomReset", "sep", "view.theme", "view.sounds", "sep", "app.settings"],
@@ -299,6 +350,8 @@ export class App {
     });
     this.syncThemeButton();
     const run = (id: string) => () => this.commands.run(id);
+    this.undoBtn = button({ icon: Undo2, cls: "ghost", tip: "Undo (Ctrl+Z)", onClick: run("edit.undo") });
+    this.redoBtn = button({ icon: Redo2, cls: "ghost", tip: "Redo (Ctrl+Y)", onClick: run("edit.redo") });
     return h(
       "div",
       { class: "toolbar" },
@@ -338,6 +391,9 @@ export class App {
         tip: "Save the workspace (Ctrl+S)",
         onClick: run("file.save"),
       }),
+      h("div", { class: "tb-sep" }),
+      this.undoBtn,
+      this.redoBtn,
       h("div", { class: "tb-sep" }),
       h("span", { class: "tb-label" }, "All rows"),
       allRows.el,
@@ -447,6 +503,84 @@ export class App {
     toast(`All rows now use ${BASE_NAMES[b]}`);
   }
 
+  // ================================================================ undo history
+  private snapshot(): string {
+    return JSON.stringify(this.cards.map((c) => c.model.toJSON()));
+  }
+
+  /** Rebuilds the workspace from a snapshot (undo / redo / session restore). */
+  private restore(snap: string) {
+    const scroll = this.workspace.scrollTop;
+    const models = (JSON.parse(snap) as unknown[]).map((d) => ValueModel.fromJSON(d));
+    this.clearCards();
+    for (const m of models) this.addValue(m.width, m, undefined, false);
+    this.workspace.scrollTop = scroll;
+  }
+
+  private undo() {
+    if (this.history.undo()) play("op");
+  }
+
+  private redo() {
+    if (this.history.redo()) play("op");
+  }
+
+  private onHistoryChange() {
+    this.undoBtn.disabled = !this.history.canUndo;
+    this.redoBtn.disabled = !this.history.canRedo;
+    this.updateTitle();
+    saveSessionSoon(() => this.sessionData());
+  }
+
+  /** Marks the current state as the saved one. */
+  private markSaved() {
+    this.history.flush();
+    this.savedSnapshot = this.history.snapshot;
+    this.updateTitle();
+  }
+
+  // ================================================================ session
+  private sessionData(): Session {
+    return {
+      version: 1,
+      path: this.path,
+      fileName: this.fileName,
+      dirty: this.dirty,
+      values: this.cards.map((c) => c.model.toJSON()),
+      savedAt: Date.now(),
+    };
+  }
+
+  /** Reopens what was open last time. Returns false when there was nothing to restore. */
+  private async restoreSession(): Promise<boolean> {
+    const s = await loadSession();
+    if (!s) return false;
+    if (!s.dirty && s.path && (await this.loadPath(s.path, true))) return true;
+    if (!s.values) return false;
+    try {
+      this.loadValues(s.values, s.path, s.fileName);
+    } catch {
+      return false;
+    }
+    if (s.dirty) {
+      this.savedSnapshot = null; // contents differ from any file on disk
+      this.updateTitle();
+      toast("Restored unsaved changes from your last session", "ok");
+    }
+    return true;
+  }
+
+  /** Window close: ask about unsaved changes, then leave the session tidy. */
+  private async beforeClose(): Promise<boolean> {
+    const dirtyBefore = this.dirty;
+    if (!(await this.maybeSave())) return false;
+    // "Don't save" means the changes are discarded, so don't bring them back next time
+    const discarded = dirtyBefore && this.dirty;
+    await saveSessionNow({ ...this.sessionData(), dirty: false, values: discarded ? null : this.sessionData().values });
+    await S.flush();
+    return true;
+  }
+
   // ================================================================ values
   addValue(width: number, model?: ValueModel, index?: number, reveal = true): ValueCard {
     if (!model) {
@@ -466,10 +600,10 @@ export class App {
       duplicate: (c) => this.duplicateValue(c),
       resize: (c) => this.resizeValue(c),
     });
-    model.subscribe(() => this.setDirty(true));
+    model.subscribe(() => this.history.touch());
     this.cards.splice(index ?? this.cards.length, 0, card);
     this.relayout();
-    this.setDirty(true);
+    this.history.touch();
     if (reveal) {
       play("add");
       card.root.classList.add("enter");
@@ -489,7 +623,7 @@ export class App {
     }
     this.drop(card);
     this.relayout();
-    this.setDirty(true);
+    this.history.touch();
     play("remove");
   }
 
@@ -505,14 +639,13 @@ export class App {
     if (j < 0 || j >= this.cards.length) return;
     [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
     this.relayout();
-    this.setDirty(true);
+    this.history.touch();
   }
 
   private async addCustom() {
-    const last = Number(localStorage.getItem("bitviewer.lastWidth")) || 16;
-    const width = await pickWidth("Add value", last, "Add value");
+    const width = await pickWidth("Add value", S.get("last_width"), "Add value");
     if (width === null) return;
-    localStorage.setItem("bitviewer.lastWidth", String(width));
+    S.set("last_width", width);
     this.addValue(width);
   }
 
@@ -571,14 +704,15 @@ export class App {
   }
 
   // ================================================================ files
-  private setDirty(dirty: boolean) {
-    this.dirty = dirty;
-    this.titleFile.textContent = `${this.fileName}${dirty ? " •" : ""}`;
-    P.setTitle(`${this.fileName}${dirty ? " •" : ""} — Bit Viewer`);
+  private updateTitle() {
+    const mark = this.dirty ? " •" : "";
+    this.titleFile.textContent = `${this.fileName}${mark}`;
+    P.setTitle(`${this.fileName}${mark} — Bit Viewer`);
   }
 
   /** Resolves true when it is fine to discard the current workspace. */
   private async maybeSave(): Promise<boolean> {
+    this.history.flush();
     if (!this.dirty || !this.cards.length) return true;
     const r = await ask("Unsaved changes", `Save changes to “${this.fileName}”?`, [
       { id: "cancel", label: "Cancel" },
@@ -589,60 +723,79 @@ export class App {
     return r === "discard";
   }
 
-  private clear() {
+  private clearCards() {
     for (const c of [...this.cards]) this.drop(c);
     this.relayout();
   }
 
+  /** A new untitled workspace with one 32-bit value. */
+  private startFresh() {
+    this.clearCards();
+    this.path = null;
+    this.fileName = UNTITLED;
+    this.addValue(32, undefined, undefined, false);
+    this.history.reset();
+    this.markSaved();
+  }
+
   private async newWorkspace() {
     if (!(await this.maybeSave())) return;
-    this.clear();
-    this.path = null;
-    this.fileName = "Untitled";
-    this.addValue(32);
-    this.setDirty(false);
+    this.startFresh();
+    void saveSessionNow(this.sessionData());
   }
 
   private async openFile() {
     if (!(await this.maybeSave())) return;
     try {
-      const f = await P.pickAndRead(localStorage.getItem("bitviewer.lastDir") ?? (await P.defaultDir()));
+      const f = await P.pickAndRead(S.get("last_dir") || (await P.defaultDir()));
       if (f) this.loadText(f.text, f.path, f.name);
     } catch (e) {
       this.fail("Could not open file", e);
     }
   }
 
-  private async loadPath(path: string): Promise<boolean> {
+  private async loadPath(path: string, quiet = false): Promise<boolean> {
     try {
-      return this.loadText(await P.readText(path), path, P.basename(path));
+      return this.loadText(await P.readText(path), path, P.basename(path), quiet);
     } catch (e) {
-      this.fail("Could not open file", e, path);
+      if (!quiet) this.fail("Could not open file", e, path);
       return false;
     }
   }
 
-  private loadText(text: string, path: string | null, name: string): boolean {
-    let models: ValueModel[];
+  private loadText(text: string, path: string | null, name: string, quiet = false): boolean {
+    let values: unknown[];
     try {
       const data = JSON.parse(text);
       if (!data || typeof data !== "object" || data.app !== "bitviewer") {
         throw new ModelError("This is not a Bit Viewer workspace file");
       }
-      models = (data.values ?? []).map((d: unknown) => ValueModel.fromJSON(d));
+      values = data.values ?? [];
+      values.forEach((d) => ValueModel.fromJSON(d)); // validate everything before replacing the workspace
     } catch (e) {
-      this.fail("Could not open file", e, name);
+      if (!quiet) this.fail("Could not open file", e, name);
       return false;
     }
-    this.clear();
+    this.loadValues(values, path, name);
+    if (path) {
+      this.rememberDir(path);
+      S.addRecent(path);
+    }
+    void saveSessionNow(this.sessionData());
+    if (!quiet) toast(`Opened ${name}`, "ok");
+    return true;
+  }
+
+  /** Replaces the workspace and starts a fresh undo history. */
+  private loadValues(values: unknown[], path: string | null, name: string) {
+    const models = values.map((d) => ValueModel.fromJSON(d));
+    this.clearCards();
     for (const m of models) this.addValue(m.width, m, undefined, false);
     this.path = path;
     this.fileName = name;
-    this.rememberDir(path);
-    this.setDirty(false);
+    this.history.reset();
+    this.markSaved();
     this.workspace.scrollTop = 0;
-    toast(`Opened ${name}`, "ok");
-    return true;
   }
 
   private async save(): Promise<boolean> {
@@ -651,7 +804,7 @@ export class App {
   }
 
   private async saveAs(): Promise<boolean> {
-    const dir = localStorage.getItem("bitviewer.lastDir") ?? (await P.defaultDir());
+    const dir = S.get("last_dir") || (await P.defaultDir());
     const start = this.path ?? (dir ? P.joinPath(dir, "workspace.bitview.json") : "workspace.bitview.json");
     let path = await P.pickSavePath(start);
     if (!path) return false;
@@ -660,6 +813,7 @@ export class App {
   }
 
   private async write(path: string): Promise<boolean> {
+    this.history.flush();
     const data = { app: "bitviewer", version: FILE_VERSION, values: this.cards.map((c) => c.model.toJSON()) };
     try {
       await P.writeText(path, JSON.stringify(data, null, 2));
@@ -670,15 +824,16 @@ export class App {
     this.path = P.isTauri ? path : null;
     this.fileName = P.basename(path);
     this.rememberDir(path);
-    this.setDirty(false);
+    if (P.isTauri) S.addRecent(path);
+    this.markSaved();
+    void saveSessionNow(this.sessionData());
     toast(`Saved ${this.fileName}`, "ok");
     return true;
   }
 
-  private rememberDir(path: string | null) {
-    if (!path) return;
+  private rememberDir(path: string) {
     const i = Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"));
-    if (i > 0) localStorage.setItem("bitviewer.lastDir", path.slice(0, i));
+    if (i > 0) S.set("last_dir", path.slice(0, i));
   }
 
   private fail(title: string, e: unknown, where = "") {

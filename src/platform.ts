@@ -122,10 +122,12 @@ export async function isMaximized(): Promise<boolean> {
 export async function onResized(cb: () => void) {
   if (isTauri) await (await win()).onResized(cb);
 }
-/** Close button / Alt+F4. `canClose` decides; returning false keeps the window open. */
-export async function guardClose(canClose: () => Promise<boolean>) {
+/** Close button / Alt+F4. `canClose` decides; returning false keeps the window open.
+ *  In the browser preview a page can't wait for a dialog, so `onUnload` runs
+ *  instead (the session auto-save keeps the work). */
+export async function guardClose(canClose: () => Promise<boolean>, onUnload: () => void) {
   if (!isTauri) {
-    window.addEventListener("beforeunload", (e) => e.preventDefault());
+    window.addEventListener("pagehide", onUnload);
     return;
   }
   const w = await win();
@@ -140,4 +142,33 @@ export async function closeWindow() {
 
 export async function copyText(text: string): Promise<void> {
   await navigator.clipboard.writeText(text);
+}
+
+// ------------------------------------------------------------------ app files
+// Small files in the app's own folders: "config" for settings, "data" for the
+// session / autosave. In the browser they live in localStorage instead.
+export type AppDir = "config" | "data";
+
+export async function readAppFile(dir: AppDir, name: string): Promise<string | null> {
+  if (!isTauri) return localStorage.getItem(`bitviewer.app.${dir}.${name}`);
+  const { invoke } = await core();
+  return invoke<string | null>("read_app_file", { dir, name });
+}
+
+export async function writeAppFile(dir: AppDir, name: string, contents: string): Promise<void> {
+  if (!isTauri) {
+    localStorage.setItem(`bitviewer.app.${dir}.${name}`, contents);
+    return;
+  }
+  const { invoke } = await core();
+  await invoke("write_app_file", { dir, name, contents });
+}
+
+export async function deleteAppFile(dir: AppDir, name: string): Promise<void> {
+  if (!isTauri) {
+    localStorage.removeItem(`bitviewer.app.${dir}.${name}`);
+    return;
+  }
+  const { invoke } = await core();
+  await invoke("delete_app_file", { dir, name });
 }

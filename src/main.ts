@@ -6,6 +6,9 @@ import { installMenus, installTooltips } from "./ui";
 
 installTooltips();
 installMenus();
+
+import { S } from "./settings";
+
 const app = new App(document.getElementById("app")!);
-app.start();
+S.load().then(() => app.start());
 if (import.meta.env.DEV) (window as any).__app = app; // for scripted UI checks
