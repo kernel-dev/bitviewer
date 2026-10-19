@@ -6,6 +6,7 @@ import {
   FilePlus,
   FolderOpen,
   Info,
+  LayoutTemplate,
   LogOut,
   Maximize,
   Minimize,
@@ -34,6 +35,7 @@ import { CommandRegistry } from "./commands";
 import { showAbout, showControls } from "./dialogs/help";
 import { newValueFromExpression } from "./dialogs/newvalue";
 import { openSettings } from "./dialogs/settings";
+import { pickTemplate } from "./dialogs/templates";
 import { pickWidth } from "./dialogs/width";
 import { History } from "./history";
 import { logoSvg } from "./logo";
@@ -181,6 +183,14 @@ export class App {
       },
       { id: "sel.clear", group: "Edit", label: "Clear selection", keys: ["Esc"], run: () => this.clearSelections() },
       {
+        id: "value.fromTemplate",
+        group: "Edit",
+        label: "Add value from template…",
+        icon: LayoutTemplate,
+        keywords: "float ieee rgb ipv4 layout fields preset",
+        run: () => this.addFromTemplate(),
+      },
+      {
         id: "value.fromExpr",
         group: "Edit",
         label: "New value from expression…",
@@ -273,6 +283,7 @@ export class App {
           "value.add64",
           "value.addCustom",
           "value.fromExpr",
+          "value.fromTemplate",
           "sep",
           "sel.group",
           "sel.clear",
@@ -660,6 +671,15 @@ export class App {
     if (width === null) return;
     S.set("last_width", width);
     this.addValue(width);
+  }
+
+  private async addFromTemplate() {
+    const t = await pickTemplate("Add value from template", "Add value");
+    if (!t) return;
+    const card = this.addValue(t.width);
+    card.model.setName(t.name);
+    card.model.applyTemplate(t);
+    card.rebuild();
   }
 
   /** A value by name for expressions. Case, spaces and underscores don't matter. */

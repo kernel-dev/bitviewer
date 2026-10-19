@@ -6,6 +6,7 @@
 // span rows.
 
 import { BASE_ORDER, type Base, isBase, maxValue } from "./numfmt";
+import type { Template } from "./templates";
 
 export const GROUP_COLORS = ["#f59f00", "#2fb344", "#ae3ec9", "#15aabf", "#4c6ef5", "#82c91e", "#f76707", "#868e96"];
 export type View = "line" | "byte" | "nibble";
@@ -108,7 +109,42 @@ export function applyOp(op: Op, v: bigint, width: number, arg = 1n): bigint {
   throw new ModelError(`Unknown operation ${op}`);
 }
 
-export class Group {
+/** read-write, read-only, or reserved (don't touch). */
+export type Access = "rw" | "ro" | "reserved";
+
+/** A named value of a field, e.g. MODE 1 = "Auto". */
+export interface NamedValue {
+  value: bigint;
+  label: string;
+}
+
+/** Optional details of a field; everything defaults to "plain unsigned number". */
+export interface FieldDetails {
+  signed: boolean;
+  formula: string; // real expression in x (the raw or signed value), e.g. "x * 0.5 - 40"
+  unit: string;
+  named: NamedValue[];
+  description: string;
+  access: Access;
+}
+
+export const DEFAULT_DETAILS: FieldDetails = {
+  signed: false,
+  formula: "",
+  unit: "",
+  named: [],
+  description: "",
+  access: "rw",
+};
+
+export class Group implements FieldDetails {
+  signed = false;
+  formula = "";
+  unit = "";
+  named: NamedValue[] = [];
+  description = "";
+  access: Access = "rw";
+
   constructor(
     public lo: number,
     public hi: number,
@@ -125,9 +161,65 @@ export class Group {
   label(): string {
     return this.width > 1 ? `[${this.hi}:${this.lo}]` : `[${this.lo}]`;
   }
-  toJSON() {
-    return { lo: this.lo, hi: this.hi, name: this.name, color: this.color, base: this.base };
+  get protected(): boolean {
+    return this.access !== "rw";
   }
+  /** The label of a named value, if `raw` has one. */
+  nameOf(raw: bigint): string | undefined {
+    return this.named.find((n) => n.value === raw)?.label;
+  }
+  details(): FieldDetails {
+    return {
+      signed: this.signed,
+      formula: this.formula,
+      unit: this.unit,
+      named: this.named.map((n) => ({ ...n })),
+      description: this.description,
+      access: this.access,
+    };
+  }
+  /** Only non-default details are written, so plain fields stay compact. */
+  toJSON() {
+    const out: Record<string, unknown> = {
+      lo: this.lo,
+      hi: this.hi,
+      name: this.name,
+      color: this.color,
+      base: this.base,
+    };
+    if (this.signed) out.signed = true;
+    if (this.formula) out.formula = this.formula;
+    if (this.unit) out.unit = this.unit;
+    if (this.named.length) out.named = this.named.map((n) => ({ value: n.value.toString(), label: n.label }));
+    if (this.description) out.description = this.description;
+    if (this.access !== "rw") out.access = this.access;
+    return out;
+  }
+}
+
+/** Reads the optional field details from JSON, ignoring anything malformed. */
+export function detailsFromJSON(d: any): Partial<FieldDetails> {
+  const out: Partial<FieldDetails> = {};
+  if (d?.signed === true) out.signed = true;
+  if (typeof d?.formula === "string") out.formula = d.formula;
+  if (typeof d?.unit === "string") out.unit = d.unit;
+  if (typeof d?.description === "string") out.description = d.description;
+  if (d?.access === "ro" || d?.access === "reserved") out.access = d.access;
+  if (Array.isArray(d?.named)) {
+    out.named = [];
+    for (const n of d.named) {
+      try {
+        if (typeof n?.label === "string") out.named.push({ value: toBig(n.value), label: n.label });
+      } catch {
+        /* skip a malformed entry */
+      }
+    }
+  }
+  return out;
+}
+
+function toSignedBits(v: bigint, width: number): bigint {
+  return (v >> BigInt(width - 1)) & 1n ? v - (1n << BigInt(width)) : v;
 }
 
 function checkWidth(w: number): void {
@@ -428,6 +520,25 @@ export class ValueModel {
   }
   /** Opens a compare row on every row, filled with the bits of `other`
    *  (e.g. another value, or a snapshot). Bits above this width are dropped. */
+  /** Replaces all fields with a template's. Call only with the user's go-ahead:
+   *  it removes the current fields. Refuses if a template field doesn't fit. */
+  applyTemplate(t: Template): void {
+    const tooWide = t.fields.filter((f) => f.hi >= this.width);
+    if (tooWide.length) throw new ModelError(`The template needs ${t.width} bits; this value has ${this.width}`);
+    const old = this.groups;
+    this.groups = [];
+    try {
+      for (const f of t.fields) {
+        const g = this.addGroupQuiet(f.lo, f.hi, f.name, f.color, isBase(f.base) ? f.base : undefined);
+        Object.assign(g, detailsFromJSON(f));
+      }
+    } catch (e) {
+      this.groups = old; // all or nothing
+      throw e;
+    }
+    this.emit("groups");
+  }
+
   compareWith(other: bigint): void {
     for (const lo of this.rowLos()) {
       this.compares.set(lo, (other >> BigInt(lo)) & maxValue(this.rowWidthAt(lo)));
@@ -486,6 +597,12 @@ export class ValueModel {
     return GROUP_COLORS.find((c) => !used.has(c)) ?? GROUP_COLORS[this.groups.length % GROUP_COLORS.length];
   }
   addGroup(lo: number, hi: number, name?: string, color?: string, base?: Base): Group {
+    const g = this.addGroupQuiet(lo, hi, name, color, base);
+    this.emit("groups");
+    return g;
+  }
+  /** addGroup without the change notification (for batch updates). */
+  private addGroupQuiet(lo: number, hi: number, name?: string, color?: string, base?: Base): Group {
     [lo, hi] = [Math.min(lo, hi), Math.max(lo, hi)];
     if (lo < 0 || hi >= this.width) throw new ModelError("Group outside the value");
     const clash = this.overlapping(lo, hi);
@@ -502,7 +619,6 @@ export class ValueModel {
     );
     this.groups.push(g);
     this.groups.sort((a, b) => b.hi - a.hi);
-    this.emit("groups");
     return g;
   }
   removeGroup(g: Group): void {
@@ -527,6 +643,16 @@ export class ValueModel {
       changed = true;
     }
     if (changed) this.emit("group_meta");
+  }
+  /** Replaces a field's details (signedness, formula, named values, …). */
+  setGroupDetails(g: Group, details: Partial<FieldDetails>): void {
+    Object.assign(g, details);
+    this.emit("groups"); // the fields panel shows these, so rebuild it
+  }
+  /** Value of a field as a number: two's complement when the field is signed. */
+  groupNumber(g: Group): bigint {
+    const raw = this.groupValue(g);
+    return g.signed && g.width > 1 ? toSignedBits(raw, g.width) : raw;
   }
   groupValue(g: Group): bigint {
     return this.bitsValue(g.lo, g.width);
@@ -585,7 +711,14 @@ export class ValueModel {
     }
     for (const gd of d.groups ?? []) {
       if (gd?.lo === undefined || gd?.hi === undefined) throw new ModelError("Invalid group entry");
-      m.addGroup(Number(gd.lo), Number(gd.hi), String(gd.name ?? ""), gd.color, checkBase(Number(gd.base ?? 16)));
+      const g = m.addGroup(
+        Number(gd.lo),
+        Number(gd.hi),
+        String(gd.name ?? ""),
+        gd.color,
+        checkBase(Number(gd.base ?? 16)),
+      );
+      Object.assign(g, detailsFromJSON(gd));
     }
     return m;
   }

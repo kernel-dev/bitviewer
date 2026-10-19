@@ -4,6 +4,7 @@
 import type { View } from "./model";
 import { BASE_ORDER, type Base } from "./numfmt";
 import { isTauri, readAppFile, writeAppFile } from "./platform";
+import { type Template, validTemplate } from "./templates";
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 3.0;
@@ -24,6 +25,7 @@ export interface Settings {
   last_width: number; // last custom width picked
   recent_files: string[]; // most recent first
   readout_chips: string[]; // which readout chips show under each value (stats.ts CHIPS ids)
+  templates: Template[]; // the user's own field layout templates
 }
 
 const DEFAULTS: Settings = {
@@ -40,6 +42,7 @@ const DEFAULTS: Settings = {
   last_width: 16,
   recent_files: [],
   readout_chips: ["u", "s", "pop", "float"],
+  templates: [],
 };
 
 const FILE = "settings.json";
@@ -58,7 +61,9 @@ function merge(into: Settings, raw: unknown) {
     const v = r[k];
     const d = DEFAULTS[k];
     if (v === undefined) continue;
-    if (Array.isArray(d)) {
+    if (k === "templates") {
+      if (Array.isArray(v)) into.templates = v.map(validTemplate).filter((t): t is Template => t !== null);
+    } else if (Array.isArray(d)) {
       if (Array.isArray(v) && v.every((x) => typeof x === "string")) (into as any)[k] = v;
     } else if (typeof v === typeof d) (into as any)[k] = v;
   }

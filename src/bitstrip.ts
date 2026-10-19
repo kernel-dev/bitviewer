@@ -16,6 +16,8 @@ export interface StripHost {
   updateDrag(bit: number): void;
   extendSelection(bit: number): void;
   clearSelection(): void;
+  /** Flips a bit of the value (the host may ask first for protected fields). */
+  flipBit(bit: number): void;
   bitTip(bit: number, lo: number, compare: boolean): string;
   openRowMenu(lo: number, compare: boolean, bit: number | null, at: { x: number; y: number }): void;
   root: HTMLElement;
@@ -181,6 +183,7 @@ export class BitStrip {
       el.classList.toggle("on", !!on);
       const g = m.groupAt(b);
       el.classList.toggle("grouped", !!g);
+      el.classList.toggle("locked", !!g?.protected);
       if (g) el.style.setProperty("--g", g.color);
       el.classList.toggle("sel", !!sel && sel[0] <= b && b <= sel[1]);
       if (this.compare) el.classList.toggle("diff", on !== Number((parentRow >> BigInt(b - this.lo)) & 1n));
@@ -230,8 +233,7 @@ export class BitStrip {
         play(host.model.compareBit(this.lo, b) ? "bitOn" : "bitOff");
       } else {
         host.clearSelection();
-        host.model.flipBit(b);
-        play(host.model.bit(b) ? "bitOn" : "bitOff");
+        host.flipBit(b);
       }
     };
     document.addEventListener("pointermove", move);

@@ -5,6 +5,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Binary,
+  BookmarkPlus,
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
@@ -12,10 +13,13 @@ import {
   Copy,
   CopyPlus,
   Ellipsis,
+  FileCode2,
   GitCompareArrows,
   Group as GroupIcon,
   type IconNode,
   Layers,
+  LayoutTemplate,
+  Lock,
   MousePointerClick,
   Palette,
   PencilLine,
@@ -23,6 +27,7 @@ import {
   Rows3,
   Rows4,
   Ruler,
+  SlidersVertical,
   SquareFunction,
   Tag,
   Trash,
@@ -31,9 +36,15 @@ import {
 } from "lucide";
 import { BitStrip, type StripHost } from "./bitstrip";
 import { copyBytesMenu, pasteBytes } from "./dialogs/bytes";
+import { exportCode } from "./dialogs/export";
+import { editField } from "./dialogs/field";
+import { pickTemplate, saveTemplate } from "./dialogs/templates";
+import { ExprError } from "./expr";
 import { expressionBar } from "./exprbar";
+import { decodeField, isInvertible, rawFromNumber } from "./fieldfmt";
+import { parseFloatText } from "./formats";
 import { type ChangeKind, GROUP_COLORS, type Group, ModelError, type Op, type ValueModel, type View } from "./model";
-import { BASE_NAMES, BASE_ORDER, type Base, formatInt, popcount } from "./numfmt";
+import { BASE_NAMES, BASE_ORDER, type Base, formatInt, ParseError, popcount } from "./numfmt";
 import { moreOpsMenu } from "./ops-ui";
 import { copyText } from "./platform";
 import { SelectionBar } from "./selbar";
@@ -99,6 +110,20 @@ function baseSeg(base: Base, onPick: (b: Base) => void, cls = "sm"): Segmented<B
   );
 }
 
+interface FieldUi {
+  g: Group;
+  edit: NumberInput;
+  seg: Segmented<Base>;
+  decoded?: HTMLElement;
+  named?: HTMLButtonElement;
+}
+
+/** "21.5 °C" → "21.5" when the unit is "°C". */
+function stripUnit(text: string, unit: string): string {
+  const t = text.trim();
+  return unit && t.endsWith(unit) ? t.slice(0, -unit.length).trim() : t;
+}
+
 export class ValueCard implements StripHost {
   root: HTMLElement;
   sel: [number, number] | null = null;
@@ -113,7 +138,7 @@ export class ValueCard implements StripHost {
   private cmpEdits = new Map<number, NumberInput>();
   private cmpReadouts = new Map<number, HTMLElement>();
   private cmpBases = new Map<number, HTMLElement>();
-  private groupEdits: [Group, NumberInput, Segmented<Base>][] = [];
+  private fieldUis: FieldUi[] = [];
   private baseEdits = new Map<Base, NumberInput>();
   private fullBase!: Segmented<Base>;
   private fullEdit!: NumberInput;
@@ -263,6 +288,15 @@ export class ValueCard implements StripHost {
             icon: SquareFunction,
             action: () => this.toggleExpr(),
           },
+          "sep",
+          { label: "Apply template…", icon: LayoutTemplate, action: () => this.applyTemplate() },
+          {
+            label: "Save fields as template…",
+            icon: BookmarkPlus,
+            disabled: !m.groups.length,
+            action: () => this.saveAsTemplate(),
+          },
+          { label: "Export code…", icon: FileCode2, action: () => this.exportCode() },
           "sep",
           { label: "Paste bytes…", icon: ClipboardPaste, action: () => this.pasteBytes() },
           {
@@ -566,7 +600,7 @@ export class ValueCard implements StripHost {
   // ------------------------------------------------------------ fields & stats
   private buildFields(): HTMLElement {
     const m = this.model;
-    this.groupEdits = [];
+    this.fieldUis = [];
     const head = h(
       "div",
       { class: "fields-head" },
@@ -580,42 +614,136 @@ export class ValueCard implements StripHost {
             { class: "muted small hint" },
             "Drag across bits (or click a row label, then Shift+click another) and press “Group selection”. Fields may span rows; they cannot overlap.",
           ),
+      h("div", { class: "spacer" }),
+      button({
+        icon: LayoutTemplate,
+        label: "Templates",
+        cls: "ghost sm",
+        tip: "Apply a field layout (IEEE-754, RGB565, IPv4, your own…)",
+        onClick: () => this.applyTemplate(),
+      }),
     );
     const list = h("div", { class: "fields-list" });
-    for (const g of m.groups) {
-      const sw = h("button", { type: "button", class: "swatch", style: `--g:${g.color}`, tip: "Change colour" });
-      sw.addEventListener("click", () => this.pickColor(g, sw));
-      const name = h("input", { class: "field", value: g.name, placeholder: "Field name", spellcheck: false });
-      name.addEventListener("input", () => m.updateGroup(g, { name: name.value }));
-      const seg = baseSeg(g.base, (b) => m.updateGroup(g, { base: b }), "xs");
-      const edit = new NumberInput(g.width, g.base, (v) => m.setGroupValue(g, v), { cls: "group-edit" });
-      edit.el.style.setProperty("--chars", String(Math.min(Math.max(g.width, 4), 34)));
-      this.groupEdits.push([g, edit, seg]);
-      list.append(
-        h(
-          "div",
-          { class: "field-row" },
-          sw,
-          name,
-          h("span", { class: "muted mono small range" }, `${g.label()} · ${g.width} bit${g.width > 1 ? "s" : ""}`),
-          seg.el,
-          edit.el,
-          button({
-            icon: MousePointerClick,
-            cls: "ghost sm",
-            tip: "Select this field's bits",
-            onClick: () => this.setSelection(g.lo, g.hi),
-          }),
-          button({
-            icon: Trash,
-            cls: "ghost danger sm",
-            tip: "Remove this field",
-            onClick: () => this.removed(() => m.removeGroup(g)),
-          }),
+    for (const g of m.groups) list.append(this.buildFieldRow(g));
+    return h("div", { class: `fields${m.groups.length ? "" : " no-fields"}` }, head, m.groups.length ? list : null);
+  }
+
+  private buildFieldRow(g: Group): HTMLElement {
+    const m = this.model;
+    const sw = h("button", { type: "button", class: "swatch", style: `--g:${g.color}`, tip: "Change colour" });
+    sw.addEventListener("click", () => this.pickColor(g, sw));
+    const name = h("input", { class: "field", value: g.name, placeholder: "Field name", spellcheck: false });
+    name.addEventListener("input", () => m.updateGroup(g, { name: name.value }));
+    if (g.description) setTip(name, g.description);
+    const seg = baseSeg(g.base, (b) => m.updateGroup(g, { base: b }), "xs");
+    const edit = new NumberInput(g.width, g.base, (v) => m.setGroupValue(g, v), { cls: "group-edit" });
+    edit.el.style.setProperty("--chars", String(Math.min(Math.max(g.width, 4), 34)));
+    const ui: FieldUi = { g, edit, seg };
+
+    // the field's meaning: signed number / formula result with unit
+    let decoded: HTMLElement | null = null;
+    if (g.signed || g.formula || g.unit) {
+      if (isInvertible(g)) {
+        const input = h("input", {
+          class: "field mono decoded-edit",
+          spellcheck: false,
+          tip: "Type a value to set the raw bits",
+        });
+        const commit = () => {
+          if (input.dataset.dirty !== "1") return;
+          input.dataset.dirty = "";
+          try {
+            const y = parseFloatText(stripUnit(input.value, g.unit));
+            m.setGroupValue(g, rawFromNumber(g, y));
+            input.classList.remove("invalid");
+          } catch (e) {
+            if (!(e instanceof ExprError || e instanceof ParseError)) throw e;
+            input.classList.add("invalid");
+            play("error");
+            toast(e.message, "error");
+          }
+        };
+        input.addEventListener("input", () => {
+          input.dataset.dirty = "1";
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            input.dataset.dirty = "";
+            input.blur();
+          }
+        });
+        input.addEventListener("blur", () => {
+          commit();
+          this.refresh();
+        });
+        ui.decoded = input;
+        decoded = h("span", { class: "decoded" }, input, g.unit ? h("span", { class: "muted small" }, g.unit) : null);
+      } else {
+        const span = h("span", {
+          class: "decoded-ro mono",
+          tip: "Not linear, so it can't be typed in; edit the raw value",
+        });
+        ui.decoded = span;
+        decoded = span;
+      }
+    }
+    // named values
+    let named: HTMLButtonElement | null = null;
+    if (g.named.length) {
+      named = h("button", { type: "button", class: "btn outline sm named-pick", tip: "Pick a named value" });
+      named.addEventListener("click", () =>
+        openMenu(
+          g.named.map((n) => ({
+            label: `${n.label}  ·  ${formatInt(n.value, g.base, g.width, { prefix: true })}`,
+            checked: m.groupValue(g) === n.value,
+            action: () => {
+              m.setGroupValue(g, n.value);
+              play("toggle");
+            },
+          })),
+          named as HTMLButtonElement,
         ),
       );
+      ui.named = named;
     }
-    return h("div", { class: `fields${m.groups.length ? "" : " no-fields"}` }, head, m.groups.length ? list : null);
+    this.fieldUis.push(ui);
+    return h(
+      "div",
+      { class: `field-row${g.protected ? " protected" : ""}` },
+      sw,
+      name,
+      h(
+        "span",
+        { class: "muted mono small range" },
+        g.protected ? icon(Lock, 12, "lock") : null,
+        `${g.label()} · ${g.width} bit${g.width > 1 ? "s" : ""}`,
+      ),
+      seg.el,
+      edit.el,
+      decoded,
+      named,
+      h("div", { class: "spacer" }),
+      button({
+        icon: SlidersVertical,
+        cls: "ghost sm",
+        tip: "Field details: description, signed, formula & unit, named values, access",
+        onClick: () => this.editFieldDetails(g),
+      }),
+      button({
+        icon: MousePointerClick,
+        cls: "ghost sm",
+        tip: "Select this field's bits",
+        onClick: () => this.setSelection(g.lo, g.hi),
+      }),
+      button({
+        icon: Trash,
+        cls: "ghost danger sm",
+        tip: "Remove this field",
+        onClick: () => this.removed(() => m.removeGroup(g)),
+      }),
+    );
   }
 
   /** The value in every base, each line editable and copyable. */
@@ -690,6 +818,99 @@ export class ValueCard implements StripHost {
     }
   }
 
+  // ------------------------------------------------------------ field features
+  /** Fields the user already agreed to change this session. */
+  private unlocked = new WeakSet<Group>();
+
+  /** Flips a bit; for read-only / reserved fields, asks first (once per field per session). */
+  async flipBit(bit: number) {
+    const m = this.model;
+    const g = m.groupAt(bit);
+    if (g?.protected && !this.unlocked.has(g)) {
+      play("error");
+      const kind = g.access === "ro" ? "read-only" : "reserved";
+      const r = await ask(
+        `Change a ${kind} field?`,
+        `Bit ${bit} belongs to “${g.name}” ${g.label()}, which is marked ${kind}.` +
+          (g.description ? `\n\n${g.description}` : ""),
+        [
+          { id: "cancel", label: "Cancel" },
+          { id: "always", label: "Allow for this field", cls: "outline" },
+          { id: "once", label: "Change it", cls: "primary" },
+        ],
+      );
+      if (r === "cancel") return;
+      if (r === "always") this.unlocked.add(g);
+    }
+    m.flipBit(bit);
+    play(m.bit(bit) ? "bitOn" : "bitOff");
+  }
+
+  private async editFieldDetails(g: Group) {
+    const d = await editField(g);
+    if (d) {
+      this.model.setGroupDetails(g, d);
+      play("toggle");
+    }
+  }
+
+  private async applyTemplate() {
+    const m = this.model;
+    const t = await pickTemplate(`Apply a template to “${m.name || "value"}”`, "Apply");
+    if (!t) return;
+    if (t.width > m.width) {
+      const r = await ask(
+        "Template is wider",
+        `“${t.name}” is ${t.width} bits wide; this value has ${m.width}. Widen the value to ${t.width} bits?`,
+        [
+          { id: "cancel", label: "Cancel" },
+          { id: "yes", label: `Widen to ${t.width} bits`, cls: "primary" },
+        ],
+      );
+      if (r !== "yes") return;
+      m.setWidth(t.width);
+    }
+    if (m.groups.length) {
+      // replacing named fields is only ever done with the user's explicit go-ahead
+      const r = await ask(
+        "Replace fields?",
+        `This removes the current field${m.groups.length > 1 ? "s" : ""} (${m.groups.map((g) => g.name).join(", ")}) ` +
+          `and applies “${t.name}”. You can undo this with Ctrl+Z.`,
+        [
+          { id: "cancel", label: "Cancel" },
+          { id: "yes", label: "Replace fields", cls: "danger-btn" },
+        ],
+      );
+      if (r !== "yes") return;
+    }
+    try {
+      m.applyTemplate(t);
+      play("group");
+    } catch (e) {
+      if (!(e instanceof ModelError)) throw e;
+      toast(e.message, "error");
+    }
+  }
+
+  private async saveAsTemplate() {
+    const m = this.model;
+    if (!m.groups.length) {
+      toast("Create some fields first", "error");
+      return;
+    }
+    const name = await prompt("Save fields as template", "Template name", m.name || "My register", BookmarkPlus);
+    if (!name?.trim()) return;
+    saveTemplate({
+      name: name.trim(),
+      width: m.width,
+      fields: m.groups.map((g) => g.toJSON() as never),
+    });
+  }
+
+  private exportCode() {
+    void exportCode(this.model);
+  }
+
   // ================================================================ refresh
   refresh() {
     const m = this.model;
@@ -729,10 +950,21 @@ export class ValueCard implements StripHost {
       edit.setFormat(m.width, edit.base);
       edit.setValue(m.value);
     }
-    for (const [g, edit, seg] of this.groupEdits) {
-      seg.set(g.base);
-      edit.setFormat(g.width, g.base);
-      edit.setValue(m.groupValue(g));
+    for (const f of this.fieldUis) {
+      const raw = m.groupValue(f.g);
+      f.seg.set(f.g.base);
+      f.edit.setFormat(f.g.width, f.g.base);
+      f.edit.setValue(raw);
+      if (f.decoded) {
+        const d = decodeField(f.g, raw);
+        if (f.decoded instanceof HTMLInputElement) {
+          if (document.activeElement !== f.decoded) {
+            f.decoded.value = d.error ? "?" : stripUnit(d.text, f.g.unit);
+            f.decoded.classList.toggle("invalid", !!d.error);
+          }
+        } else f.decoded.textContent = d.error ? `⚠ ${d.error}` : d.text;
+      }
+      if (f.named) f.named.textContent = f.g.nameOf(raw) ?? "—";
     }
     this.statsBar.update();
     this.updateSelUi();
@@ -978,7 +1210,15 @@ export class ValueCard implements StripHost {
       lines.push(`Bit ${b} (compare) = ${cv}` + (cv === pv ? "" : `   ≠ parent ${pv}`));
     } else lines.push(`Bit ${b} = ${m.bit(b)}`);
     const g = m.groupAt(b);
-    if (g) lines.push(`${g.name} ${g.label()} = ${formatInt(m.groupValue(g), g.base, g.width, { prefix: true })}`);
+    if (g) {
+      const raw = m.groupValue(g);
+      const extra = [decodeField(g, raw).text, g.nameOf(raw)].filter(Boolean).join(" · ");
+      lines.push(
+        `${g.name} ${g.label()} = ${formatInt(raw, g.base, g.width, { prefix: true })}${extra ? `  (${extra})` : ""}`,
+      );
+      if (g.access !== "rw") lines.push(g.access === "ro" ? "🔒 read-only field" : "🔒 reserved field");
+      if (g.description) lines.push(g.description);
+    }
     if (!compare) lines.push("Click: flip · Drag: select · Shift+click: extend");
     return lines.join("\n");
   }
