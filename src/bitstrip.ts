@@ -42,6 +42,7 @@ export class BitStrip {
   el: HTMLElement;
   private cells = new Map<number, HTMLElement>();
   private perLine = 0;
+  private sizer = h("div", { class: "strip-sizer", "aria-hidden": "true" });
 
   /** Bits per visual line (for moving the keyboard cursor up/down). */
   get lineBits(): number {
@@ -62,8 +63,13 @@ export class BitStrip {
       e.preventDefault();
       host.openRowMenu(lo, compare, this.bitOf(e.target), { x: e.clientX, y: e.clientY });
     });
+    // Watch a zero-height sizer rather than the strip: building the bits
+    // changes the strip's height, which (if observed) makes the browser report
+    // a ResizeObserver loop. The sizer only changes with the available width,
+    // so layout can run right away and the bits never flash empty.
+    this.el.append(this.sizer);
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(this.el);
+    this.ro.observe(this.sizer);
   }
 
   /** Bits in this row (the top byte/nibble row can be short). */
@@ -101,7 +107,7 @@ export class BitStrip {
   }
 
   private layout() {
-    const avail = this.el.clientWidth;
+    const avail = this.sizer.clientWidth;
     if (!avail) return;
     const opts = this.lineOptions();
     const per = opts.find((k) => (avail - this.fixedSpace(k)) / k >= MIN_CELL) ?? opts[opts.length - 1];
@@ -116,7 +122,7 @@ export class BitStrip {
   private build(perLine: number) {
     this.perLine = perLine;
     this.cells.clear();
-    this.el.replaceChildren();
+    this.el.replaceChildren(this.sizer);
     this.lines = [];
     const n = this.n;
     const top = this.lo + n - 1;

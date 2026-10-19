@@ -9,3 +9,7 @@ src-tauri/gen/
 
 # workspaces saved with the newer extension
 *.bitview
+
+# end-to-end test output
+test-results/
+playwright-report/

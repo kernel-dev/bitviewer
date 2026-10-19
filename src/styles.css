@@ -856,3 +856,4 @@ body.painting, body.painting * { cursor: crosshair !important; }
     repeating-linear-gradient(135deg, transparent 0 4px, rgba(255, 255, 255, 0.22) 4px 6px),
     linear-gradient(180deg, var(--bit-on), var(--bit-on-2));
 }
+.strip-sizer { height: 0; width: 100%; }

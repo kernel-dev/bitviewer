@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src/**", "*.ts", "*.json", "!package-lock.json", "!src-tauri"]
+    "includes": ["src/**", "e2e/**", "*.ts", "*.json", "!package-lock.json", "!src-tauri"]
   },
   "formatter": {
     "enabled": true,

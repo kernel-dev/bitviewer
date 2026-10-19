@@ -15,6 +15,8 @@ export class History {
   private restoring = false;
   private lastInput: Element | null = null;
   private lastTime = 0;
+  /** The text field the pending change came from (null = not typing). */
+  private pendingSrc: HTMLInputElement | null = null;
 
   constructor(
     private take: () => string,
@@ -47,7 +49,14 @@ export class History {
 
   /** Call after any change; the step is recorded once the current event finishes. */
   touch() {
-    if (this.restoring || this.timer) return;
+    if (this.restoring) return;
+    // Where the change came from is decided now, not when it's recorded. (The
+    // app also flushes before each new input/pointer event, so a pending step
+    // never absorbs the start of a different kind of edit.)
+    const active = document.activeElement;
+    const src = active instanceof HTMLInputElement ? active : null;
+    if (this.timer) return;
+    this.pendingSrc = src;
     this.timer = window.setTimeout(() => {
       this.timer = 0;
       this.capture();
@@ -94,8 +103,7 @@ export class History {
     if (this.holds) return;
     const snap = this.take();
     if (snap === this.current) return;
-    const active = document.activeElement;
-    const typing = active instanceof HTMLInputElement ? active : null;
+    const typing = this.pendingSrc;
     const now = performance.now();
     const merge = typing !== null && typing === this.lastInput && now - this.lastTime < TYPING_MERGE_MS;
     if (!merge) {

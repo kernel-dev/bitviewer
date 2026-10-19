@@ -1251,6 +1251,11 @@ export class App {
       if (c) this.activeCard = c;
     };
     document.addEventListener("pointerdown", track, true);
+    // Record any pending undo step before the next edit starts, so that a bit
+    // click followed instantly by typing (or the reverse) stays two steps.
+    // Capture-phase listeners run before the field's or strip's own handlers.
+    document.addEventListener("input", () => this.history.flush(), true);
+    document.addEventListener("pointerdown", () => this.history.flush(), true);
     document.addEventListener("focusin", track);
 
     document.addEventListener("keydown", (e) => {
