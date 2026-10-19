@@ -579,3 +579,44 @@ kbd {
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast[data-kind="ok"] { border-left-color: var(--ok); }
 .toast[data-kind="error"] { border-left-color: var(--accent); }
+
+/* ------------------------------------------------------------ operations */
+.ops-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.more-ops { width: 24px; padding: 0; }
+
+/* ------------------------------------------------------------ selection editor */
+.sel-bar { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.sel-hint { color: var(--faint); font-size: 12px; white-space: nowrap; }
+.sel-range { color: var(--select); font-size: 12px; white-space: nowrap; }
+.sel-edit { width: calc(var(--chars, 6) * 1ch + 24px); height: 26px; border-color: var(--select); }
+.sel-edit:focus { border-color: var(--select); box-shadow: 0 0 0 3px var(--select-soft); }
+@container (max-width: 1000px) { .sel-hint { display: none; } }
+
+/* ------------------------------------------------------------ expressions */
+.expr-bar {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+}
+.expr-icon { color: var(--accent); display: grid; place-items: center; height: 32px; }
+.expr-bar .expr-field { flex: 1; min-width: 0; }
+.expr-bar .btn { margin-top: 3px; }
+.expr-target { white-space: nowrap; line-height: 32px; }
+.expr-field { display: flex; flex-direction: column; gap: 6px; }
+.expr-input { width: 100%; height: 32px; }
+.expr-preview { font-size: 12.5px; min-height: 18px; color: var(--text); user-select: text; word-break: break-all; }
+.expr-eq { color: var(--accent); font-weight: 700; }
+.expr-note { color: var(--select); }
+.expr-error { color: var(--error); font-family: var(--ui); }
+.bytes-area { width: 100%; height: auto; min-height: 72px; padding: 8px 10px; resize: vertical; line-height: 1.5; }
+
+/* ------------------------------------------------------------ readout chips */
+.stat-add { width: 26px; height: 26px; padding: 0; align-self: center; opacity: 0.7; }
+.stat-add:hover { opacity: 1; }
+.stat-edit {
+  border: 0; background: none; padding: 0 2px; border-radius: 4px; cursor: text;
+  font: inherit; font-size: 12.5px; color: inherit;
+}
+.stat-edit:hover { background: var(--surface-3); }
+.stat-detail { color: var(--faint); font-size: 11px; }
+.stat-input { height: 22px; width: 16ch; padding: 0 6px; font-size: 12.5px !important; }
+.menu-check { color: var(--accent); }

@@ -23,6 +23,7 @@ export interface Settings {
   last_dir: string; // folder of the last opened / saved workspace
   last_width: number; // last custom width picked
   recent_files: string[]; // most recent first
+  readout_chips: string[]; // which readout chips show under each value (stats.ts CHIPS ids)
 }
 
 const DEFAULTS: Settings = {
@@ -38,6 +39,7 @@ const DEFAULTS: Settings = {
   last_dir: "",
   last_width: 16,
   recent_files: [],
+  readout_chips: ["u", "s", "pop", "float"],
 };
 
 const FILE = "settings.json";

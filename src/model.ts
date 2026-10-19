@@ -13,7 +13,28 @@ export const MIN_WIDTH = 1;
 export const MAX_WIDTH = 512;
 export const VIEWS: readonly View[] = ["line", "byte", "nibble"];
 const VIEW_WIDTHS: Partial<Record<View, number>> = { byte: 8, nibble: 4 };
-export type Op = "invert" | "clear" | "set" | "shl" | "shr";
+/** Operations on a value / row. Shifts and rotates take an amount (default 1);
+ *  and / or / xor take an operand. */
+export type Op =
+  | "invert"
+  | "clear"
+  | "set"
+  | "shl"
+  | "shr"
+  | "asr"
+  | "rol"
+  | "ror"
+  | "bswap"
+  | "brev"
+  | "neg"
+  | "inc"
+  | "dec"
+  | "and"
+  | "or"
+  | "xor";
+
+/** Operations that need an argument (amount or operand) from the user. */
+export const ARG_OPS = new Set<Op>(["and", "or", "xor"]);
 
 /** Change kinds passed to listeners:
  *  value       bits of the value or a compare row changed
@@ -27,8 +48,16 @@ type Listener = (kind: ChangeKind) => void;
 
 export class ModelError extends Error {}
 
-export function applyOp(op: Op, v: bigint, width: number): bigint {
+/** Applies `op` to a `width`-bit value. `arg` is the shift/rotate amount
+ *  (default 1) or the and/or/xor operand. */
+export function applyOp(op: Op, v: bigint, width: number, arg = 1n): bigint {
   const m = maxValue(width);
+  const w = BigInt(width);
+  v &= m;
+  const amount = () => {
+    if (arg < 0n) throw new ModelError("The amount can't be negative");
+    return arg;
+  };
   switch (op) {
     case "invert":
       return ~v & m;
@@ -37,9 +66,44 @@ export function applyOp(op: Op, v: bigint, width: number): bigint {
     case "set":
       return m;
     case "shl":
-      return (v << 1n) & m;
+      return amount() >= w ? 0n : (v << arg) & m;
     case "shr":
-      return (v & m) >> 1n;
+      return amount() >= w ? 0n : v >> arg;
+    case "asr": {
+      const n = amount() >= w ? w - 1n : arg;
+      const signed = (v >> (w - 1n)) & 1n ? v - (1n << w) : v;
+      return (signed >> n) & m;
+    }
+    case "rol":
+    case "ror": {
+      const n = amount() % w;
+      if (n === 0n) return v;
+      const left = op === "rol" ? n : w - n;
+      return ((v << left) | (v >> (w - left))) & m;
+    }
+    case "bswap": {
+      if (width % 8) throw new ModelError("Swapping bytes needs a width that is a whole number of bytes");
+      let out = 0n;
+      for (let i = 0n; i < w / 8n; i++) out = (out << 8n) | ((v >> (i * 8n)) & 0xffn);
+      return out;
+    }
+    case "brev": {
+      let out = 0n;
+      for (let i = 0n; i < w; i++) out = (out << 1n) | ((v >> i) & 1n);
+      return out;
+    }
+    case "neg":
+      return -v & m;
+    case "inc":
+      return (v + 1n) & m;
+    case "dec":
+      return (v - 1n) & m;
+    case "and":
+      return v & arg & m;
+    case "or":
+      return (v | arg) & m;
+    case "xor":
+      return (v ^ arg) & m;
   }
   throw new ModelError(`Unknown operation ${op}`);
 }
@@ -234,14 +298,19 @@ export class ValueModel {
   }
 
   // ------------------------------------------------------------ operations
-  opValue(op: Op): void {
-    this.setValue(applyOp(op, this.value, this.width));
+  opValue(op: Op, arg?: bigint): void {
+    this.setValue(applyOp(op, this.value, this.width, arg));
   }
-  opRow(lo: number, op: Op): void {
-    this.setRowValue(lo, applyOp(op, this.rowValue(lo), this.rowWidthAt(lo)));
+  opRow(lo: number, op: Op, arg?: bigint): void {
+    this.setRowValue(lo, applyOp(op, this.rowValue(lo), this.rowWidthAt(lo), arg));
   }
-  opCompare(lo: number, op: Op): void {
-    this.setCompare(lo, applyOp(op, this.compareValue(lo), this.rowWidthAt(lo)));
+  opCompare(lo: number, op: Op, arg?: bigint): void {
+    this.setCompare(lo, applyOp(op, this.compareValue(lo), this.rowWidthAt(lo), arg));
+  }
+  /** Applies `op` to the bits lo..hi only (e.g. a selection). */
+  opBits(lo: number, hi: number, op: Op, arg?: bigint): void {
+    const w = hi - lo + 1;
+    this.setBitsValue(lo, w, applyOp(op, this.bitsValue(lo, w), w, arg));
   }
 
   // ------------------------------------------------------------ view / order
@@ -357,6 +426,16 @@ export class ValueModel {
       this.emit("structure");
     }
   }
+  /** Opens a compare row on every row, filled with the bits of `other`
+   *  (e.g. another value, or a snapshot). Bits above this width are dropped. */
+  compareWith(other: bigint): void {
+    for (const lo of this.rowLos()) {
+      this.compares.set(lo, (other >> BigInt(lo)) & maxValue(this.rowWidthAt(lo)));
+      this.hiddenCompares.delete(lo);
+    }
+    this.emit("structure");
+  }
+
   /** Closes a compare row; its value is kept and comes back on reopen. */
   removeCompare(lo: number): void {
     const v = this.compares.get(lo);

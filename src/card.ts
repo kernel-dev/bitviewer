@@ -5,8 +5,10 @@ import {
   ArrowUp,
   ArrowUpDown,
   Binary,
+  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
+  ClipboardPaste,
   Copy,
   CopyPlus,
   Ellipsis,
@@ -21,17 +23,23 @@ import {
   Rows3,
   Rows4,
   Ruler,
+  SquareFunction,
   Tag,
   Trash,
   Undo2,
   X,
 } from "lucide";
 import { BitStrip, type StripHost } from "./bitstrip";
+import { copyBytesMenu, pasteBytes } from "./dialogs/bytes";
+import { expressionBar } from "./exprbar";
 import { type ChangeKind, GROUP_COLORS, type Group, ModelError, type Op, type ValueModel, type View } from "./model";
-import { asFloat, BASE_NAMES, BASE_ORDER, type Base, formatFloat, formatInt, popcount, toSigned } from "./numfmt";
+import { BASE_NAMES, BASE_ORDER, type Base, formatInt, popcount } from "./numfmt";
+import { moreOpsMenu } from "./ops-ui";
 import { copyText } from "./platform";
+import { SelectionBar } from "./selbar";
 import { S } from "./settings";
 import { play } from "./sound";
+import { StatsBar } from "./stats";
 import {
   ask,
   button,
@@ -57,12 +65,13 @@ const VIEW_UI: { value: View; label: string; icon: IconNode; tip: string }[] = [
   { value: "byte", label: "Bytes", icon: Rows3, tip: "One row per byte" },
   { value: "nibble", label: "Nibbles", icon: Rows4, tip: "One row per nibble" },
 ];
+const SEL_NOTE = " — applies to the selection when bits are selected";
 const OPS_UI: { value: Op; label?: string; icon?: IconNode; tip: string }[] = [
-  { value: "invert", label: "NOT", tip: "Invert every bit (bitwise NOT)" },
-  { value: "clear", label: "CLR", tip: "Clear every bit to 0" },
-  { value: "set", label: "SET", tip: "Set every bit to 1" },
-  { value: "shl", icon: ChevronsLeft, tip: "Logical shift left by one bit" },
-  { value: "shr", icon: ChevronsRight, tip: "Logical shift right by one bit" },
+  { value: "invert", label: "NOT", tip: `Invert every bit (bitwise NOT)${SEL_NOTE}` },
+  { value: "clear", label: "CLR", tip: `Clear every bit to 0${SEL_NOTE}` },
+  { value: "set", label: "SET", tip: `Set every bit to 1${SEL_NOTE}` },
+  { value: "shl", icon: ChevronsLeft, tip: `Logical shift left by one bit${SEL_NOTE}` },
+  { value: "shr", icon: ChevronsRight, tip: `Logical shift right by one bit${SEL_NOTE}` },
 ];
 const ROW_OPS: [Op, string][] = [
   ["invert", "Invert bits"],
@@ -77,6 +86,10 @@ export interface CardEvents {
   move(card: ValueCard, delta: number): void;
   duplicate(card: ValueCard): void;
   resize(card: ValueCard): void;
+  /** Value of another card by name, for expressions. */
+  lookup(card: ValueCard, name: string): bigint | undefined;
+  /** The other cards in the workspace. */
+  others(card: ValueCard): ValueCard[];
 }
 
 function baseSeg(base: Base, onPick: (b: Base) => void, cls = "sm"): Segmented<Base> {
@@ -104,11 +117,12 @@ export class ValueCard implements StripHost {
   private baseEdits = new Map<Base, NumberInput>();
   private fullBase!: Segmented<Base>;
   private fullEdit!: NumberInput;
-  private selLabel!: HTMLElement;
+  private selBar: SelectionBar;
   private groupBtn!: HTMLButtonElement;
   private clearSelBtn!: HTMLButtonElement;
-  private stats = new Map<string, HTMLElement>();
-  private statsEl!: HTMLElement;
+  private statsBar: StatsBar;
+  private exprOpen = false;
+  private exprText = "";
   private listener = (k: ChangeKind) => this.onModel(k);
 
   constructor(
@@ -116,8 +130,38 @@ export class ValueCard implements StripHost {
     private events: CardEvents,
   ) {
     this.root = h("section", { class: "card" });
+    this.selBar = new SelectionBar(model);
+    this.statsBar = new StatsBar(model);
     model.subscribe(this.listener);
     this.rebuild();
+  }
+
+  /** Resolves a name in an expression: x / this / value, this card's fields, then other values. */
+  lookup = (name: string): bigint | undefined => {
+    const m = this.model;
+    const n = name.trim().toLowerCase();
+    if (["x", "this", "value", "v"].includes(n)) return m.value;
+    const g = m.groups.find((f) => f.name.toLowerCase() === n);
+    if (g) return m.groupValue(g);
+    return this.events.lookup(this, name);
+  };
+
+  /** Width that operations act on: the selection, or the whole value. */
+  private get opWidth(): number {
+    return this.sel ? this.sel[1] - this.sel[0] + 1 : this.model.width;
+  }
+
+  /** Runs an operation on the selected bits, or on the whole value when nothing is selected. */
+  private applyOp(op: Op, arg?: bigint) {
+    try {
+      if (this.sel) this.model.opBits(this.sel[0], this.sel[1], op, arg);
+      else this.model.opValue(op, arg);
+      play("op");
+    } catch (e) {
+      if (!(e instanceof ModelError)) throw e;
+      play("error");
+      toast(e.message, "error");
+    }
   }
 
   detach() {
@@ -163,6 +207,7 @@ export class ValueCard implements StripHost {
       ...[
         this.buildHeader(),
         this.buildToolbar(),
+        this.exprOpen ? this.buildExprBar() : null,
         rows,
         this.buildBases(),
         this.buildFields(),
@@ -211,7 +256,36 @@ export class ValueCard implements StripHost {
           { label: "Move down", icon: ArrowDown, action: () => this.events.move(this, +1) },
           { label: "Duplicate", icon: CopyPlus, action: () => this.events.duplicate(this) },
           { label: "Change width…", icon: Ruler, action: () => this.events.resize(this) },
+          "sep",
           { label: m.showBases ? "Hide all bases" : "Show all bases", icon: Binary, action: () => this.toggleBases() },
+          {
+            label: this.exprOpen ? "Hide expression bar" : "Expression bar",
+            icon: SquareFunction,
+            action: () => this.toggleExpr(),
+          },
+          "sep",
+          { label: "Paste bytes…", icon: ClipboardPaste, action: () => this.pasteBytes() },
+          {
+            label: "Copy as bytes",
+            icon: Copy,
+            submenu: copyBytesMenu(
+              () => m.value,
+              m.width,
+              (t) => this.copyText(t),
+            ),
+          },
+          {
+            label: "Compare with",
+            icon: GitCompareArrows,
+            disabled: this.events.others(this).length === 0,
+            submenu: this.events.others(this).map((o) => ({
+              label: `${o.model.name || "(unnamed)"}  ·  ${o.model.width}-bit`,
+              action: () => {
+                m.compareWith(o.model.value);
+                play("toggle");
+              },
+            })),
+          },
           "sep",
           { label: "Remove value", icon: Trash, danger: true, action: () => this.events.remove(this) },
         ],
@@ -262,7 +336,27 @@ export class ValueCard implements StripHost {
         onClick: () => m.setMsbFirst(!m.msbFirst),
       });
     }
-    const ops = segmented(OPS_UI, { checkable: false, onPick: (op) => this.op(() => m.opValue(op)), cls: "ops" });
+    const ops = segmented(OPS_UI, { checkable: false, onPick: (op) => this.applyOp(op), cls: "ops" });
+    const moreOps = button({
+      icon: ChevronDown,
+      cls: "ghost sm more-ops",
+      tip: `More operations: rotate, swap bytes, reverse, negate, AND/OR/XOR…${SEL_NOTE}`,
+    });
+    moreOps.dataset.keepSel = "";
+    moreOps.addEventListener("click", () =>
+      openMenu(
+        moreOpsMenu((op, arg) => this.applyOp(op, arg), this.opWidth, this.lookup),
+        moreOps,
+      ),
+    );
+    const expr = button({
+      icon: SquareFunction,
+      cls: `outline expr-toggle${this.exprOpen ? " on" : ""}`,
+      tip: "Expression bar: type a calculation to set the value (or the selected bits)",
+      onClick: () => this.toggleExpr(),
+    });
+    expr.dataset.keepSel = "";
+    ops.el.dataset.keepSel = "";
     const bases = button({
       icon: Binary,
       label: "Bases",
@@ -271,7 +365,6 @@ export class ValueCard implements StripHost {
       onClick: () => this.toggleBases(),
     });
 
-    this.selLabel = h("span", { class: "sel-label mono" });
     this.groupBtn = button({
       icon: GroupIcon,
       label: "Group selection",
@@ -292,12 +385,37 @@ export class ValueCard implements StripHost {
       view.el,
       mid,
       bases,
-      ops.el,
+      h("div", { class: "ops-wrap" }, ops.el, moreOps),
+      expr,
       h("div", { class: "spacer" }),
-      this.selLabel,
+      this.selBar.el,
       this.groupBtn,
       this.clearSelBtn,
     );
+  }
+
+  private buildExprBar(): HTMLElement {
+    return expressionBar({
+      width: () => this.opWidth,
+      lookup: this.lookup,
+      target: () => (this.sel ? `bits [${this.sel[1]}:${this.sel[0]}]` : "value"),
+      text: this.exprText,
+      onText: (s) => {
+        this.exprText = s;
+      },
+      apply: (v) => {
+        if (this.sel) this.model.setBitsValue(this.sel[0], this.opWidth, v);
+        else this.model.setValue(v);
+        play("op");
+      },
+      close: () => this.toggleExpr(false),
+    });
+  }
+
+  toggleExpr(open = !this.exprOpen) {
+    this.exprOpen = open;
+    play("toggle");
+    this.rebuild();
   }
 
   private rowMenuButton(lo: number, compare: boolean): HTMLButtonElement {
@@ -560,23 +678,16 @@ export class ValueCard implements StripHost {
   }
 
   private buildStats(): HTMLElement {
-    const w = this.model.width;
-    const defs: [string, string, string][] = [
-      ["u", `u${w}`, `Unsigned ${w}-bit integer`],
-      ["s", `s${w}`, `Signed ${w}-bit integer (two's complement)`],
-      ["pop", "set bits", "Number of bits set to 1"],
-    ];
-    // IEEE-754 only defines the float view for these widths
-    if (w === 32 || w === 64) defs.push(["float", `float${w}`, `IEEE-754 float${w} interpretation of the bits`]);
-    this.stats.clear();
-    this.statsEl = h("div", { class: "stats" });
-    for (const [k, label, tip] of defs) {
-      const val = h("span", { class: "stat-val mono" });
-      this.stats.set(k, val);
-      this.statsEl.append(h("div", { class: `stat stat-${k}`, tip }, h("span", { class: "stat-label" }, label), val));
+    this.statsBar.build();
+    return this.statsBar.el;
+  }
+
+  private async pasteBytes() {
+    const v = await pasteBytes(this.model.width);
+    if (v !== null) {
+      this.model.setValue(v);
+      play("op");
     }
-    this.statsEl.hidden = !S.get("show_interp");
-    return this.statsEl;
   }
 
   // ================================================================ refresh
@@ -623,7 +734,7 @@ export class ValueCard implements StripHost {
       edit.setFormat(g.width, g.base);
       edit.setValue(m.groupValue(g));
     }
-    if (S.get("show_interp")) this.updateStats();
+    this.statsBar.update();
     this.updateSelUi();
   }
 
@@ -631,15 +742,6 @@ export class ValueCard implements StripHost {
     const parts = [formatInt(v, 16, w, { prefix: true }), v.toString(), formatInt(v, 8, w, { prefix: true })];
     if (w === 8 && v >= 0x20n && v < 0x7fn) parts.push(`'${String.fromCharCode(Number(v))}'`);
     return parts.join(" · ");
-  }
-
-  private updateStats() {
-    const { width: w, value: v } = this.model;
-    this.stats.get("u")!.textContent = v.toString();
-    this.stats.get("s")!.textContent = toSigned(v, w).toString();
-    this.stats.get("pop")!.textContent = String(popcount(v));
-    const fl = this.stats.get("float");
-    if (fl) fl.textContent = formatFloat(asFloat(v, w), w);
   }
 
   // ================================================================ selection
@@ -693,16 +795,7 @@ export class ValueCard implements StripHost {
   }
 
   private updateSelUi() {
-    if (this.sel) {
-      const [lo, hi] = this.sel;
-      const w = hi - lo + 1;
-      const rng = w > 1 ? `[${hi}:${lo}]` : `[${lo}]`;
-      this.selLabel.textContent = `${rng} · ${w} bit${w > 1 ? "s" : ""} = ${formatInt(this.model.bitsValue(lo, w), 16, w, { prefix: true })}`;
-      this.selLabel.classList.add("active");
-    } else {
-      this.selLabel.textContent = "drag across bits to select";
-      this.selLabel.classList.remove("active");
-    }
+    this.selBar.update(this.sel);
     this.groupBtn.disabled = !this.sel;
     this.clearSelBtn.hidden = !this.sel;
   }
@@ -780,7 +873,10 @@ export class ValueCard implements StripHost {
   }
 
   private copy(v: bigint, base: Base, width: number) {
-    const text = formatInt(v, base, width, { prefix: true });
+    this.copyText(formatInt(v, base, width, { prefix: true }));
+  }
+
+  private copyText(text: string) {
     copyText(text).then(
       () => {
         play("copy");
@@ -837,9 +933,9 @@ export class ValueCard implements StripHost {
       }
       items.push("sep");
     }
-    for (const [op, text] of ROW_OPS) {
-      items.push({ label: text, action: () => this.op(() => (compare ? m.opCompare(lo, op) : m.opRow(lo, op))) });
-    }
+    const rowOp = (op: Op, arg?: bigint) => this.op(() => (compare ? m.opCompare(lo, op, arg) : m.opRow(lo, op, arg)));
+    for (const [op, text] of ROW_OPS) items.push({ label: text, action: () => rowOp(op) });
+    items.push({ label: "More operations", icon: ChevronDown, submenu: moreOpsMenu(rowOp, rw, this.lookup) });
     items.push(
       "sep",
       {

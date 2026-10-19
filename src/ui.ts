@@ -1,6 +1,6 @@
 // Small UI kit: element builder, icons, segmented control, switch, popup
 // menus, dialogs, tooltips, toasts and the validated number input.
-import { createElement, type IconNode, X } from "lucide";
+import { Check, createElement, type IconNode, X } from "lucide";
 import { type Base, formatInt, ParseError, parseValue } from "./numfmt";
 import { play } from "./sound";
 
@@ -202,6 +202,10 @@ export type MenuItem =
       shortcut?: string;
       submenu?: MenuItem[];
       swatch?: string;
+      /** Shows a checkmark (true) or an empty slot (false) instead of an icon. */
+      checked?: boolean;
+      /** Keep the menu open after clicking (for checkbox lists). */
+      keepOpen?: boolean;
     };
 
 const openMenus: HTMLElement[] = [];
@@ -225,11 +229,15 @@ export function openMenu(items: MenuItem[], at: { x: number; y: number } | HTMLE
     const row = h(
       "button",
       { type: "button", class: `menu-item${it.danger ? " danger" : ""}`, disabled: !!it.disabled, role: "menuitem" },
-      it.swatch
-        ? h("span", { class: "menu-swatch", style: `background:${it.swatch}` })
-        : it.icon
-          ? icon(it.icon, 15)
-          : h("span", { class: "menu-ico-pad" }),
+      it.checked !== undefined
+        ? it.checked
+          ? icon(Check, 15, "menu-check")
+          : h("span", { class: "menu-ico-pad" })
+        : it.swatch
+          ? h("span", { class: "menu-swatch", style: `background:${it.swatch}` })
+          : it.icon
+            ? icon(it.icon, 15)
+            : h("span", { class: "menu-ico-pad" }),
       h("span", { class: "menu-label" }, it.label),
       it.shortcut ? h("span", { class: "menu-kbd" }, it.shortcut) : null,
       it.submenu ? h("span", { class: "menu-arrow" }, "›") : null,
@@ -245,6 +253,16 @@ export function openMenu(items: MenuItem[], at: { x: number; y: number } | HTMLE
     } else {
       row.addEventListener("pointerenter", () => closeMenus(depth + 1));
       row.addEventListener("click", () => {
+        if (it.keepOpen) {
+          it.action?.();
+          if (it.checked !== undefined) {
+            it.checked = !it.checked;
+            row.firstElementChild?.replaceWith(
+              it.checked ? icon(Check, 15, "menu-check") : h("span", { class: "menu-ico-pad" }),
+            );
+          }
+          return;
+        }
         closeMenus();
         it.action?.();
       });

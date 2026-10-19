@@ -20,6 +20,7 @@ import {
   Settings as SettingsIcon,
   SlidersHorizontal,
   Square,
+  SquareFunction,
   Sun,
   Undo2,
   Volume2,
@@ -31,6 +32,7 @@ import {
 import { ValueCard } from "./card";
 import { CommandRegistry } from "./commands";
 import { showAbout, showControls } from "./dialogs/help";
+import { newValueFromExpression } from "./dialogs/newvalue";
 import { openSettings } from "./dialogs/settings";
 import { pickWidth } from "./dialogs/width";
 import { History } from "./history";
@@ -178,6 +180,14 @@ export class App {
         run: () => this.groupSelection(),
       },
       { id: "sel.clear", group: "Edit", label: "Clear selection", keys: ["Esc"], run: () => this.clearSelections() },
+      {
+        id: "value.fromExpr",
+        group: "Edit",
+        label: "New value from expression…",
+        icon: SquareFunction,
+        keywords: "calculate combine and or xor add",
+        run: () => this.addFromExpression(),
+      },
       // View
       {
         id: "view.zoomIn",
@@ -262,6 +272,7 @@ export class App {
           "value.add32",
           "value.add64",
           "value.addCustom",
+          "value.fromExpr",
           "sep",
           "sel.group",
           "sel.clear",
@@ -477,7 +488,7 @@ export class App {
     } else if (key === "zoom") {
       P.setZoom(S.get("zoom"));
       this.updateZoomLabel();
-    } else if (key === "msb_left" || key === "show_readouts" || key === "show_interp") {
+    } else if (["msb_left", "show_readouts", "show_interp", "readout_chips"].includes(key)) {
       for (const c of this.cards) c.rebuild();
     }
   }
@@ -599,6 +610,8 @@ export class App {
       move: (c, d) => this.moveValue(c, d),
       duplicate: (c) => this.duplicateValue(c),
       resize: (c) => this.resizeValue(c),
+      lookup: (_c, name) => this.valueByName(name),
+      others: (c) => this.cards.filter((x) => x !== c),
     });
     model.subscribe(() => this.history.touch());
     this.cards.splice(index ?? this.cards.length, 0, card);
@@ -647,6 +660,34 @@ export class App {
     if (width === null) return;
     S.set("last_width", width);
     this.addValue(width);
+  }
+
+  /** A value by name for expressions. Case, spaces and underscores don't matter. */
+  private valueByName(name: string): bigint | undefined {
+    const norm = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[\s_]+/g, " ")
+        .trim();
+    const n = norm(name);
+    return this.cards.find((c) => norm(c.model.name) === n)?.model.value;
+  }
+
+  private async addFromExpression() {
+    const widest = Math.max(32, ...this.cards.map((c) => c.model.width));
+    const r = await newValueFromExpression(
+      (name) => {
+        const n = name.trim().toLowerCase();
+        // "x" has no meaning here (there's no current value yet)
+        return n === "x" ? undefined : this.valueByName(name);
+      },
+      Math.min(widest, 512),
+    );
+    if (!r) return;
+    const card = this.addValue(r.width);
+    card.model.setValue(r.value);
+    if (r.name) card.model.setName(r.name);
+    card.rebuild();
   }
 
   private async resizeValue(card: ValueCard) {
@@ -771,7 +812,8 @@ export class App {
         throw new ModelError("This is not a Bit Viewer workspace file");
       }
       values = data.values ?? [];
-      values.forEach((d) => ValueModel.fromJSON(d)); // validate everything before replacing the workspace
+      // validate everything before replacing the workspace
+      for (const d of values) ValueModel.fromJSON(d);
     } catch (e) {
       if (!quiet) this.fail("Could not open file", e, name);
       return false;
