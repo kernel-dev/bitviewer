@@ -5,12 +5,9 @@
 // its lowest bit index `lo`. Groups are inclusive bit ranges [lo, hi] and may
 // span rows.
 
-import { Base, BASE_ORDER, isBase, maxValue } from "./numfmt";
+import { BASE_ORDER, type Base, isBase, maxValue } from "./numfmt";
 
-export const GROUP_COLORS = [
-  "#f59f00", "#2fb344", "#ae3ec9", "#15aabf",
-  "#4c6ef5", "#82c91e", "#f76707", "#868e96",
-];
+export const GROUP_COLORS = ["#f59f00", "#2fb344", "#ae3ec9", "#15aabf", "#4c6ef5", "#82c91e", "#f76707", "#868e96"];
 export type View = "line" | "byte" | "nibble";
 export const MIN_WIDTH = 1;
 export const MAX_WIDTH = 512;
@@ -33,11 +30,16 @@ export class ModelError extends Error {}
 export function applyOp(op: Op, v: bigint, width: number): bigint {
   const m = maxValue(width);
   switch (op) {
-    case "invert": return ~v & m;
-    case "clear": return 0n;
-    case "set": return m;
-    case "shl": return (v << 1n) & m;
-    case "shr": return (v & m) >> 1n;
+    case "invert":
+      return ~v & m;
+    case "clear":
+      return 0n;
+    case "set":
+      return m;
+    case "shl":
+      return (v << 1n) & m;
+    case "shr":
+      return (v & m) >> 1n;
   }
   throw new ModelError(`Unknown operation ${op}`);
 }
@@ -103,10 +105,17 @@ export class ValueModel {
   hiddenCompares = new Map<number, bigint>();
   private listeners: Listener[] = [];
 
-  constructor(opts: {
-    width?: number; value?: bigint; name?: string; view?: View; msbFirst?: boolean;
-    fullBase?: Base; defaultRowBase?: Base;
-  } = {}) {
+  constructor(
+    opts: {
+      width?: number;
+      value?: bigint;
+      name?: string;
+      view?: View;
+      msbFirst?: boolean;
+      fullBase?: Base;
+      defaultRowBase?: Base;
+    } = {},
+  ) {
     const width = opts.width ?? 32;
     checkWidth(width);
     const view = opts.view ?? "byte";
@@ -405,8 +414,13 @@ export class ValueModel {
       throw new ModelError("Groups cannot overlap: " + clash.map((g) => `${g.name} ${g.label()}`).join(", "));
     }
     const width = hi - lo + 1;
-    const g = new Group(lo, hi, (name ?? "").trim() || this.suggestGroupName(), color || this.nextColor(),
-      base ? checkBase(base) : width <= 3 ? 2 : 16);
+    const g = new Group(
+      lo,
+      hi,
+      (name ?? "").trim() || this.suggestGroupName(),
+      color || this.nextColor(),
+      base ? checkBase(base) : width <= 3 ? 2 : 16,
+    );
     this.groups.push(g);
     this.groups.sort((a, b) => b.hi - a.hi);
     this.emit("groups");
@@ -421,9 +435,18 @@ export class ValueModel {
   }
   updateGroup(g: Group, changes: { name?: string; color?: string; base?: Base }): void {
     let changed = false;
-    if (changes.name !== undefined && changes.name !== g.name) { g.name = changes.name; changed = true; }
-    if (changes.color !== undefined && changes.color !== g.color) { g.color = changes.color; changed = true; }
-    if (changes.base !== undefined && checkBase(changes.base) !== g.base) { g.base = changes.base; changed = true; }
+    if (changes.name !== undefined && changes.name !== g.name) {
+      g.name = changes.name;
+      changed = true;
+    }
+    if (changes.color !== undefined && changes.color !== g.color) {
+      g.color = changes.color;
+      changed = true;
+    }
+    if (changes.base !== undefined && checkBase(changes.base) !== g.base) {
+      g.base = changes.base;
+      changed = true;
+    }
     if (changed) this.emit("group_meta");
   }
   groupValue(g: Group): bigint {

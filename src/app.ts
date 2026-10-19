@@ -1,45 +1,48 @@
-// Main window: custom title bar, menus, toolbar, workspace, status bar,
-// keyboard shortcuts, zoom and save/load.
+// Main window: title bar, menus, toolbar, workspace, status bar, save/load.
+// Actions live in the command registry (commands.ts); this file wires them up.
 import {
-  CircleQuestionMark, FilePlus, FolderOpen, Info, Keyboard, LogOut, Maximize, Minimize, Minus, Moon, Plus,
-  RotateCcw, Ruler, Save, SaveAll, Volume2, VolumeX, Settings as SettingsIcon, SlidersHorizontal, Square, Sun, X, ZoomIn, ZoomOut,
+  CircleQuestionMark,
+  FilePlus,
+  FolderOpen,
+  Info,
+  LogOut,
+  Maximize,
+  Minimize,
+  Minus,
+  Moon,
+  Plus,
+  RotateCcw,
+  Ruler,
+  Save,
+  SaveAll,
+  Settings as SettingsIcon,
+  SlidersHorizontal,
+  Square,
+  Sun,
+  Volume2,
+  VolumeX,
+  X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide";
 import { ValueCard } from "./card";
+import { CommandRegistry } from "./commands";
+import { showAbout, showControls } from "./dialogs/help";
+import { openSettings } from "./dialogs/settings";
+import { pickWidth } from "./dialogs/width";
+import { logoSvg } from "./logo";
 import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "./model";
-import { Base, BASE_NAMES, BASE_ORDER } from "./numfmt";
+import { BASE_NAMES, BASE_ORDER, type Base } from "./numfmt";
 import * as P from "./platform";
-import { S, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "./settings";
+import { S, ZOOM_STEP } from "./settings";
 import { play } from "./sound";
-import { ask, button, h, icon, MenuItem, menusOpen, modal, modalOpen, openMenu, segmented, toast, toggleSwitch } from "./ui";
+import { ask, button, h, icon, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
 
 const FILE_VERSION = 1;
-const VERSION = "2.0.0";
-
-export function logoSvg(size: number): SVGElement {
-  // 4×4 grid of bits, the same mark as the app icon
-  const on = [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1];
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 64 64");
-  svg.setAttribute("width", String(size));
-  svg.setAttribute("height", String(size));
-  svg.classList.add("logo");
-  const bg = document.createElementNS(ns, "rect");
-  Object.entries({ x: 1, y: 1, width: 62, height: 62, rx: 14, class: "logo-bg" }).forEach(([k, v]) => bg.setAttribute(k, String(v)));
-  svg.append(bg);
-  on.forEach((v, i) => {
-    const r = document.createElementNS(ns, "rect");
-    const x = 9 + (i % 4) * 12;
-    const y = 9 + Math.floor(i / 4) * 12;
-    Object.entries({ x, y, width: 10, height: 10, rx: 2.5, class: v ? "logo-on" : "logo-off" })
-      .forEach(([k, val]) => r.setAttribute(k, String(val)));
-    svg.append(r);
-  });
-  return svg;
-}
 
 export class App {
-  private cards: ValueCard[] = [];
+  readonly commands = new CommandRegistry();
+  cards: ValueCard[] = [];
   private path: string | null = null;
   private fileName = "Untitled";
   private dirty = false;
@@ -54,10 +57,11 @@ export class App {
   constructor(private root: HTMLElement) {}
 
   async start() {
+    this.registerCommands();
     this.applyTheme();
     await P.setZoom(S.get("zoom"));
     this.root.replaceChildren(this.buildTitlebar(), this.buildToolbar(), this.buildWorkspace(), this.buildStatusbar());
-    this.installShortcuts();
+    this.installInput();
     S.onChange((k) => this.onSetting(k));
     await P.guardClose(() => this.maybeSave());
     await P.onResized(() => this.syncMaxButton());
@@ -70,50 +74,166 @@ export class App {
     }
   }
 
+  // ================================================================ commands
+  private registerCommands() {
+    const dark = () => S.get("theme") === "dark";
+    this.commands.add(
+      // File
+      {
+        id: "file.new",
+        group: "File",
+        label: "New workspace",
+        icon: FilePlus,
+        keys: ["Ctrl+N"],
+        run: () => this.newWorkspace(),
+      },
+      {
+        id: "file.open",
+        group: "File",
+        label: "Open…",
+        icon: FolderOpen,
+        keys: ["Ctrl+O"],
+        run: () => this.openFile(),
+      },
+      { id: "file.save", group: "File", label: "Save", icon: Save, keys: ["Ctrl+S"], run: () => this.save() },
+      {
+        id: "file.saveAs",
+        group: "File",
+        label: "Save as…",
+        icon: SaveAll,
+        keys: ["Ctrl+Shift+S"],
+        run: () => this.saveAs(),
+      },
+      { id: "file.quit", group: "File", label: "Quit", icon: LogOut, run: () => P.closeWindow() },
+      // Edit
+      {
+        id: "value.add32",
+        group: "Edit",
+        label: "Add 32-bit value",
+        icon: Plus,
+        keys: ["Ctrl+1"],
+        run: () => this.addValue(32),
+      },
+      {
+        id: "value.add64",
+        group: "Edit",
+        label: "Add 64-bit value",
+        icon: Plus,
+        keys: ["Ctrl+2"],
+        run: () => this.addValue(64),
+      },
+      {
+        id: "value.addCustom",
+        group: "Edit",
+        label: "Add value with custom width…",
+        icon: Ruler,
+        keys: ["Ctrl+3"],
+        keywords: "bits width size",
+        run: () => this.addCustom(),
+      },
+      {
+        id: "sel.group",
+        group: "Edit",
+        label: "Group selection",
+        keys: ["Ctrl+G"],
+        keywords: "field register",
+        run: () => this.groupSelection(),
+      },
+      { id: "sel.clear", group: "Edit", label: "Clear selection", keys: ["Esc"], run: () => this.clearSelections() },
+      // View
+      {
+        id: "view.zoomIn",
+        group: "View",
+        label: "Zoom in",
+        icon: ZoomIn,
+        keys: ["Ctrl+=", "Ctrl++"],
+        run: () => this.zoomBy(1),
+      },
+      {
+        id: "view.zoomOut",
+        group: "View",
+        label: "Zoom out",
+        icon: ZoomOut,
+        keys: ["Ctrl+-"],
+        run: () => this.zoomBy(-1),
+      },
+      {
+        id: "view.zoomReset",
+        group: "View",
+        label: "Reset zoom",
+        icon: RotateCcw,
+        keys: ["Ctrl+0"],
+        run: () => S.set("zoom", 1),
+      },
+      {
+        id: "view.theme",
+        group: "View",
+        label: () => (dark() ? "Light theme" : "Dark theme"),
+        icon: () => (dark() ? Sun : Moon),
+        keys: ["Ctrl+T"],
+        run: () => this.toggleTheme(),
+      },
+      {
+        id: "view.sounds",
+        group: "View",
+        label: () => (S.get("sounds") ? "Turn sounds off" : "Turn sounds on"),
+        icon: () => (S.get("sounds") ? VolumeX : Volume2),
+        keywords: "audio mute",
+        run: () => this.toggleSounds(),
+      },
+      {
+        id: "app.settings",
+        group: "View",
+        label: "Settings…",
+        icon: SettingsIcon,
+        keys: ["Ctrl+,"],
+        keywords: "preferences options",
+        run: () => openSettings(),
+      },
+      // Help
+      {
+        id: "help.controls",
+        group: "Help",
+        label: "Controls & shortcuts",
+        icon: CircleQuestionMark,
+        keys: ["F1"],
+        run: () => showControls(this.commands),
+      },
+      { id: "help.about", group: "Help", label: "About Bit Viewer", icon: Info, run: () => showAbout() },
+      // swallow browser shortcuts that make no sense in an app window
+      {
+        id: "noop.browser",
+        group: "Help",
+        label: "",
+        keys: ["Ctrl+R", "Ctrl+P", "Ctrl+F", "F5"],
+        hidden: true,
+        run: () => {},
+      },
+    );
+  }
+
+  private menus(): [string, (string | "sep")[]][] {
+    return [
+      ["File", ["file.new", "file.open", "sep", "file.save", "file.saveAs", "sep", "file.quit"]],
+      ["Edit", ["value.add32", "value.add64", "value.addCustom", "sep", "sel.group", "sel.clear"]],
+      [
+        "View",
+        ["view.zoomIn", "view.zoomOut", "view.zoomReset", "sep", "view.theme", "view.sounds", "sep", "app.settings"],
+      ],
+      ["Help", ["help.controls", "help.about"]],
+    ];
+  }
+
   // ================================================================ chrome
   private buildTitlebar(): HTMLElement {
-    const menus: [string, () => MenuItem[]][] = [
-      ["File", () => [
-        { label: "New workspace", icon: FilePlus, shortcut: "Ctrl+N", action: () => this.newWorkspace() },
-        { label: "Open…", icon: FolderOpen, shortcut: "Ctrl+O", action: () => this.openFile() },
-        "sep",
-        { label: "Save", icon: Save, shortcut: "Ctrl+S", action: () => this.save() },
-        { label: "Save as…", icon: SaveAll, shortcut: "Ctrl+Shift+S", action: () => this.saveAs() },
-        "sep",
-        { label: "Quit", icon: LogOut, action: () => P.closeWindow() },
-      ]],
-      ["Edit", () => [
-        { label: "Add 32-bit value", icon: Plus, shortcut: "Ctrl+1", action: () => this.addValue(32) },
-        { label: "Add 64-bit value", icon: Plus, shortcut: "Ctrl+2", action: () => this.addValue(64) },
-        { label: "Add value with custom width…", icon: Ruler, shortcut: "Ctrl+3", action: () => this.addCustom() },
-        "sep",
-        { label: "Group selection", shortcut: "Ctrl+G", action: () => this.groupSelection() },
-        { label: "Clear selection", shortcut: "Esc", action: () => this.clearSelections() },
-      ]],
-      ["View", () => [
-        { label: "Zoom in", icon: ZoomIn, shortcut: "Ctrl+=", action: () => this.zoomBy(1) },
-        { label: "Zoom out", icon: ZoomOut, shortcut: "Ctrl+-", action: () => this.zoomBy(-1) },
-        { label: "Reset zoom", icon: RotateCcw, shortcut: "Ctrl+0", action: () => S.set("zoom", 1) },
-        "sep",
-        { label: S.get("theme") === "dark" ? "Light theme" : "Dark theme", icon: S.get("theme") === "dark" ? Sun : Moon,
-          shortcut: "Ctrl+T", action: () => this.toggleTheme() },
-        { label: S.get("sounds") ? "Turn sounds off" : "Turn sounds on", icon: S.get("sounds") ? VolumeX : Volume2,
-          action: () => this.toggleSounds() },
-        "sep",
-        { label: "Settings…", icon: SettingsIcon, shortcut: "Ctrl+,", action: () => this.openSettings() },
-      ]],
-      ["Help", () => [
-        { label: "Controls", icon: Keyboard, shortcut: "F1", action: () => this.showControls() },
-        { label: "About Bit Viewer", icon: Info, action: () => this.showAbout() },
-      ]],
-    ];
     const menuBar = h("nav", { class: "menubar" });
-    for (const [name, items] of menus) {
+    for (const [name, ids] of this.menus()) {
       const b = h("button", { type: "button", class: "menubar-item", "data-keep-sel": "" }, name);
-      b.addEventListener("click", () => openMenu(items(), b));
+      b.addEventListener("click", () => openMenu(this.commands.menu(ids), b));
       b.addEventListener("pointerenter", () => {
+        // slide between open menus like a native menu bar
         if (menusOpen() && document.querySelector(".menubar-item.menu-open") && !b.classList.contains("menu-open")) {
-          openMenu(items(), b);
+          openMenu(this.commands.menu(ids), b);
         }
       });
       menuBar.append(b);
@@ -125,43 +245,112 @@ export class App {
       this.syncMaxButton();
     });
     const controls = P.isTauri
-      ? h("div", { class: "win-controls" },
-        h("button", { type: "button", class: "win-btn", tip: "Minimize", onClick: () => P.minimize() }, icon(Minus, 15)),
-        this.maxBtn,
-        h("button", { type: "button", class: "win-btn close", tip: "Close", onClick: () => P.closeWindow() }, icon(X, 16)))
+      ? h(
+          "div",
+          { class: "win-controls" },
+          h(
+            "button",
+            { type: "button", class: "win-btn", tip: "Minimize", onClick: () => P.minimize() },
+            icon(Minus, 15),
+          ),
+          this.maxBtn,
+          h(
+            "button",
+            { type: "button", class: "win-btn close", tip: "Close", onClick: () => P.closeWindow() },
+            icon(X, 16),
+          ),
+        )
       : null;
-    const drag = h("div", { class: "drag", "data-tauri-drag-region": "" },
-      h("span", { class: "title-text", "data-tauri-drag-region": "" }, "Bit Viewer"), this.titleFile);
-    return h("div", { class: "titlebar" },
+    const drag = h(
+      "div",
+      { class: "drag", "data-tauri-drag-region": "" },
+      h("span", { class: "title-text", "data-tauri-drag-region": "" }, "Bit Viewer"),
+      this.titleFile,
+    );
+    return h(
+      "div",
+      { class: "titlebar" },
       h("div", { class: "brand", "data-tauri-drag-region": "" }, logoSvg(20)),
-      menuBar, drag, controls);
+      menuBar,
+      drag,
+      controls,
+    );
   }
 
   private async syncMaxButton() {
     if (!P.isTauri) return;
     const max = await P.isMaximized();
     this.maxBtn.replaceChildren(icon(max ? Minimize : Maximize, 13));
-    this.maxBtn.dataset.max = max ? "1" : "";
   }
 
   private buildToolbar(): HTMLElement {
-    const allRows = segmented(BASE_ORDER.map((b) => ({ value: b, label: BASE_NAMES[b], tip: `Switch every row of every value to ${BASE_NAMES[b]}` })),
-      { checkable: false, onPick: (b) => this.applyGlobalBase(b) });
-    this.themeBtn = button({ cls: "ghost", tip: "Toggle light / dark theme (Ctrl+T)", onClick: () => this.toggleTheme() });
+    const allRows = segmented(
+      BASE_ORDER.map((b) => ({
+        value: b,
+        label: BASE_NAMES[b],
+        tip: `Switch every row of every value to ${BASE_NAMES[b]}`,
+      })),
+      { checkable: false, onPick: (b) => this.applyGlobalBase(b) },
+    );
+    this.themeBtn = button({
+      cls: "ghost",
+      tip: "Toggle light / dark theme (Ctrl+T)",
+      onClick: () => this.toggleTheme(),
+    });
     this.syncThemeButton();
-    return h("div", { class: "toolbar" },
-      button({ icon: Plus, label: "32-bit", cls: "primary", tip: "Add a 32-bit value (Ctrl+1)", onClick: () => this.addValue(32) }),
-      button({ icon: Plus, label: "64-bit", cls: "primary", tip: "Add a 64-bit value (Ctrl+2)", onClick: () => this.addValue(64) }),
-      button({ icon: Ruler, label: "Custom", cls: "outline", tip: `Add a value with any width, ${MIN_WIDTH}–${MAX_WIDTH} bits (Ctrl+3)`, onClick: () => this.addCustom() }),
+    const run = (id: string) => () => this.commands.run(id);
+    return h(
+      "div",
+      { class: "toolbar" },
+      button({
+        icon: Plus,
+        label: "32-bit",
+        cls: "primary",
+        tip: "Add a 32-bit value (Ctrl+1)",
+        onClick: run("value.add32"),
+      }),
+      button({
+        icon: Plus,
+        label: "64-bit",
+        cls: "primary",
+        tip: "Add a 64-bit value (Ctrl+2)",
+        onClick: run("value.add64"),
+      }),
+      button({
+        icon: Ruler,
+        label: "Custom",
+        cls: "outline",
+        tip: `Add a value with any width, ${MIN_WIDTH}–${MAX_WIDTH} bits (Ctrl+3)`,
+        onClick: run("value.addCustom"),
+      }),
       h("div", { class: "tb-sep" }),
-      button({ icon: FolderOpen, label: "Open", cls: "ghost", tip: "Open a workspace (Ctrl+O)", onClick: () => this.openFile() }),
-      button({ icon: Save, label: "Save", cls: "ghost", tip: "Save the workspace (Ctrl+S)", onClick: () => this.save() }),
+      button({
+        icon: FolderOpen,
+        label: "Open",
+        cls: "ghost",
+        tip: "Open a workspace (Ctrl+O)",
+        onClick: run("file.open"),
+      }),
+      button({
+        icon: Save,
+        label: "Save",
+        cls: "ghost",
+        tip: "Save the workspace (Ctrl+S)",
+        onClick: run("file.save"),
+      }),
       h("div", { class: "tb-sep" }),
       h("span", { class: "tb-label" }, "All rows"),
       allRows.el,
       h("div", { class: "spacer" }),
       this.themeBtn,
-      button({ icon: SlidersHorizontal, label: "Settings", cls: "ghost", tip: "Settings (Ctrl+,)", onClick: () => this.openSettings() }));
+      button({
+        icon: SlidersHorizontal,
+        label: "Settings",
+        cls: "ghost",
+        tip: "Settings (Ctrl+,)",
+        onClick: run("app.settings"),
+      }),
+    );
   }
 
   private syncThemeButton() {
@@ -170,28 +359,50 @@ export class App {
   }
 
   private buildWorkspace(): HTMLElement {
-    this.empty = h("div", { class: "empty" },
+    const run = (id: string) => () => this.commands.run(id);
+    this.empty = h(
+      "div",
+      { class: "empty" },
       logoSvg(56),
       h("h3", {}, "No values yet"),
       h("p", { class: "muted" }, "Add a value to start inspecting bits."),
-      h("div", { class: "empty-actions" },
-        button({ icon: Plus, label: "32-bit value", cls: "primary", onClick: () => this.addValue(32) }),
-        button({ icon: Plus, label: "64-bit value", cls: "outline", onClick: () => this.addValue(64) }),
-        button({ icon: Ruler, label: "Custom width", cls: "outline", onClick: () => this.addCustom() })));
+      h(
+        "div",
+        { class: "empty-actions" },
+        button({ icon: Plus, label: "32-bit value", cls: "primary", onClick: run("value.add32") }),
+        button({ icon: Plus, label: "64-bit value", cls: "outline", onClick: run("value.add64") }),
+        button({ icon: Ruler, label: "Custom width", cls: "outline", onClick: run("value.addCustom") }),
+      ),
+    );
     this.workspace = h("main", { class: "workspace" }, this.empty);
     return this.workspace;
   }
 
   private buildStatusbar(): HTMLElement {
-    this.zoomLabel = h("button", { type: "button", class: "zoom-label", tip: "Reset zoom (Ctrl+0)", onClick: () => S.set("zoom", 1) });
+    this.zoomLabel = h("button", {
+      type: "button",
+      class: "zoom-label",
+      tip: "Reset zoom (Ctrl+0)",
+      onClick: () => S.set("zoom", 1),
+    });
     this.updateZoomLabel();
-    return h("footer", { class: "statusbar" },
-      h("span", { class: "status-hint" }, "Click a bit to flip · drag to select · right-click for row actions · F1 for help"),
+    return h(
+      "footer",
+      { class: "statusbar" },
+      h(
+        "span",
+        { class: "status-hint" },
+        "Click a bit to flip · drag to select · right-click for row actions · F1 for help",
+      ),
       h("div", { class: "spacer" }),
-      h("div", { class: "zoom" },
+      h(
+        "div",
+        { class: "zoom" },
         button({ icon: Minus, cls: "ghost xs", tip: "Zoom out (Ctrl+-)", onClick: () => this.zoomBy(-1), size: 13 }),
         this.zoomLabel,
-        button({ icon: Plus, cls: "ghost xs", tip: "Zoom in (Ctrl+=)", onClick: () => this.zoomBy(1), size: 13 })));
+        button({ icon: Plus, cls: "ghost xs", tip: "Zoom in (Ctrl+=)", onClick: () => this.zoomBy(1), size: 13 }),
+      ),
+    );
   }
 
   private updateZoomLabel() {
@@ -236,84 +447,18 @@ export class App {
     toast(`All rows now use ${BASE_NAMES[b]}`);
   }
 
-  private openSettings() {
-    modal<void>({
-      title: "Settings",
-      icon: SlidersHorizontal,
-      wide: true,
-      cancelValue: undefined,
-      build: (body, close) => {
-        const section = (name: string, ...rows: HTMLElement[]) =>
-          h("section", { class: "set-section" }, h("h4", {}, name), h("div", { class: "set-card" }, ...rows));
-        const row = (label: string, control: HTMLElement, hint = "") =>
-          h("div", { class: "set-row" }, h("div", {}, h("div", { class: "set-label" }, label),
-            hint ? h("div", { class: "set-hint" }, hint) : null), control);
-
-        const theme = segmented([{ value: "dark" as const, label: "Dark", icon: Moon }, { value: "light" as const, label: "Light", icon: Sun }],
-          { value: S.get("theme"), onPick: (v) => S.set("theme", v) });
-        const zoomVal = h("span", { class: "mono zoom-val" }, `${Math.round(S.get("zoom") * 100)}%`);
-        const slider = h("input", { type: "range", class: "slider", min: ZOOM_MIN * 100, max: ZOOM_MAX * 100, step: 10, value: Math.round(S.get("zoom") * 100) });
-        const paint = () => slider.style.setProperty("--p", `${((+slider.value - ZOOM_MIN * 100) / ((ZOOM_MAX - ZOOM_MIN) * 100)) * 100}%`);
-        paint();
-        slider.addEventListener("input", () => {
-          zoomVal.textContent = `${slider.value}%`;
-          paint();
-        });
-        slider.addEventListener("change", () => S.set("zoom", +slider.value / 100));
-
-        const order = segmented([{ value: true, label: "MSB left  7…0" }, { value: false, label: "LSB left  0…7" }],
-          { value: S.get("msb_left"), onPick: (v) => S.set("msb_left", v) });
-        const view = segmented([{ value: "line" as const, label: "Line" }, { value: "byte" as const, label: "Bytes" }, { value: "nibble" as const, label: "Nibbles" }],
-          { value: S.get("default_view"), onPick: (v) => S.set("default_view", v) });
-        const base = segmented(BASE_ORDER.map((b) => ({ value: b, label: BASE_NAMES[b] })),
-          { value: S.get("default_base"), onPick: (v) => S.set("default_base", v) });
-
-        const volVal = h("span", { class: "mono zoom-val" }, `${Math.round(S.get("sound_volume") * 100)}%`);
-        const volume = h("input", { type: "range", class: "slider", min: 0, max: 100, step: 5, value: Math.round(S.get("sound_volume") * 100) });
-        const paintVol = () => {
-          volume.style.setProperty("--p", `${volume.value}%`);
-          volume.disabled = !S.get("sounds");
-        };
-        paintVol();
-        volume.addEventListener("input", () => {
-          volVal.textContent = `${volume.value}%`;
-          S.set("sound_volume", +volume.value / 100);
-          paintVol();
-        });
-        volume.addEventListener("change", () => play("bitOn"));
-        const soundSwitch = toggleSwitch(S.get("sounds"), (v) => {
-          S.set("sounds", v);
-          paintVol();
-          if (v) play("bitOn");
-        });
-        body.append(
-          section("Appearance",
-            row("Theme", theme.el),
-            row("Zoom", h("div", { class: "zoom-ctl" }, slider, zoomVal), "Ctrl + mouse wheel anywhere · Ctrl+0 resets")),
-          section("Bits",
-            row("Bit order in a row", order.el),
-            row("Layout for new values", view.el, "Line puts every bit on one line across the window"),
-            row("Row base for new values", base.el)),
-          section("Sounds",
-            row("Interface sounds", soundSwitch, "Short sounds for flipping bits, selecting, fields, operations and errors"),
-            row("Volume", h("div", { class: "zoom-ctl" }, volume, volVal,
-              button({ icon: Volume2, cls: "ghost sm", tip: "Play a test sound", onClick: () => play("group", true) })))),
-          section("Readouts",
-            row("Per-row readouts", toggleSwitch(S.get("show_readouts"), (v) => S.set("show_readouts", v)), "hex · dec · oct next to each byte / nibble row"),
-            row("Interpretations", toggleSwitch(S.get("show_interp"), (v) => S.set("show_interp", v)), "unsigned, signed, set bits and IEEE-754 float")),
-        );
-        return [button({ label: "Done", cls: "primary", onClick: () => close() })];
-      },
-    });
-  }
-
   // ================================================================ values
   addValue(width: number, model?: ValueModel, index?: number, reveal = true): ValueCard {
     if (!model) {
       const names = new Set(this.cards.map((c) => c.model.name));
       let n = this.cards.length + 1;
       while (names.has(`Value ${n}`)) n++;
-      model = new ValueModel({ width, name: `Value ${n}`, view: S.get("default_view"), defaultRowBase: S.get("default_base") });
+      model = new ValueModel({
+        width,
+        name: `Value ${n}`,
+        view: S.get("default_view"),
+        defaultRowBase: S.get("default_base"),
+      });
     }
     const card = new ValueCard(model, {
       remove: (c) => this.removeValue(c),
@@ -322,8 +467,7 @@ export class App {
       resize: (c) => this.resizeValue(c),
     });
     model.subscribe(() => this.setDirty(true));
-    index ??= this.cards.length;
-    this.cards.splice(index, 0, card);
+    this.cards.splice(index ?? this.cards.length, 0, card);
     this.relayout();
     this.setDirty(true);
     if (reveal) {
@@ -337,8 +481,10 @@ export class App {
   private async removeValue(card: ValueCard) {
     const m = card.model;
     if (m.groups.length || m.compares.size) {
-      const r = await ask("Remove value", `Remove “${m.name}” together with its fields and compare rows?`,
-        [{ id: "cancel", label: "Cancel" }, { id: "yes", label: "Remove", cls: "danger-btn" }]);
+      const r = await ask("Remove value", `Remove “${m.name}” together with its fields and compare rows?`, [
+        { id: "cancel", label: "Cancel" },
+        { id: "yes", label: "Remove", cls: "danger-btn" },
+      ]);
       if (r !== "yes") return;
     }
     this.drop(card);
@@ -362,81 +508,40 @@ export class App {
     this.setDirty(true);
   }
 
-  /** Asks for a bit width. Resolves to null when cancelled. */
-  private pickWidth(title: string, current: number, okLabel: string): Promise<number | null> {
-    const presets = [8, 16, 32, 64, 128, 256, 512];
-    return modal<number | null>({
-      title,
-      icon: Ruler,
-      cancelValue: null,
-      build: (body, close) => {
-        const input = h("input", { class: "field mono width-input", type: "number", min: MIN_WIDTH, max: MAX_WIDTH,
-          step: 1, value: String(current), spellcheck: false });
-        const err = h("div", { class: "width-error" });
-        const seg = segmented(presets.map((p) => ({ value: p, label: String(p) })), {
-          value: presets.includes(current) ? current : undefined,
-          onPick: (p) => {
-            input.value = String(p);
-            validate();
-            input.focus();
-          },
-          cls: "width-presets",
-        });
-        const ok = button({ label: okLabel, cls: "primary", onClick: () => submit() });
-        const parse = () => (/^\s*\d+\s*$/.test(input.value) ? Number(input.value) : NaN);
-        const validate = () => {
-          const n = parse();
-          const valid = Number.isInteger(n) && n >= MIN_WIDTH && n <= MAX_WIDTH;
-          ok.disabled = !valid;
-          input.classList.toggle("invalid", !valid && input.value !== "");
-          err.textContent = valid || input.value === "" ? "" : `Enter a whole number from ${MIN_WIDTH} to ${MAX_WIDTH}`;
-          seg.set(presets.includes(n) ? n : (undefined as unknown as number));
-          return valid;
-        };
-        const submit = () => {
-          if (validate()) {
-            localStorage.setItem("bitviewer.lastWidth", String(parse()));
-            close(parse());
-          }
-        };
-        input.addEventListener("input", validate);
-        input.addEventListener("keydown", (e) => e.key === "Enter" && submit());
-        body.append(
-          h("label", { class: "modal-label" }, `Number of bits (${MIN_WIDTH}–${MAX_WIDTH})`),
-          h("div", { class: "width-row" }, input, h("span", { class: "muted" }, "bits")),
-          err,
-          h("div", { class: "modal-label presets-label" }, "Presets"),
-          seg.el);
-        validate();
-        return [button({ label: "Cancel", onClick: () => close(null) }), ok];
-      },
-    });
-  }
-
   private async addCustom() {
     const last = Number(localStorage.getItem("bitviewer.lastWidth")) || 16;
-    const width = await this.pickWidth("Add value", last, "Add value");
-    if (width !== null) this.addValue(width);
+    const width = await pickWidth("Add value", last, "Add value");
+    if (width === null) return;
+    localStorage.setItem("bitviewer.lastWidth", String(width));
+    this.addValue(width);
   }
 
   private async resizeValue(card: ValueCard) {
     const m = card.model;
-    const width = await this.pickWidth(`Change width of “${m.name}”`, m.width, "Change width");
+    const width = await pickWidth(`Change width of “${m.name}”`, m.width, "Change width");
     if (width === null || width === m.width) return;
     const lost = m.lostOnResize(width);
     if (lost.groups.length) {
       // named fields are only ever removed by the user, never by a resize
       const names = lost.groups.map((g) => `“${g.name}” ${g.label()}`).join(", ");
-      await ask("Fields don't fit", `${names} ${lost.groups.length > 1 ? "don't" : "doesn't"} fit in ${width} bits. ` +
-        `Remove ${lost.groups.length > 1 ? "those fields" : "that field"} first, or use at least ${m.minWidthForGroups} bits.`,
-        [{ id: "ok", label: "OK", cls: "primary" }], "ok");
+      const many = lost.groups.length > 1;
+      await ask(
+        "Fields don't fit",
+        `${names} ${many ? "don't" : "doesn't"} fit in ${width} bits. ` +
+          `Remove ${many ? "those fields" : "that field"} first, or use at least ${m.minWidthForGroups} bits.`,
+        [{ id: "ok", label: "OK", cls: "primary" }],
+        "ok",
+      );
       return;
     }
     if (lost.compares || width < m.width) {
       const parts = [`bits above ${width - 1} are cleared`];
-      if (lost.compares) parts.push(`${lost.compares} compare row${lost.compares > 1 ? "s" : ""} no longer fit and will be removed`);
-      const r = await ask("Change width", `Shrinking to ${width} bits: ${parts.join(", and ")}.`,
-        [{ id: "cancel", label: "Cancel" }, { id: "yes", label: "Change width", cls: "danger-btn" }]);
+      if (lost.compares)
+        parts.push(`${lost.compares} compare row${lost.compares > 1 ? "s" : ""} no longer fit and will be removed`);
+      const r = await ask("Change width", `Shrinking to ${width} bits: ${parts.join(", and ")}.`, [
+        { id: "cancel", label: "Cancel" },
+        { id: "yes", label: "Change width", cls: "danger-btn" },
+      ]);
       if (r !== "yes") return;
     }
     card.clearSelection();
@@ -521,7 +626,9 @@ export class App {
     let models: ValueModel[];
     try {
       const data = JSON.parse(text);
-      if (!data || typeof data !== "object" || data.app !== "bitviewer") throw new ModelError("This is not a Bit Viewer workspace file");
+      if (!data || typeof data !== "object" || data.app !== "bitviewer") {
+        throw new ModelError("This is not a Bit Viewer workspace file");
+      }
       models = (data.values ?? []).map((d: unknown) => ValueModel.fromJSON(d));
     } catch (e) {
       this.fail("Could not open file", e, name);
@@ -579,49 +686,33 @@ export class App {
     ask(title, where ? `${where}\n\n${msg}` : msg, [{ id: "ok", label: "OK", cls: "primary" }], "ok");
   }
 
-  // ================================================================ shortcuts
-  private installShortcuts() {
-    window.addEventListener("wheel", (e) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      this.wheelAcc += -e.deltaY;
-      while (this.wheelAcc >= 100) {
-        this.wheelAcc -= 100;
-        this.zoomBy(1);
-      }
-      while (this.wheelAcc <= -100) {
-        this.wheelAcc += 100;
-        this.zoomBy(-1);
-      }
-    }, { passive: false });
+  // ================================================================ input
+  private installInput() {
+    window.addEventListener(
+      "wheel",
+      (e) => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        this.wheelAcc += -e.deltaY;
+        while (this.wheelAcc >= 100) {
+          this.wheelAcc -= 100;
+          this.zoomBy(1);
+        }
+        while (this.wheelAcc <= -100) {
+          this.wheelAcc += 100;
+          this.zoomBy(-1);
+        }
+      },
+      { passive: false },
+    );
 
     document.addEventListener("keydown", (e) => {
       if (modalOpen() || menusOpen()) return;
-      const mod = e.ctrlKey || e.metaKey;
-      const k = e.key.toLowerCase();
-      const run = (f: () => void) => {
-        e.preventDefault();
-        f();
-      };
-      if (mod && !e.altKey) {
-        if (k === "1") return run(() => this.addValue(32));
-        if (k === "2") return run(() => this.addValue(64));
-        if (k === "3") return run(() => this.addCustom());
-        if (k === "g") return run(() => this.groupSelection());
-        if (k === "=" || k === "+") return run(() => this.zoomBy(1));
-        if (k === "-") return run(() => this.zoomBy(-1));
-        if (k === "0") return run(() => S.set("zoom", 1));
-        if (k === "t") return run(() => this.toggleTheme());
-        if (k === ",") return run(() => this.openSettings());
-        if (k === "n") return run(() => this.newWorkspace());
-        if (k === "o") return run(() => this.openFile());
-        if (k === "s") return run(() => (e.shiftKey ? this.saveAs() : this.save()));
-        if (k === "r" || k === "p" || k === "f") return run(() => undefined); // no browser reload/print/find
-      }
-      if (e.key === "F1") return run(() => this.showControls());
-      if (e.key === "F5") return run(() => undefined);
-      if (e.key === "Escape" && !(document.activeElement instanceof HTMLInputElement)) this.clearSelections();
+      // Esc inside a field reverts that field instead of clearing the selection
+      if (e.key === "Escape" && document.activeElement instanceof HTMLInputElement) return;
+      this.commands.handleKey(e);
     });
+
     // Clicking anywhere that isn't part of selecting drops the selection.
     document.addEventListener("pointerdown", (e) => {
       if (!this.cards.some((c) => c.sel)) return;
@@ -631,58 +722,10 @@ export class App {
       if (t instanceof HTMLElement && (e.offsetX >= t.clientWidth || e.offsetY >= t.clientHeight)) return;
       this.clearSelections();
     });
+
     document.addEventListener("contextmenu", (e) => {
       // keep the native menu for text fields, suppress the browser one elsewhere
       if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
-    });
-  }
-
-  // ================================================================ help
-  private showControls() {
-    const kbd = (...keys: string[]) => h("span", { class: "keys" }, ...keys.map((k) => h("kbd", {}, k)));
-    const sc: [string, HTMLElement][] = [
-      ["Add 32 / 64-bit value", h("span", {}, kbd("Ctrl", "1"), " / ", kbd("Ctrl", "2"))],
-      ["Add value with custom width", kbd("Ctrl", "3")],
-      ["Group selection", kbd("Ctrl", "G")],
-      ["Clear selection", kbd("Esc")],
-      ["Zoom", h("span", {}, kbd("Ctrl", "wheel"), " ", kbd("Ctrl", "="), " ", kbd("Ctrl", "-"), " ", kbd("Ctrl", "0"))],
-      ["Toggle theme", kbd("Ctrl", "T")],
-      ["Settings", kbd("Ctrl", ",")],
-      ["New / Open", h("span", {}, kbd("Ctrl", "N"), " ", kbd("Ctrl", "O"))],
-      ["Save / Save as", h("span", {}, kbd("Ctrl", "S"), " ", kbd("Ctrl", "Shift", "S"))],
-    ];
-    modal<void>({
-      title: "Controls",
-      icon: CircleQuestionMark,
-      wide: true,
-      cancelValue: undefined,
-      build: (body, close) => {
-        body.append(
-          h("div", { class: "help" },
-            h("h4", {}, "Bits"),
-            h("p", {}, "Click a bit to flip it · drag across bits (also across rows) to select · Shift+click to extend · click a row label to select the row, Shift+click another to select consecutive rows · right-click a bit for row actions."),
-            h("h4", {}, "Values"),
-            h("p", {}, "Type into any field in its selected base. Prefixes 0x / 0b / 0o override the base (in HEX, 0b… is read as hex). Spaces and _ are ignored. The whole-value field accepts negative decimals (stored as two's complement). Invalid input turns red; Esc reverts."),
-            h("h4", {}, "Fields & compare rows"),
-            h("p", {}, "Select bits, then “Group selection” or Ctrl+G. Fields may span rows but cannot overlap. Compare rows hold an independent value, inherit the parent's fields, and outline bits that differ."),
-            h("h4", {}, "Shortcuts"),
-            h("div", { class: "shortcuts" }, ...sc.flatMap(([a, b]) => [h("span", {}, a), b]))));
-        return [button({ label: "Got it", cls: "primary", onClick: () => close() })];
-      },
-    });
-  }
-
-  private showAbout() {
-    modal<void>({
-      title: "About",
-      icon: Info,
-      cancelValue: undefined,
-      build: (body, close) => {
-        body.append(h("div", { class: "about" }, logoSvg(64),
-          h("div", {}, h("h3", {}, "Bit Viewer"), h("p", { class: "muted" }, `Version ${VERSION}`),
-            h("p", {}, "Inspect and edit 32/64-bit values bit by bit."))));
-        return [button({ label: "Close", cls: "primary", onClick: () => close() })];
-      },
     });
   }
 }

@@ -44,12 +44,7 @@ export function maxValue(width: number): bigint {
  *   prefix, because 0B is a valid hex number.
  * - With `allowNegative` a leading "-" stores the two's-complement value.
  */
-export function parseValue(
-  text: string,
-  base: Base,
-  width: number,
-  allowNegative = false,
-): bigint {
+export function parseValue(text: string, base: Base, width: number, allowNegative = false): bigint {
   let s = [...text].filter((ch) => !IGNORED.has(ch)).join("");
   if (!s) throw new ParseError("Enter a value", true);
   let negative = false;
@@ -78,26 +73,19 @@ export function parseValue(
       break;
     }
   }
-  if (!low)
-    throw new ParseError(
-      `Enter ${BASE_NAMES[b]} digits after the prefix`,
-      true,
-    );
+  if (!low) throw new ParseError(`Enter ${BASE_NAMES[b]} digits after the prefix`, true);
   const allowed = DIGITS.slice(0, b);
   let v = 0n;
   const bb = BigInt(b);
   for (const ch of low) {
     const d = allowed.indexOf(ch);
-    if (d < 0)
-      throw new ParseError(`'${ch}' is not a valid ${BASE_NAMES[b]} digit`);
+    if (d < 0) throw new ParseError(`'${ch}' is not a valid ${BASE_NAMES[b]} digit`);
     v = v * bb + BigInt(d);
   }
   if (negative) {
-    if (!allowNegative)
-      throw new ParseError("Negative values are not allowed here");
+    if (!allowNegative) throw new ParseError("Negative values are not allowed here");
     const limit = 1n << BigInt(width - 1);
-    if (v > limit)
-      throw new ParseError(`Below the signed ${width}-bit minimum (-${limit})`);
+    if (v > limit) throw new ParseError(`Below the signed ${width}-bit minimum (-${limit})`);
     return -v & maxValue(width);
   }
   if (v > maxValue(width)) {

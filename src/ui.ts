@@ -1,7 +1,7 @@
 // Small UI kit: element builder, icons, segmented control, switch, popup
 // menus, dialogs, tooltips, toasts and the validated number input.
-import { createElement, IconNode, X } from "lucide";
-import { Base, formatInt, ParseError, parseValue } from "./numfmt";
+import { createElement, type IconNode, X } from "lucide";
+import { type Base, formatInt, ParseError, parseValue } from "./numfmt";
 import { play } from "./sound";
 
 // ------------------------------------------------------------------ elements
@@ -39,7 +39,11 @@ export function icon(node: IconNode, size = 16, cls = ""): SVGElement {
 
 /** Button with an optional icon and label. */
 export function button(opts: {
-  icon?: IconNode; label?: string; tip?: string; cls?: string; onClick?: (e: MouseEvent) => void;
+  icon?: IconNode;
+  label?: string;
+  tip?: string;
+  cls?: string;
+  onClick?: (e: MouseEvent) => void;
   size?: number;
 }): HTMLButtonElement {
   const b = h("button", { class: `btn ${opts.cls ?? ""}`, type: "button", tip: opts.tip });
@@ -102,7 +106,12 @@ export function toggleSwitch(checked: boolean, onChange: (v: boolean) => void): 
     onChange(input.checked);
     play("toggle");
   });
-  return h("label", { class: "switch" }, input, h("span", { class: "switch-track" }, h("span", { class: "switch-knob" })));
+  return h(
+    "label",
+    { class: "switch" },
+    input,
+    h("span", { class: "switch-track" }, h("span", { class: "switch-knob" })),
+  );
 }
 
 // ------------------------------------------------------------------ tooltips
@@ -195,7 +204,7 @@ export type MenuItem =
       swatch?: string;
     };
 
-let openMenus: HTMLElement[] = [];
+const openMenus: HTMLElement[] = [];
 
 export function closeMenus(depth = 0) {
   for (const m of openMenus.splice(depth)) m.remove();
@@ -273,28 +282,36 @@ export function menusOpen(): boolean {
 }
 
 export function installMenus() {
-  document.addEventListener("pointerdown", (e) => {
-    if (!openMenus.length) return;
-    const t = e.target as Element;
-    if (!t.closest(".menu") && !t.closest(".menu-open")) closeMenus();
-  }, true);
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!openMenus.length) return;
+      const t = e.target as Element;
+      if (!t.closest(".menu") && !t.closest(".menu-open")) closeMenus();
+    },
+    true,
+  );
   window.addEventListener("blur", () => closeMenus());
   window.addEventListener("resize", () => closeMenus());
-  document.addEventListener("keydown", (e) => {
-    if (!openMenus.length) return;
-    const menu = openMenus[openMenus.length - 1];
-    const items = [...menu.querySelectorAll<HTMLButtonElement>(".menu-item:not(:disabled)")];
-    const i = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      closeMenus(openMenus.length - 1);
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      const n = items.length;
-      items[(i + (e.key === "ArrowDown" ? 1 : n - 1) + n) % n]?.focus();
-    }
-  }, true);
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!openMenus.length) return;
+      const menu = openMenus[openMenus.length - 1];
+      const items = [...menu.querySelectorAll<HTMLButtonElement>(".menu-item:not(:disabled)")];
+      const i = items.indexOf(document.activeElement as HTMLButtonElement);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeMenus(openMenus.length - 1);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const n = items.length;
+        items[(i + (e.key === "ArrowDown" ? 1 : n - 1) + n) % n]?.focus();
+      }
+    },
+    true,
+  );
 }
 
 // ------------------------------------------------------------------ dialogs
@@ -308,7 +325,7 @@ export function modal<T>(opts: {
   title: string;
   icon?: IconNode;
   wide?: boolean;
-  build: (body: HTMLElement, close: (r: T) => void) => HTMLElement[] | void; // returns footer buttons
+  build: (body: HTMLElement, close: (r: T) => void) => HTMLElement[] | undefined; // returns footer buttons
   cancelValue: T;
 }): Promise<T> {
   closeMenus();
@@ -318,12 +335,19 @@ export function modal<T>(opts: {
     const prevFocus = document.activeElement as HTMLElement | null;
     const body = h("div", { class: "modal-body" });
     const footer = h("div", { class: "modal-footer" });
-    const box = h("div", { class: `modal${opts.wide ? " wide" : ""}`, role: "dialog", "aria-modal": "true" },
-      h("div", { class: "modal-head" },
+    const box = h(
+      "div",
+      { class: `modal${opts.wide ? " wide" : ""}`, role: "dialog", "aria-modal": "true" },
+      h(
+        "div",
+        { class: "modal-head" },
         opts.icon ? h("span", { class: "modal-ico" }, icon(opts.icon, 18)) : null,
         h("h2", {}, opts.title),
-        button({ icon: X, cls: "ghost modal-x", tip: "Close (Esc)", onClick: () => close(opts.cancelValue) })),
-      body, footer);
+        button({ icon: X, cls: "ghost modal-x", tip: "Close (Esc)", onClick: () => close(opts.cancelValue) }),
+      ),
+      body,
+      footer,
+    );
     const backdrop = h("div", { class: "backdrop" }, box);
     let done = false;
     const close = (r: T) => {
@@ -352,15 +376,21 @@ export function modal<T>(opts: {
     else footer.remove();
     document.body.append(backdrop);
     requestAnimationFrame(() => backdrop.classList.add("show"));
-    const focusable = body.querySelector<HTMLElement>("input, [autofocus]") ?? footer.querySelector<HTMLElement>(".primary");
+    const focusable =
+      body.querySelector<HTMLElement>("input, [autofocus]") ?? footer.querySelector<HTMLElement>(".primary");
     focusable?.focus();
     if (focusable instanceof HTMLInputElement) focusable.select();
   });
 }
 
 /** Message box with custom buttons. Resolves to the clicked button's id, or `cancel`. */
-export function ask(title: string, message: string, buttons: { id: string; label: string; cls?: string }[],
-  cancel = "cancel", ico?: IconNode): Promise<string> {
+export function ask(
+  title: string,
+  message: string,
+  buttons: { id: string; label: string; cls?: string }[],
+  cancel = "cancel",
+  ico?: IconNode,
+): Promise<string> {
   return modal<string>({
     title,
     icon: ico,
@@ -406,8 +436,10 @@ export class NumberInput {
     private onCommit: (v: bigint) => void,
     private opts: { allowNegative?: boolean; group?: boolean; cls?: string } = {},
   ) {
-    this.tipText = "Type a value in the selected base.\nPrefixes 0x / 0b / 0o override it (in HEX, 0b… is read as hex).\n" +
-      "Spaces and _ are ignored." + (opts.allowNegative ? "\nA leading - stores the two's complement." : "");
+    this.tipText =
+      "Type a value in the selected base.\nPrefixes 0x / 0b / 0o override it (in HEX, 0b… is read as hex).\n" +
+      "Spaces and _ are ignored." +
+      (opts.allowNegative ? "\nA leading - stores the two's complement." : "");
     this.el = h("input", { class: `field mono ${opts.cls ?? ""}`, spellcheck: false, autocomplete: "off" });
     setTip(this.el, () => (this.error ? `⚠ ${this.error}\n\n${this.tipText}` : this.tipText));
     this.el.addEventListener("input", () => this.onEdited());
@@ -464,4 +496,3 @@ export class NumberInput {
     else if (!error && document.activeElement === this.el) hideTip();
   }
 }
-

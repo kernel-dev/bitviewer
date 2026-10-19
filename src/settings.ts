@@ -1,6 +1,6 @@
 // Persisted app settings (stored in the webview's localStorage).
 import type { View } from "./model";
-import { BASE_ORDER, Base } from "./numfmt";
+import { BASE_ORDER, type Base } from "./numfmt";
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 3.0;
@@ -9,13 +9,13 @@ export const ZOOM_STEP = 0.1;
 export interface Settings {
   zoom: number;
   theme: "dark" | "light";
-  msb_left: boolean;      // bit order inside a row: MSB on the left
+  msb_left: boolean; // bit order inside a row: MSB on the left
   show_readouts: boolean; // per-row hex/dec/oct readout
-  show_interp: boolean;   // signed / float interpretation chips
-  default_base: Base;     // base for rows of newly added values
-  default_view: View;     // row layout of newly added values
-  sounds: boolean;        // interface sounds (off unless the user turns them on)
-  sound_volume: number;   // 0 … 1
+  show_interp: boolean; // signed / float interpretation chips
+  default_base: Base; // base for rows of newly added values
+  default_view: View; // row layout of newly added values
+  sounds: boolean; // interface sounds (off unless the user turns them on)
+  sound_volume: number; // 0 … 1
 }
 
 const DEFAULTS: Settings = {

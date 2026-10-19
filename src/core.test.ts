@@ -91,7 +91,10 @@ describe("model", () => {
     m.setCompare(0, 0xcdn);
     expect(m.compareDiff(0)).toBe(0xabn ^ 0xcdn);
     m.setView("nibble");
-    expect([...m.compares]).toEqual([[0, 0xdn], [4, 0xcn]]);
+    expect([...m.compares]).toEqual([
+      [0, 0xdn],
+      [4, 0xcn],
+    ]);
     m.removeCompare(4);
     m.setView("byte");
     expect([...m.compares]).toEqual([[0, 0xadn]]); // missing high nibble filled from parent
@@ -214,7 +217,12 @@ describe("model", () => {
 
   it("round-trips through JSON", () => {
     const m = new ValueModel({
-      width: 64, value: 0xdeadbeefcafef00dn, name: "R", view: "nibble", msbFirst: false, fullBase: 10,
+      width: 64,
+      value: 0xdeadbeefcafef00dn,
+      name: "R",
+      view: "nibble",
+      msbFirst: false,
+      fullBase: 10,
     });
     m.setRowBase(4, 2);
     m.addCompare(8);
@@ -227,8 +235,15 @@ describe("model", () => {
 
   it("reads files written by the Python version", () => {
     const m = ValueModel.fromJSON({
-      name: "Legacy", width: 32, value: "0x3FC00000", view: "byte", msb_first: true, full_base: 16,
-      default_row_base: 16, row_bases: { "8": 2 }, compares: { "0": "0x12" },
+      name: "Legacy",
+      width: 32,
+      value: "0x3FC00000",
+      view: "byte",
+      msb_first: true,
+      full_base: 16,
+      default_row_base: 16,
+      row_bases: { "8": 2 },
+      compares: { "0": "0x12" },
       groups: [{ lo: 23, hi: 30, name: "EXP", color: "#e8590c", base: 16 }],
     });
     expect(m.value).toBe(0x3fc00000n);

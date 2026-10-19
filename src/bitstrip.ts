@@ -34,7 +34,12 @@ export class BitStrip {
   private ro?: ResizeObserver;
   private lines: HTMLElement[] = [];
 
-  constructor(private host: StripHost, readonly lo: number, readonly compare = false, readonly flex = false) {
+  constructor(
+    private host: StripHost,
+    readonly lo: number,
+    readonly compare = false,
+    readonly flex = false,
+  ) {
     this.el = h("div", { class: `strip${flex ? " flex" : ""}${compare ? " cmp" : ""}` });
     this.el.addEventListener("pointerdown", (e) => this.onDown(e));
     this.el.addEventListener("contextmenu", (e) => {
@@ -149,11 +154,17 @@ export class BitStrip {
         else seg = null;
       }
       for (const s of segs) {
-        bars.append(h("div", {
-          class: "gbar",
-          style: `left:${s.x0}px;width:${s.x1 - s.x0}px;--g:${s.g.color}`,
-          tip: `${s.g.name} ${s.g.label()}`,
-        }, h("span", {}, s.g.name)));
+        bars.append(
+          h(
+            "div",
+            {
+              class: "gbar",
+              style: `left:${s.x0}px;width:${s.x1 - s.x0}px;--g:${s.g.color}`,
+              tip: `${s.g.name} ${s.g.label()}`,
+            },
+            h("span", {}, s.g.name),
+          ),
+        );
       }
     }
   }
