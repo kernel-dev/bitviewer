@@ -1,6 +1,6 @@
 [package]
 name = "bitviewer"
-version = "2.0.0"
+version = "2.1.0"
 description = "Inspect and edit 32/64-bit values bit by bit"
 edition = "2021"
 
@@ -17,6 +17,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [profile.release]
 codegen-units = 1

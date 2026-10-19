@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Writes `contents` atomically: write a temp file next to the target, then rename.
 fn write_atomic(target: &Path, contents: &str) -> Result<(), String> {
@@ -26,13 +26,18 @@ fn write_text(path: String, contents: String) -> Result<(), String> {
     write_atomic(Path::new(&path), &contents)
 }
 
-/// File passed on the command line, e.g. `BitViewer.exe workspace.bitview.json`.
-#[tauri::command]
-fn initial_file() -> Option<String> {
-    std::env::args()
+/// First existing file among command-line arguments (skipping the program).
+fn file_arg<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter()
         .skip(1)
         .find(|a| !a.starts_with('-'))
         .filter(|a| Path::new(a).is_file())
+}
+
+/// File passed on the command line, e.g. `BitViewer.exe workspace.bitview`.
+#[tauri::command]
+fn initial_file() -> Option<String> {
+    file_arg(std::env::args())
 }
 
 /// Resolves a file in the app's own folders. `dir` is "config" (settings) or
@@ -90,6 +95,19 @@ fn delete_app_file(app: AppHandle, dir: String, name: String) -> Result<(), Stri
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // must come first: a second launch (e.g. double-clicking another
+        // workspace) hands its file to this window instead of opening a new one
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            if let Some(path) = file_arg(argv) {
+                let _ = app.emit("open-file", path);
+            }
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![

@@ -1,3 +1,4 @@
 # Keep `tauri dev` from rebuilding/restarting when a workspace is saved here.
 *.bitview.json
 *.tmp
+*.bitview

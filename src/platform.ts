@@ -4,7 +4,7 @@
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const FILTERS = [
-  { name: "Bit Viewer workspace", extensions: ["bitview.json", "json"] },
+  { name: "Bit Viewer workspace", extensions: ["bitview", "json"] },
   { name: "All files", extensions: ["*"] },
 ];
 
@@ -171,6 +171,13 @@ export async function deleteAppFile(dir: AppDir, name: string): Promise<void> {
   }
   const { invoke } = await core();
   await invoke("delete_app_file", { dir, name });
+}
+
+/** A workspace handed over by a second launch (double-clicking another file). */
+export async function onOpenFile(cb: (path: string) => void) {
+  if (!isTauri) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen<string>("open-file", (e) => cb(e.payload));
 }
 
 // ------------------------------------------------------------------ file drops

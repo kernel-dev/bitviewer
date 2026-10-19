@@ -5,6 +5,7 @@ import {
   Camera,
   ChevronsUpDown,
   CircleQuestionMark,
+  CloudDownload,
   Command,
   FileCode2,
   FilePlus,
@@ -57,6 +58,7 @@ import { S, ZOOM_STEP } from "./settings";
 import { play } from "./sound";
 import { startTour, tourRunning } from "./tour";
 import { ask, button, h, icon, type MenuItem, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
+import { checkForUpdates } from "./updates";
 
 const FILE_VERSION = 1;
 const UNTITLED = "Untitled";
@@ -111,6 +113,10 @@ export class App {
     const initial = await P.initialFile();
     if (!(initial && (await this.loadPath(initial))) && !(await this.restoreSession())) this.startFresh();
     if (!S.get("tour_done")) setTimeout(() => this.runTour(), 700);
+    else if (S.get("check_updates")) setTimeout(() => void checkForUpdates(false), 3000);
+    void P.onOpenFile(async (path) => {
+      if (await this.maybeSave()) await this.loadPath(path);
+    });
   }
 
   private async runTour() {
@@ -312,6 +318,14 @@ export class App {
       },
       { id: "help.about", group: "Help", label: "About Bit Viewer", icon: Info, run: () => showAbout() },
       {
+        id: "help.updates",
+        group: "Help",
+        label: "Check for updates…",
+        icon: CloudDownload,
+        keywords: "upgrade version new",
+        run: () => checkForUpdates(true),
+      },
+      {
         id: "help.tour",
         group: "Help",
         label: "Take the tour",
@@ -485,7 +499,7 @@ export class App {
           "app.settings",
         ],
       ],
-      ["Help", ["app.palette", "help.controls", "help.tour", "sep", "help.about"]],
+      ["Help", ["app.palette", "help.controls", "help.tour", "sep", "help.updates", "help.about"]],
     ];
   }
 
@@ -1176,10 +1190,10 @@ export class App {
 
   private async saveAs(): Promise<boolean> {
     const dir = S.get("last_dir") || (await P.defaultDir());
-    const start = this.path ?? (dir ? P.joinPath(dir, "workspace.bitview.json") : "workspace.bitview.json");
+    const start = this.path ?? (dir ? P.joinPath(dir, "workspace.bitview") : "workspace.bitview");
     let path = await P.pickSavePath(start);
     if (!path) return false;
-    if (!path.toLowerCase().endsWith(".json")) path += ".bitview.json";
+    if (!/\.(bitview|json)$/i.test(path)) path += ".bitview";
     return this.write(path);
   }
 

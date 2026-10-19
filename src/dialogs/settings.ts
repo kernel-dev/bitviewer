@@ -166,6 +166,14 @@ export function openSettings(): Promise<void> {
           ),
         ),
         section(
+          "Updates",
+          row(
+            "Check for updates at start-up",
+            toggleSwitch(S.get("check_updates"), (v) => S.set("check_updates", v)),
+            "Help › Check for updates… works either way",
+          ),
+        ),
+        section(
           "Readouts",
           row(
             "Per-row readouts",

@@ -29,6 +29,7 @@ export interface Settings {
   compact: boolean; // tighter spacing everywhere
   accent: string; // "#rrggbb", or "" for the theme's red
   tour_done: boolean; // the first-run tour was finished or skipped
+  check_updates: boolean; // look for a newer version at start-up
 }
 
 const DEFAULTS: Settings = {
@@ -49,6 +50,7 @@ const DEFAULTS: Settings = {
   compact: false,
   accent: "",
   tour_done: false,
+  check_updates: true,
 };
 
 const FILE = "settings.json";

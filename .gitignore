@@ -6,3 +6,6 @@ src-tauri/gen/
 
 # user workspaces are data, not source
 *.bitview.json
+
+# workspaces saved with the newer extension
+*.bitview

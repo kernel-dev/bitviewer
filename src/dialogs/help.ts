@@ -1,10 +1,11 @@
 // Help (searchable topics + shortcuts) and About dialogs.
 import { CircleQuestionMark, Info, Search, Sparkles } from "lucide";
+import pkg from "../../package.json";
 import type { CommandRegistry } from "../commands";
 import { logoSvg } from "../logo";
 import { button, h, icon, modal } from "../ui";
 
-export const VERSION = "2.1.0";
+export const VERSION = pkg.version;
 
 /** Renders "Ctrl+Shift+S" as key caps. */
 export function keyCaps(spec: string): HTMLElement {
