@@ -378,12 +378,13 @@ button.badge:hover { border-color: var(--accent); color: var(--accent); }
   content: ""; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px;
   border-radius: 50%; background: var(--diff);
 }
-.bars { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; }
+.bars { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; pointer-events: none; }
+.bit-line:not(.has-bars) .bars { display: none; }
 .gbar {
   position: absolute; top: 0; height: 14px; border-radius: 4px; padding: 0 4px;
   background: var(--g); color: #fff; font: 700 9.5px/14px var(--ui); letter-spacing: 0.04em;
   text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25); pointer-events: auto;
 }
 .strip.cmp .gbar { opacity: 0.5; }
 body.dragging, body.dragging * { cursor: pointer !important; }

@@ -73,3 +73,17 @@ test("widths from 1 to 512 bits, and wrapping lines", async ({ app, page }) => {
   const lines = app.card(1).locator(".strip:not(.cmp) .bit-line");
   await expect.poll(() => lines.count()).toBeGreaterThan(1);
 });
+
+test("the bottom edge of a bit is clickable, with and without fields", async ({ app }) => {
+  const clickBottom = async (b: number) => {
+    const cell = app.bit(b);
+    const box = (await cell.boundingBox())!;
+    await cell.page().mouse.click(box.x + box.width / 2, box.y + box.height - 3);
+  };
+  await clickBottom(0);
+  expect(await app.value()).toBe("1");
+  await app.run("window.__app.cards[0].model.addGroup(8, 15, 'CTRL'); window.__app.cards[0].rebuild()");
+  await clickBottom(1);
+  await clickBottom(9);
+  expect(await app.value()).toBe("203");
+});

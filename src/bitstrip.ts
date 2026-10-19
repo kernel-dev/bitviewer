@@ -174,6 +174,7 @@ export class BitStrip {
     for (const line of this.lines) {
       const bars = line.querySelector<HTMLElement>(".bars")!;
       bars.replaceChildren();
+      line.classList.toggle("has-bars", m.groups.length > 0);
       if (!m.groups.length) continue;
       type Seg = { g: Group; x0: number; x1: number };
       let seg: Seg | null = null;
