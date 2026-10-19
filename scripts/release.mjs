@@ -43,7 +43,7 @@ if (!env.TAURI_SIGNING_PRIVATE_KEY) {
 }
 
 console.log(`Building Bit Viewer ${version} with updater artifacts…`);
-execSync(`npx tauri build --config "{\\"bundle\\":{\\"createUpdaterArtifacts\\":true}}"`, {
+execSync("npx tauri build --config src-tauri/tauri.updater.conf.json", {
   cwd: root,
   env,
   stdio: "inherit",

@@ -32,10 +32,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "nsis",
-      "msi"
-    ],
+    "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "Inspect and edit 32/64-bit values bit by bit",
     "icon": [
@@ -56,13 +53,21 @@
         "role": "Editor"
       }
     ],
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "linux": {
+      "deb": {
+        "section": "devel"
+      }
+    }
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU3NEQ3RjRBQ0UzODg2MEYKUldRUGhqak9TbjlOVjJpVm1QZGx3aG0vSFpJdnF1Q2NaOHVlUHJLWitBQTAxdjJwQXZxLzl6VXMK",
       "endpoints": [
-        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+        "https://github.com/kernel-dev/bitviewer/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

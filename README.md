@@ -24,7 +24,18 @@ Press **F1** in the app for searchable help.
 
 ## Install
 
-Build from source (below). Builds currently target Windows. Installed copies can update themselves from GitHub Releases.
+Download the latest build from [Releases](https://github.com/kernel-dev/bitviewer/releases/latest):
+
+| Platform | File |
+|---|---|
+| Windows | `*_x64-setup.exe` (or `.msi`) |
+| macOS (Apple Silicon / Intel) | `*_aarch64.dmg` / `*_x64.dmg` |
+| Linux | `.AppImage`, `.deb` or `.rpm` |
+
+Installed copies update themselves (except the Linux `.deb` / `.rpm`).
+
+> [!NOTE]
+> Builds are not code-signed. Windows SmartScreen may warn on first run ("More info" → "Run anyway"). On macOS, right-click the app → Open the first time; if it says the app is damaged, run `xattr -cr "/Applications/Bit Viewer.app"`.
 
 ## Build from source
 
@@ -52,11 +63,15 @@ npm run format       # Biome + rustfmt
 <details>
 <summary>Publishing a release with auto-updates</summary>
 
-1. In `src-tauri/tauri.conf.json`, replace `OWNER/REPO` in `plugins.updater.endpoints` with the repository.
-2. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
-3. Run `npm run release -- --notes "What changed"`. It builds a signed installer and `latest.json`, then prints the `gh release create …` command that uploads them.
+Releases are built by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) for Windows, macOS and Linux.
 
-Updates are signed with the private key in `~/.tauri/bitviewer.key`. Keep it private and backed up: without it, installed copies can't verify future updates.
+1. Once: add the repository secret `TAURI_SIGNING_PRIVATE_KEY` with the contents of `~/.tauri/bitviewer.key`.
+2. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, and commit.
+3. Tag and push: `git tag v2.1.0 && git push origin v2.1.0`.
+
+The workflow checks that the tag matches the version, runs the tests, builds every platform and publishes the release with `latest.json` for the updater. `npm run release` still builds a Windows-only release locally.
+
+Keep the signing key private and backed up: without it, installed copies can't verify future updates.
 
 </details>
 
