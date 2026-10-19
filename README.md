@@ -5,7 +5,7 @@ A desktop app for viewing and editing values of 1–512 bits, one bit at a time.
 ![Bit Viewer showing a 32-bit register split into named fields](docs/screenshot.png)
 
 > [!WARNING]
-> **This project is vibecoded.** The code was written by an AI (Claude, via Claude Code) from the maintainer's prompts, not by hand. The maintainer chose the features, tried the app and reported bugs. Unit and end-to-end tests check its behaviour, and the code has been reviewed line by line by a human. Commits made with the AI carry a `Co-Authored-By: Claude` line.
+> **This project is vibecoded.** The code was written by an AI (Claude, via Claude Code) from the maintainer's prompts, not by hand. The maintainer chose the features, tried the app and reported bugs. Unit and end-to-end tests check its behaviour, and the code has been reviewed line by line by a human skimmingly. Commits made with the AI carry a `Co-Authored-By: Claude` line.
 
 ## Features
 
