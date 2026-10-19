@@ -1,13 +1,13 @@
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
-import "./styles.css";
-import { App } from "./app";
-import { installMenus, installTooltips } from "./ui";
+import "./ui/styles.css";
+import { App } from "./app/app";
+import { installMenus, installTooltips } from "./ui/kit";
 
 installTooltips();
 installMenus();
 
-import { S } from "./settings";
+import { S } from "./app/settings";
 
 const app = new App(document.getElementById("app")!);
 S.load().then(() => app.start());

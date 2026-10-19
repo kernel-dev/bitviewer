@@ -5,7 +5,7 @@ A desktop app for viewing and editing values of 1–512 bits, one bit at a time.
 ![Bit Viewer showing a 32-bit register split into named fields](docs/screenshot.png)
 
 > [!WARNING]
-> **This project is vibecoded.** The code was written by an AI (Claude, via Claude Code) from the maintainer's prompts, not by hand. The maintainer chose the features, tried the app and reported bugs. Unit and end-to-end tests check its behaviour, but the code has not been reviewed line by line by a human. Commits made with the AI carry a `Co-Authored-By: Claude` line.
+> **This project is vibecoded.** The code was written by an AI (Claude, via Claude Code) from the maintainer's prompts, not by hand. The maintainer chose the features, tried the app and reported bugs. Unit and end-to-end tests check its behaviour, and the code has been reviewed line by line by a human. Commits made with the AI carry a `Co-Authored-By: Claude` line.
 
 ## Features
 
@@ -78,13 +78,14 @@ Updates are signed with the private key in `~/.tauri/bitviewer.key`. Keep it pri
 <summary>Show</summary>
 
 ```
-src/              TypeScript UI
-  app.ts          window, menus, files, undo, session
-  card.ts         one value card
-  bitstrip.ts     bit cells and field bars
-  model.ts        value model (no DOM)
+src/
+  main.ts         entry point
+  core/           logic with no UI: value model, number formats, expressions, code export
+  app/            window, menus, files, undo, session, settings, search, palette
+  card/           one value card: bit cells, toolbar, readouts
+  ui/             shared widgets, sounds, styles
   dialogs/        settings, help, field details, export…
-  *.test.ts       unit tests
+  (tests sit next to the code as *.test.ts)
 e2e/              end-to-end tests
 src-tauri/        Rust shell: file access, plugins, config
 scripts/          release script

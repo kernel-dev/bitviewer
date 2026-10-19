@@ -38,23 +38,25 @@ import {
   Undo2,
   X,
 } from "lucide";
-import { BitStrip, type StripHost } from "./bitstrip";
-import { copyBytesMenu, pasteBytes } from "./dialogs/bytes";
-import { exportCode } from "./dialogs/export";
-import { editField } from "./dialogs/field";
-import { pickTemplate, saveTemplate } from "./dialogs/templates";
-import { ExprError } from "./expr";
-import { expressionBar } from "./exprbar";
-import { decodeField, isInvertible, rawFromNumber } from "./fieldfmt";
-import { parseFloatText } from "./formats";
-import { type ChangeKind, GROUP_COLORS, type Group, ModelError, type Op, type ValueModel, type View } from "./model";
-import { BASE_NAMES, BASE_ORDER, type Base, formatInt, ParseError, popcount } from "./numfmt";
-import { moreOpsMenu } from "./ops-ui";
-import { copyText } from "./platform";
-import { SelectionBar } from "./selbar";
-import { S } from "./settings";
-import { play } from "./sound";
-import { StatsBar } from "./stats";
+import { copyText } from "../app/platform";
+import { S } from "../app/settings";
+import { ExprError } from "../core/expr";
+import { decodeField, isInvertible, rawFromNumber } from "../core/fieldfmt";
+import { parseFloatText } from "../core/formats";
+import {
+  type ChangeKind,
+  GROUP_COLORS,
+  type Group,
+  ModelError,
+  type Op,
+  type ValueModel,
+  type View,
+} from "../core/model";
+import { BASE_NAMES, BASE_ORDER, type Base, formatInt, ParseError, popcount } from "../core/numfmt";
+import { copyBytesMenu, pasteBytes } from "../dialogs/bytes";
+import { exportCode } from "../dialogs/export";
+import { editField } from "../dialogs/field";
+import { pickTemplate, saveTemplate } from "../dialogs/templates";
 import {
   ask,
   button,
@@ -68,7 +70,13 @@ import {
   segmented,
   setTip,
   toast,
-} from "./ui";
+} from "../ui/kit";
+import { play } from "../ui/sound";
+import { BitStrip, type StripHost } from "./bitstrip";
+import { expressionBar } from "./exprbar";
+import { moreOpsMenu } from "./ops-ui";
+import { SelectionBar } from "./selbar";
+import { StatsBar } from "./stats";
 
 const VIEW_UI: { value: View; label: string; icon: IconNode; tip: string }[] = [
   {

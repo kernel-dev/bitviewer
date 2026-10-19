@@ -1,8 +1,8 @@
 // A card's expression bar: type an expression, press Enter, and the result
 // becomes the value (or the selected bits).
 import { Check, SquareFunction, X } from "lucide";
-import { type ExprField, exprField, type Lookup } from "./exprfield";
-import { button, h, icon } from "./ui";
+import { type ExprField, exprField, type Lookup } from "../ui/exprfield";
+import { button, h, icon } from "../ui/kit";
 
 export function expressionBar(opts: {
   width: () => number;

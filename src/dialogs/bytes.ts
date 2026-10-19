@@ -1,8 +1,8 @@
 // Paste a value as bytes, and the "Copy as bytes" menu entries.
 import { ClipboardPaste } from "lucide";
-import { type ByteOrder, type ByteStyle, bytesToValue, formatBytes, parseBytes, valueToBytes } from "../formats";
-import { formatInt, ParseError } from "../numfmt";
-import { button, h, type MenuItem, modal, segmented } from "../ui";
+import { type ByteOrder, type ByteStyle, bytesToValue, formatBytes, parseBytes, valueToBytes } from "../core/formats";
+import { formatInt, ParseError } from "../core/numfmt";
+import { button, h, type MenuItem, modal, segmented } from "../ui/kit";
 
 /** Asks for bytes and returns the value they make, or null when cancelled. */
 export function pasteBytes(width: number, initial = ""): Promise<bigint | null> {

@@ -1,6 +1,7 @@
 // Command palette (Ctrl+K): type to find any command, Enter to run it.
+
+import { closeMenus, h, hideTip, icon } from "../ui/kit";
 import type { Command, CommandRegistry } from "./commands";
-import { closeMenus, h, hideTip, icon } from "./ui";
 
 /** Ranks how well `c` matches the query words; -1 = no match. */
 export function score(label: string, extra: string, query: string): number {

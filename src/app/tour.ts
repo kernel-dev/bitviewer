@@ -1,6 +1,6 @@
 // First-run tour: a spotlight on a few key parts of the window, with short
 // explanations. Shown once (until finished or skipped) and from Help.
-import { h } from "./ui";
+import { h } from "../ui/kit";
 
 interface Step {
   target: string; // CSS selector; steps whose target isn't on screen are skipped

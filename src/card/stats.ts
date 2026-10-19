@@ -1,6 +1,7 @@
 // The readout chips under a card: unsigned, signed, set bits, floats (editable)
 // and optional extras. Which chips show is a global setting.
 import { Plus } from "lucide";
+import { S } from "../app/settings";
 import {
   bcdDecode,
   bytesAsText,
@@ -16,12 +17,11 @@ import {
   grayToBinary,
   onesComplement,
   parseFloatText,
-} from "./formats";
-import type { ValueModel } from "./model";
-import { ParseError, popcount, toSigned } from "./numfmt";
-import { S } from "./settings";
-import { play } from "./sound";
-import { button, h, type MenuItem, openMenu, setTip, toast } from "./ui";
+} from "../core/formats";
+import type { ValueModel } from "../core/model";
+import { ParseError, popcount, toSigned } from "../core/numfmt";
+import { button, h, type MenuItem, openMenu, setTip, toast } from "../ui/kit";
+import { play } from "../ui/sound";
 
 interface ChipDef {
   id: string;

@@ -10,9 +10,9 @@ import {
   RotateCw,
   Sigma,
 } from "lucide";
-import { type ExprResult, exprField, type Lookup } from "./exprfield";
-import type { Op } from "./model";
-import { button, h, type MenuItem, modal, segmented } from "./ui";
+import type { Op } from "../core/model";
+import { type ExprResult, exprField, type Lookup } from "../ui/exprfield";
+import { button, h, type MenuItem, modal, segmented } from "../ui/kit";
 
 export type ApplyOp = (op: Op, arg?: bigint) => void;
 

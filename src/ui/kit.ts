@@ -1,7 +1,7 @@
 // Small UI kit: element builder, icons, segmented control, switch, popup
 // menus, dialogs, tooltips, toasts and the validated number input.
 import { Check, createElement, type IconNode, X } from "lucide";
-import { type Base, formatInt, ParseError, parseValue } from "./numfmt";
+import { type Base, formatInt, ParseError, parseValue } from "../core/numfmt";
 import { play } from "./sound";
 
 // ------------------------------------------------------------------ elements

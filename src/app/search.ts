@@ -1,10 +1,10 @@
 // Ctrl+F search bar: filters values by name, fields, descriptions, named
 // values, snapshots or hex digits, and highlights matching fields.
 import { ChevronDown, ChevronUp, Search, X } from "lucide";
-import type { ValueCard } from "./card";
-import type { ValueModel } from "./model";
-import { formatInt } from "./numfmt";
-import { button, h, icon } from "./ui";
+import type { ValueCard } from "../card/card";
+import type { ValueModel } from "../core/model";
+import { formatInt } from "../core/numfmt";
+import { button, h, icon } from "../ui/kit";
 
 /** Does a value match the (lower-case) query? Field names that match are returned too. */
 export function matchValue(m: ValueModel, q: string): { hit: boolean; fields: Set<string> } {

@@ -1,10 +1,10 @@
 // The Settings dialog. Every change applies immediately.
 import { Contrast, Moon, SlidersHorizontal, Sun, Volume2 } from "lucide";
-import { ACCENTS } from "../accent";
-import { BASE_NAMES, BASE_ORDER } from "../numfmt";
-import { S, ZOOM_MAX, ZOOM_MIN } from "../settings";
-import { play } from "../sound";
-import { button, h, modal, segmented, toggleSwitch } from "../ui";
+import { S, ZOOM_MAX, ZOOM_MIN } from "../app/settings";
+import { BASE_NAMES, BASE_ORDER } from "../core/numfmt";
+import { ACCENTS } from "../ui/accent";
+import { button, h, modal, segmented, toggleSwitch } from "../ui/kit";
+import { play } from "../ui/sound";
 
 function section(name: string, ...rows: HTMLElement[]): HTMLElement {
   return h("section", { class: "set-section" }, h("h4", {}, name), h("div", { class: "set-card" }, ...rows));

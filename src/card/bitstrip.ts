@@ -4,10 +4,11 @@
 //
 // `flex` strips (the "line" view) stretch their cells to fill the width and
 // wrap onto 2 or 4 lines when the cells would get too narrow.
-import type { Group, ValueModel } from "./model";
-import { S } from "./settings";
-import { play } from "./sound";
-import { h, setTip } from "./ui";
+
+import { S } from "../app/settings";
+import type { Group, ValueModel } from "../core/model";
+import { h, setTip } from "../ui/kit";
+import { play } from "../ui/sound";
 
 export interface StripHost {
   model: ValueModel;

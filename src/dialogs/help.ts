@@ -1,9 +1,9 @@
 // Help (searchable topics + shortcuts) and About dialogs.
 import { CircleQuestionMark, Info, Search, Sparkles } from "lucide";
 import pkg from "../../package.json";
-import type { CommandRegistry } from "../commands";
-import { logoSvg } from "../logo";
-import { button, h, icon, modal } from "../ui";
+import type { CommandRegistry } from "../app/commands";
+import { button, h, icon, modal } from "../ui/kit";
+import { logoSvg } from "../ui/logo";
 
 export const VERSION = pkg.version;
 

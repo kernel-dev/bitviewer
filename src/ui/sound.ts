@@ -1,6 +1,6 @@
 // Optional interface sounds, synthesized with Web Audio (no audio files).
 // Silent unless the "sounds" setting is on — it is off by default.
-import { S } from "./settings";
+import { S } from "../app/settings";
 
 export type Sound = "bitOn" | "bitOff" | "select" | "group" | "remove" | "op" | "copy" | "error" | "add" | "toggle";
 

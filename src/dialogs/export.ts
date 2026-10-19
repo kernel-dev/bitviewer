@@ -1,11 +1,11 @@
 // "Export code…": C macros / C struct / Rust / Python for a value's fields.
 import { Copy, Download, FileCode2 } from "lucide";
-import { generate, ident, LANG_EXT, LANG_NAMES, type Lang } from "../codegen";
-import type { ValueModel } from "../model";
-import { basename, copyText, joinPath, pickSavePath, writeText } from "../platform";
-import { S } from "../settings";
-import { play } from "../sound";
-import { button, h, modal, segmented, toast, toggleSwitch } from "../ui";
+import { basename, copyText, joinPath, pickSavePath, writeText } from "../app/platform";
+import { S } from "../app/settings";
+import { generate, ident, LANG_EXT, LANG_NAMES, type Lang } from "../core/codegen";
+import type { ValueModel } from "../core/model";
+import { button, h, modal, segmented, toast, toggleSwitch } from "../ui/kit";
+import { play } from "../ui/sound";
 
 let lastLang: Lang = "c";
 

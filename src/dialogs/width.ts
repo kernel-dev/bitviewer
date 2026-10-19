@@ -1,7 +1,7 @@
 // Dialog asking for a bit width (1–512) with presets.
 import { Ruler } from "lucide";
-import { MAX_WIDTH, MIN_WIDTH } from "../model";
-import { button, h, modal, segmented } from "../ui";
+import { MAX_WIDTH, MIN_WIDTH } from "../core/model";
+import { button, h, modal, segmented } from "../ui/kit";
 
 const PRESETS = [8, 16, 32, 64, 128, 256, 512];
 

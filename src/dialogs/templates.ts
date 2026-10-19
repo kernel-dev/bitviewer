@@ -1,8 +1,8 @@
 // Template picker (built-in + your own) and "save fields as template".
 import { LayoutTemplate, Trash } from "lucide";
-import { S } from "../settings";
-import { BUILTIN_TEMPLATES, type Template } from "../templates";
-import { button, h, modal, toast } from "../ui";
+import { S } from "../app/settings";
+import { BUILTIN_TEMPLATES, type Template } from "../core/templates";
+import { button, h, modal, toast } from "../ui/kit";
 
 const CHIP_COLOR = (c?: string) => c ?? "#868e96";
 

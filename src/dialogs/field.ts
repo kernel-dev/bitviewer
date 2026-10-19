@@ -1,11 +1,11 @@
 // "Field details" dialog: description, access, signedness, formula + unit,
 // and named values.
 import { Plus, SlidersVertical, Trash } from "lucide";
-import { ExprError } from "../expr";
-import { compileFormula, formatReal } from "../fieldfmt";
-import type { Access, FieldDetails, Group, NamedValue } from "../model";
-import { maxValue } from "../numfmt";
-import { button, h, modal, segmented, toggleSwitch } from "../ui";
+import { ExprError } from "../core/expr";
+import { compileFormula, formatReal } from "../core/fieldfmt";
+import type { Access, FieldDetails, Group, NamedValue } from "../core/model";
+import { maxValue } from "../core/numfmt";
+import { button, h, modal, segmented, toggleSwitch } from "../ui/kit";
 
 function parseInteger(text: string): bigint {
   const t = text.trim().replace(/_/g, "");

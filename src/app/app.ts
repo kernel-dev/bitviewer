@@ -38,26 +38,26 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide";
-import { applyAccent } from "./accent";
-import { ValueCard } from "./card";
+import { ValueCard } from "../card/card";
+import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "../core/model";
+import { BASE_NAMES, BASE_ORDER, type Base } from "../core/numfmt";
+import { showAbout, showHelp } from "../dialogs/help";
+import { newValueFromExpression } from "../dialogs/newvalue";
+import { openSettings } from "../dialogs/settings";
+import { pickTemplate } from "../dialogs/templates";
+import { pickWidth } from "../dialogs/width";
+import { applyAccent } from "../ui/accent";
+import { ask, button, h, icon, type MenuItem, menusOpen, modalOpen, openMenu, segmented, toast } from "../ui/kit";
+import { logoSvg } from "../ui/logo";
+import { play } from "../ui/sound";
 import { CommandRegistry } from "./commands";
-import { showAbout, showHelp } from "./dialogs/help";
-import { newValueFromExpression } from "./dialogs/newvalue";
-import { openSettings } from "./dialogs/settings";
-import { pickTemplate } from "./dialogs/templates";
-import { pickWidth } from "./dialogs/width";
 import { History } from "./history";
-import { logoSvg } from "./logo";
-import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "./model";
-import { BASE_NAMES, BASE_ORDER, type Base } from "./numfmt";
 import { openPalette, paletteOpen } from "./palette";
 import * as P from "./platform";
 import { SearchBar } from "./search";
 import { loadSession, type Session, saveSessionNow, saveSessionSoon } from "./session";
 import { S, ZOOM_STEP } from "./settings";
-import { play } from "./sound";
 import { startTour, tourRunning } from "./tour";
-import { ask, button, h, icon, type MenuItem, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
 import { checkForUpdates } from "./updates";
 
 const FILE_VERSION = 1;

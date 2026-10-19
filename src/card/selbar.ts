@@ -1,8 +1,8 @@
 // Selection readout in a card's toolbar: the selected range plus an editable
 // value for just those bits, in a base of your choice.
-import type { ValueModel } from "./model";
-import { BASE_NAMES, type Base } from "./numfmt";
-import { h, NumberInput, segmented } from "./ui";
+import type { ValueModel } from "../core/model";
+import { BASE_NAMES, type Base } from "../core/numfmt";
+import { h, NumberInput, segmented } from "../ui/kit";
 
 const BASES: Base[] = [16, 10, 2];
 

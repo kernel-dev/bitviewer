@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { ValueModel } from "../core/model";
 import { matchKey } from "./commands";
-import { ValueModel } from "./model";
 import { score } from "./palette";
 import { matchValue } from "./search";
 
