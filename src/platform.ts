@@ -172,3 +172,38 @@ export async function deleteAppFile(dir: AppDir, name: string): Promise<void> {
   const { invoke } = await core();
   await invoke("delete_app_file", { dir, name });
 }
+
+// ------------------------------------------------------------------ file drops
+/** Calls `hover(true/false)` while files are dragged over the window and
+ *  `drop(file)` with the first dropped file. */
+export async function onFileDrop(hover: (over: boolean) => void, drop: (file: OpenedFile) => void) {
+  if (isTauri) {
+    const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+    await getCurrentWebview().onDragDropEvent(async (event) => {
+      const p = event.payload;
+      if (p.type === "enter" || p.type === "over") hover(true);
+      else if (p.type === "leave") hover(false);
+      else if (p.type === "drop") {
+        hover(false);
+        const path = p.paths[0];
+        if (path) drop({ path, name: basename(path), text: await readText(path) });
+      }
+    });
+    return;
+  }
+  window.addEventListener("dragover", (e) => {
+    if (e.dataTransfer?.types.includes("Files")) {
+      e.preventDefault();
+      hover(true);
+    }
+  });
+  window.addEventListener("dragleave", (e) => {
+    if (!e.relatedTarget) hover(false);
+  });
+  window.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    hover(false);
+    const f = e.dataTransfer?.files[0];
+    if (f) drop({ path: null, name: f.name, text: await f.text() });
+  });
+}

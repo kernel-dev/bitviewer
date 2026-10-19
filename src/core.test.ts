@@ -100,6 +100,32 @@ describe("model", () => {
     expect([...m.compares]).toEqual([[0, 0xadn]]); // missing high nibble filled from parent
   });
 
+  it("keeps snapshots and the collapsed state in files", () => {
+    const m = new ValueModel({ width: 16, value: 0x1234n });
+    const a = m.takeSnapshot("after reset", 1000);
+    m.setValue(0xbeefn);
+    m.takeSnapshot("", 2000);
+    m.setCollapsed(true);
+    expect(m.snapshots.map((s) => s.name)).toEqual(["after reset", "Snapshot 2"]);
+    const back = ValueModel.fromJSON(JSON.parse(JSON.stringify(m)));
+    expect(back.collapsed).toBe(true);
+    expect(back.snapshots).toEqual([
+      { name: "after reset", value: 0x1234n, at: 1000 },
+      { name: "Snapshot 2", value: 0xbeefn, at: 2000 },
+    ]);
+    m.removeSnapshot(a);
+    expect(m.snapshots.length).toBe(1);
+    expect(
+      ValueModel.fromJSON({
+        width: 8,
+        snapshots: [
+          { name: "x", value: "zz" },
+          { name: "y", value: "0x1ff" },
+        ],
+      }).snapshots,
+    ).toEqual([{ name: "y", value: 0xffn, at: 0 }]);
+  });
+
   it("remembers a closed compare row's value", () => {
     const m = new ValueModel({ width: 32, value: 0x1n, view: "line" });
     m.addCompare(0);

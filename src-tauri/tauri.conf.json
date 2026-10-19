@@ -23,7 +23,7 @@
         "decorations": false,
         "shadow": true,
         "backgroundColor": "#09090b",
-        "dragDropEnabled": false
+        "dragDropEnabled": true
       }
     ],
     "security": {

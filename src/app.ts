@@ -2,8 +2,13 @@
 // undo history and session auto-save. Actions live in the command registry
 // (commands.ts); this file wires them up.
 import {
+  Camera,
+  ChevronsUpDown,
   CircleQuestionMark,
+  Command,
+  FileCode2,
   FilePlus,
+  FolderClock,
   FolderOpen,
   Info,
   LayoutTemplate,
@@ -18,6 +23,7 @@ import {
   Ruler,
   Save,
   SaveAll,
+  Search,
   Settings as SettingsIcon,
   SlidersHorizontal,
   Square,
@@ -41,11 +47,13 @@ import { History } from "./history";
 import { logoSvg } from "./logo";
 import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "./model";
 import { BASE_NAMES, BASE_ORDER, type Base } from "./numfmt";
+import { openPalette, paletteOpen } from "./palette";
 import * as P from "./platform";
+import { SearchBar } from "./search";
 import { loadSession, type Session, saveSessionNow, saveSessionSoon } from "./session";
 import { S, ZOOM_STEP } from "./settings";
 import { play } from "./sound";
-import { ask, button, h, icon, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
+import { ask, button, h, icon, type MenuItem, menusOpen, modalOpen, openMenu, segmented, toast } from "./ui";
 
 const FILE_VERSION = 1;
 const UNTITLED = "Untitled";
@@ -71,6 +79,9 @@ export class App {
   private undoBtn!: HTMLButtonElement;
   private redoBtn!: HTMLButtonElement;
   private wheelAcc = 0;
+  private search = new SearchBar(() => this.cards);
+  /** The value last clicked or focused; palette "Value:" commands act on it. */
+  private activeCard: ValueCard | null = null;
 
   constructor(private root: HTMLElement) {}
 
@@ -78,8 +89,14 @@ export class App {
     this.registerCommands();
     this.applyTheme();
     await P.setZoom(S.get("zoom"));
-    this.root.replaceChildren(this.buildTitlebar(), this.buildToolbar(), this.buildWorkspace(), this.buildStatusbar());
+    this.root.replaceChildren(
+      this.buildTitlebar(),
+      h("div", { class: "topbars" }, this.buildToolbar(), this.search.el),
+      this.buildWorkspace(),
+      this.buildStatusbar(),
+    );
     this.installInput();
+    this.installFileDrop();
     S.onChange((k) => this.onSetting(k));
     await P.guardClose(
       () => this.beforeClose(),
@@ -101,6 +118,7 @@ export class App {
   // ================================================================ commands
   private registerCommands() {
     const dark = () => S.get("theme") === "dark";
+    this.registerValueCommands();
     this.commands.add(
       // File
       {
@@ -183,6 +201,25 @@ export class App {
       },
       { id: "sel.clear", group: "Edit", label: "Clear selection", keys: ["Esc"], run: () => this.clearSelections() },
       {
+        id: "edit.find",
+        group: "Edit",
+        label: "Find…",
+        icon: Search,
+        keys: ["Ctrl+F"],
+        keywords: "search filter",
+        run: () => this.search.open(),
+      },
+      {
+        id: "app.palette",
+        group: "Help",
+        label: "Command palette…",
+        icon: Command,
+        keys: ["Ctrl+K", "Ctrl+Shift+P"],
+        keywords: "actions run",
+        run: () => openPalette(this.commands),
+        hidden: true,
+      },
+      {
         id: "value.fromTemplate",
         group: "Edit",
         label: "Add value from template…",
@@ -232,6 +269,14 @@ export class App {
         run: () => this.toggleTheme(),
       },
       {
+        id: "view.compact",
+        group: "View",
+        label: () => (S.get("compact") ? "Normal spacing" : "Compact mode"),
+        icon: () => (S.get("compact") ? Maximize : Minimize),
+        keywords: "dense tight spacing",
+        run: () => S.set("compact", !S.get("compact")),
+      },
+      {
         id: "view.sounds",
         group: "View",
         label: () => (S.get("sounds") ? "Turn sounds off" : "Turn sounds on"),
@@ -263,16 +308,135 @@ export class App {
         id: "noop.browser",
         group: "Help",
         label: "",
-        keys: ["Ctrl+R", "Ctrl+P", "Ctrl+F", "F5"],
+        keys: ["Ctrl+R", "Ctrl+P", "F5"],
         hidden: true,
         run: () => {},
       },
     );
   }
 
-  private menus(): [string, (string | "sep")[]][] {
+  /** Palette commands that act on the current value ("Value: …"). */
+  private registerValueCommands() {
+    const card = () => this.activeCard ?? this.cards[0] ?? null;
+    const named = (verb: string) => () => {
+      const c = card();
+      return c ? `${verb} — ${c.model.name || "value"}` : verb;
+    };
+    const has = () => card() !== null;
+    const on = (f: (c: ValueCard) => unknown) => () => {
+      const c = card();
+      if (c) void f(c);
+    };
+    this.commands.add(
+      {
+        id: "card.collapse",
+        group: "Value",
+        label: named("Collapse / expand"),
+        icon: ChevronsUpDown,
+        enabled: has,
+        run: on((c) => c.toggleCollapsed()),
+      },
+      {
+        id: "card.snapshot",
+        group: "Value",
+        label: named("Take snapshot…"),
+        icon: Camera,
+        enabled: has,
+        run: on((c) => c.takeSnapshot()),
+      },
+      {
+        id: "card.export",
+        group: "Value",
+        label: named("Export code…"),
+        icon: FileCode2,
+        keywords: "c rust python header",
+        enabled: has,
+        run: on((c) => c.exportCode()),
+      },
+      {
+        id: "card.template",
+        group: "Value",
+        label: named("Apply template…"),
+        icon: LayoutTemplate,
+        enabled: has,
+        run: on((c) => c.applyTemplate()),
+      },
+      {
+        id: "card.saveTemplate",
+        group: "Value",
+        label: named("Save fields as template…"),
+        enabled: has,
+        run: on((c) => c.saveAsTemplate()),
+      },
+      {
+        id: "card.expr",
+        group: "Value",
+        label: named("Expression bar"),
+        icon: SquareFunction,
+        keywords: "calculate formula",
+        enabled: has,
+        run: on((c) => c.toggleExpr()),
+      },
+      {
+        id: "card.bases",
+        group: "Value",
+        label: named("Show / hide all bases"),
+        keywords: "hex dec oct bin",
+        enabled: has,
+        run: on((c) => c.toggleBases()),
+      },
+      {
+        id: "card.paste",
+        group: "Value",
+        label: named("Paste bytes…"),
+        keywords: "endian",
+        enabled: has,
+        run: on((c) => c.pasteBytes()),
+      },
+      {
+        id: "card.swap",
+        group: "Value",
+        label: named("Swap bytes"),
+        keywords: "endian bswap",
+        enabled: has,
+        run: on((c) => c.applyOp("bswap")),
+      },
+      {
+        id: "card.not",
+        group: "Value",
+        label: named("Invert bits (NOT)"),
+        enabled: has,
+        run: on((c) => c.applyOp("invert")),
+      },
+      {
+        id: "card.clear",
+        group: "Value",
+        label: named("Clear to 0"),
+        enabled: has,
+        run: on((c) => c.applyOp("clear")),
+      },
+      {
+        id: "card.duplicate",
+        group: "Value",
+        label: named("Duplicate"),
+        enabled: has,
+        run: on((c) => this.duplicateValue(c)),
+      },
+      {
+        id: "card.width",
+        group: "Value",
+        label: named("Change width…"),
+        icon: Ruler,
+        enabled: has,
+        run: on((c) => this.resizeValue(c)),
+      },
+      { id: "card.remove", group: "Value", label: named("Remove"), enabled: has, run: on((c) => this.removeValue(c)) },
+    );
+  }
+
+  private menus(): [string, (string | MenuItem)[]][] {
     return [
-      ["File", ["file.new", "file.open", "sep", "file.save", "file.saveAs", "sep", "file.quit"]],
+      ["File", ["file.new", "file.open", this.recentMenu(), "sep", "file.save", "file.saveAs", "sep", "file.quit"]],
       [
         "Edit",
         [
@@ -287,26 +451,40 @@ export class App {
           "sep",
           "sel.group",
           "sel.clear",
+          "sep",
+          "edit.find",
         ],
       ],
       [
         "View",
-        ["view.zoomIn", "view.zoomOut", "view.zoomReset", "sep", "view.theme", "view.sounds", "sep", "app.settings"],
+        [
+          "view.zoomIn",
+          "view.zoomOut",
+          "view.zoomReset",
+          "sep",
+          "view.theme",
+          "view.compact",
+          "view.sounds",
+          "sep",
+          "app.settings",
+        ],
       ],
-      ["Help", ["help.controls", "help.about"]],
+      ["Help", ["app.palette", "help.controls", "help.about"]],
     ];
   }
 
   // ================================================================ chrome
   private buildTitlebar(): HTMLElement {
     const menuBar = h("nav", { class: "menubar" });
-    for (const [name, ids] of this.menus()) {
+    for (const [name] of this.menus()) {
+      // built on each open so dynamic entries (recent files, labels) are current
+      const items = () => this.commands.menu(this.menus().find(([n]) => n === name)?.[1] ?? []);
       const b = h("button", { type: "button", class: "menubar-item", "data-keep-sel": "" }, name);
-      b.addEventListener("click", () => openMenu(this.commands.menu(ids), b));
+      b.addEventListener("click", () => openMenu(items(), b));
       b.addEventListener("pointerenter", () => {
         // slide between open menus like a native menu bar
         if (menusOpen() && document.querySelector(".menubar-item.menu-open") && !b.classList.contains("menu-open")) {
-          openMenu(this.commands.menu(ids), b);
+          openMenu(items(), b);
         }
       });
       menuBar.append(b);
@@ -490,10 +668,11 @@ export class App {
   // ================================================================ settings
   private applyTheme() {
     document.documentElement.dataset.theme = S.get("theme");
+    document.body.classList.toggle("compact", S.get("compact"));
   }
 
   private onSetting(key: string) {
-    if (key === "theme") {
+    if (key === "theme" || key === "compact") {
       this.applyTheme();
       this.syncThemeButton();
     } else if (key === "zoom") {
@@ -623,6 +802,7 @@ export class App {
       resize: (c) => this.resizeValue(c),
       lookup: (_c, name) => this.valueByName(name),
       others: (c) => this.cards.filter((x) => x !== c),
+      dragStart: (c, e) => this.dragCard(c, e),
     });
     model.subscribe(() => this.history.touch());
     this.cards.splice(index ?? this.cards.length, 0, card);
@@ -655,6 +835,73 @@ export class App {
     card.detach();
     this.cards.splice(this.cards.indexOf(card), 1);
     card.root.remove();
+  }
+
+  /** Drag a card by its handle; a line shows where it will land. */
+  private dragCard(card: ValueCard, e: PointerEvent) {
+    e.preventDefault();
+    if (this.cards.length < 2) return;
+    const from = this.cards.indexOf(card);
+    let target = from;
+    let lastY = e.clientY;
+    const line = h("div", { class: "drop-line" });
+    card.root.classList.add("dragging");
+    document.body.classList.add("reordering");
+
+    const place = () => {
+      let idx = 0;
+      for (const c of this.cards) {
+        const r = c.root.getBoundingClientRect();
+        if (lastY > r.top + r.height / 2) idx++;
+      }
+      target = idx;
+      this.workspace.insertBefore(line, this.cards[idx]?.root ?? null);
+    };
+    // keep scrolling while the pointer rests near the top or bottom edge
+    const scroller = window.setInterval(() => {
+      const r = this.workspace.getBoundingClientRect();
+      const edge = 48;
+      const dy = lastY < r.top + edge ? -14 : lastY > r.bottom - edge ? 14 : 0;
+      if (dy) {
+        this.workspace.scrollTop += dy;
+        place();
+      }
+    }, 16);
+    const move = (ev: PointerEvent) => {
+      lastY = ev.clientY;
+      place();
+    };
+    const end = (commit: boolean) => {
+      window.clearInterval(scroller);
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancel);
+      document.removeEventListener("keydown", esc, true);
+      line.remove();
+      card.root.classList.remove("dragging");
+      document.body.classList.remove("reordering");
+      const to = target > from ? target - 1 : target;
+      if (commit && to !== from) {
+        this.cards.splice(from, 1);
+        this.cards.splice(to, 0, card);
+        this.relayout();
+        this.history.touch();
+        play("toggle");
+      }
+    };
+    const up = () => end(true);
+    const cancel = () => end(false);
+    const esc = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        ev.stopPropagation();
+        end(false);
+      }
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancel);
+    document.addEventListener("keydown", esc, true);
+    place();
   }
 
   private moveValue(card: ValueCard, delta: number) {
@@ -749,9 +996,11 @@ export class App {
   }
 
   private relayout() {
+    if (this.activeCard && !this.cards.includes(this.activeCard)) this.activeCard = null;
     const focused = document.activeElement;
     this.workspace.replaceChildren(...(this.cards.length ? this.cards.map((c) => c.root) : [this.empty]));
     if (focused instanceof HTMLElement && this.workspace.contains(focused)) focused.focus({ preventScroll: true });
+    if (this.search.isOpen) this.search.apply();
   }
 
   private groupSelection() {
@@ -803,6 +1052,47 @@ export class App {
     if (!(await this.maybeSave())) return;
     this.startFresh();
     void saveSessionNow(this.sessionData());
+  }
+
+  private recentMenu(): MenuItem {
+    const files = P.isTauri ? S.get("recent_files") : [];
+    const folder = (p: string) => {
+      const d = p.slice(0, Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/")));
+      return d.length > 38 ? `…${d.slice(-37)}` : d;
+    };
+    return {
+      label: "Open recent",
+      icon: FolderClock,
+      disabled: !files.length,
+      submenu: [
+        ...files.map(
+          (p): MenuItem => ({ label: P.basename(p), shortcut: folder(p), action: () => this.openRecent(p) }),
+        ),
+        "sep",
+        { label: "Clear list", action: () => S.set("recent_files", []) },
+      ],
+    };
+  }
+
+  private async openRecent(path: string) {
+    if (!(await this.maybeSave())) return;
+    if (!(await this.loadPath(path))) S.removeRecent(path);
+  }
+
+  private installFileDrop() {
+    const overlay = h(
+      "div",
+      { class: "drop-overlay" },
+      h("div", { class: "drop-card" }, icon(FolderOpen, 28), h("b", {}, "Drop to open the workspace")),
+    );
+    document.body.append(overlay);
+    void P.onFileDrop(
+      (over) => overlay.classList.toggle("show", over),
+      async (f) => {
+        if (!(await this.maybeSave())) return;
+        this.loadText(f.text, f.path, f.name);
+      },
+    );
   }
 
   private async openFile() {
@@ -923,8 +1213,15 @@ export class App {
       { passive: false },
     );
 
+    const track = (e: Event) => {
+      const c = this.cards.find((x) => x.root.contains(e.target as Node));
+      if (c) this.activeCard = c;
+    };
+    document.addEventListener("pointerdown", track, true);
+    document.addEventListener("focusin", track);
+
     document.addEventListener("keydown", (e) => {
-      if (modalOpen() || menusOpen()) return;
+      if (modalOpen() || menusOpen() || paletteOpen()) return;
       // Esc inside a field reverts that field instead of clearing the selection
       if (e.key === "Escape" && document.activeElement instanceof HTMLInputElement) return;
       this.commands.handleKey(e);

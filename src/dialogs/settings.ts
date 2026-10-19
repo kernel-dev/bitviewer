@@ -90,6 +90,11 @@ export function openSettings(): Promise<void> {
         section(
           "Appearance",
           row("Theme", theme.el),
+          row(
+            "Compact mode",
+            toggleSwitch(S.get("compact"), (v) => S.set("compact", v)),
+            "Tighter spacing, so more values fit on screen",
+          ),
           row("Zoom", h("div", { class: "zoom-ctl" }, zoom, zoomVal), "Ctrl + mouse wheel anywhere · Ctrl+0 resets"),
         ),
         section(

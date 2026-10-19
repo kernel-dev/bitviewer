@@ -49,6 +49,13 @@ type Listener = (kind: ChangeKind) => void;
 
 export class ModelError extends Error {}
 
+/** A named copy of a value at some moment. */
+export interface Snapshot {
+  name: string;
+  value: bigint;
+  at: number; // ms since epoch
+}
+
 /** Applies `op` to a `width`-bit value. `arg` is the shift/rotate amount
  *  (default 1) or the and/or/xor operand. */
 export function applyOp(op: Op, v: bigint, width: number, arg = 1n): bigint {
@@ -254,6 +261,8 @@ export class ValueModel {
   fullBase: Base;
   defaultRowBase: Base;
   showBases = false; // optional panel with the value in every base
+  collapsed = false; // card shows only its header
+  snapshots: Snapshot[] = []; // named copies of the value, oldest first
   rowBases = new Map<number, Base>();
   groups: Group[] = [];
   compares = new Map<number, bigint>();
@@ -491,6 +500,29 @@ export class ValueModel {
     };
   }
 
+  setCollapsed(collapsed: boolean): void {
+    if (collapsed !== this.collapsed) {
+      this.collapsed = collapsed;
+      this.emit("structure");
+    }
+  }
+
+  /** Saves the current value under a name. */
+  takeSnapshot(name: string, at = Date.now()): Snapshot {
+    const snap = { name: name.trim() || `Snapshot ${this.snapshots.length + 1}`, value: this.value, at };
+    this.snapshots.push(snap);
+    this.emit("meta");
+    return snap;
+  }
+
+  removeSnapshot(snap: Snapshot): void {
+    const i = this.snapshots.indexOf(snap);
+    if (i >= 0) {
+      this.snapshots.splice(i, 1);
+      this.emit("meta");
+    }
+  }
+
   setShowBases(show: boolean): void {
     if (show !== this.showBases) {
       this.showBases = show;
@@ -674,6 +706,8 @@ export class ValueModel {
       full_base: this.fullBase,
       default_row_base: this.defaultRowBase,
       show_bases: this.showBases,
+      collapsed: this.collapsed,
+      snapshots: this.snapshots.map((x) => ({ name: x.name, value: hex(x.value), at: x.at })),
       row_bases: Object.fromEntries(sorted(this.rowBases).map(([k, v]) => [String(k), v])),
       compares: Object.fromEntries(sorted(this.compares).map(([k, v]) => [String(k), hex(v)])),
       hidden_compares: Object.fromEntries(sorted(this.hiddenCompares).map(([k, v]) => [String(k), hex(v)])),
@@ -694,6 +728,14 @@ export class ValueModel {
       defaultRowBase: checkBase(Number(d.default_row_base ?? 16)),
     });
     m.showBases = d.show_bases === true;
+    m.collapsed = d.collapsed === true;
+    for (const x of Array.isArray(d.snapshots) ? d.snapshots : []) {
+      try {
+        m.snapshots.push({ name: String(x.name ?? "Snapshot"), value: toBig(x.value) & m.mask, at: Number(x.at) || 0 });
+      } catch {
+        /* skip a malformed snapshot */
+      }
+    }
     for (const [k, b] of Object.entries(d.row_bases ?? {})) {
       const lo = Number(k);
       m.checkRow(lo);

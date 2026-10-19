@@ -26,6 +26,7 @@ export interface Settings {
   recent_files: string[]; // most recent first
   readout_chips: string[]; // which readout chips show under each value (stats.ts CHIPS ids)
   templates: Template[]; // the user's own field layout templates
+  compact: boolean; // tighter spacing everywhere
 }
 
 const DEFAULTS: Settings = {
@@ -43,6 +44,7 @@ const DEFAULTS: Settings = {
   recent_files: [],
   readout_chips: ["u", "s", "pop", "float"],
   templates: [],
+  compact: false,
 };
 
 const FILE = "settings.json";

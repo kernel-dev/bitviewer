@@ -79,9 +79,10 @@ export class CommandRegistry {
   }
 
   /** Menu entries from command ids; "sep" adds a separator. */
-  menu(ids: (string | "sep")[]): MenuItem[] {
+  menu(ids: (string | MenuItem)[]): MenuItem[] {
     return ids.map((id): MenuItem => {
       if (id === "sep") return "sep";
+      if (typeof id !== "string") return id; // a ready-made entry (e.g. a submenu)
       const c = this.get(id);
       return {
         label: this.label(c),

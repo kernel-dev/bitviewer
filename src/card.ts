@@ -6,7 +6,9 @@ import {
   ArrowUpDown,
   Binary,
   BookmarkPlus,
+  Camera,
   ChevronDown,
+  ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   ClipboardPaste,
@@ -15,7 +17,9 @@ import {
   Ellipsis,
   FileCode2,
   GitCompareArrows,
+  GripVertical,
   Group as GroupIcon,
+  History,
   type IconNode,
   Layers,
   LayoutTemplate,
@@ -101,6 +105,8 @@ export interface CardEvents {
   lookup(card: ValueCard, name: string): bigint | undefined;
   /** The other cards in the workspace. */
   others(card: ValueCard): ValueCard[];
+  /** The drag handle was pressed: start reordering. */
+  dragStart(card: ValueCard, e: PointerEvent): void;
 }
 
 function baseSeg(base: Base, onPick: (b: Base) => void, cls = "sm"): Segmented<Base> {
@@ -116,6 +122,7 @@ interface FieldUi {
   seg: Segmented<Base>;
   decoded?: HTMLElement;
   named?: HTMLButtonElement;
+  row?: HTMLElement;
 }
 
 /** "21.5 °C" → "21.5" when the unit is "°C". */
@@ -139,6 +146,8 @@ export class ValueCard implements StripHost {
   private cmpReadouts = new Map<number, HTMLElement>();
   private cmpBases = new Map<number, HTMLElement>();
   private fieldUis: FieldUi[] = [];
+  /** Field names matching the current search, highlighted in the fields panel. */
+  private fieldMatches = new Set<string>();
   private baseEdits = new Map<Base, NumberInput>();
   private fullBase!: Segmented<Base>;
   private fullEdit!: NumberInput;
@@ -177,7 +186,7 @@ export class ValueCard implements StripHost {
   }
 
   /** Runs an operation on the selected bits, or on the whole value when nothing is selected. */
-  private applyOp(op: Op, arg?: bigint) {
+  applyOp(op: Op, arg?: bigint) {
     try {
       if (this.sel) this.model.opBits(this.sel[0], this.sel[1], op, arg);
       else this.model.opValue(op, arg);
@@ -217,6 +226,19 @@ export class ValueCard implements StripHost {
     const m = this.model;
     const focusedName =
       document.activeElement?.classList.contains("name-edit") && this.root.contains(document.activeElement);
+
+    this.root.classList.toggle("collapsed", m.collapsed);
+    if (m.collapsed) {
+      // only the header line; the toolbar's buttons are still created because
+      // selection code updates them
+      this.fieldUis = [];
+      const header = this.buildHeader();
+      this.buildToolbar();
+      this.root.replaceChildren(header);
+      if (focusedName) (this.root.querySelector(".name-edit") as HTMLElement).focus();
+      this.refresh();
+      return;
+    }
 
     const rows = h("div", { class: `rows ${this.line ? "line" : "grid"}` });
     for (const lo of m.rowLos()) {
@@ -277,6 +299,13 @@ export class ValueCard implements StripHost {
     more.addEventListener("click", () =>
       openMenu(
         [
+          {
+            label: m.collapsed ? "Expand" : "Collapse",
+            icon: m.collapsed ? ChevronRight : ChevronDown,
+            action: () => this.toggleCollapsed(),
+          },
+          { label: "Snapshots", icon: Camera, submenu: this.snapshotMenu() },
+          "sep",
           { label: "Move up", icon: ArrowUp, action: () => this.events.move(this, -1) },
           { label: "Move down", icon: ArrowDown, action: () => this.events.move(this, +1) },
           { label: "Duplicate", icon: CopyPlus, action: () => this.events.duplicate(this) },
@@ -327,9 +356,25 @@ export class ValueCard implements StripHost {
       ),
     );
 
+    const grip = h(
+      "button",
+      { type: "button", class: "grip", tip: "Drag to reorder", "aria-label": "Drag to reorder" },
+      icon(GripVertical, 16),
+    );
+    grip.addEventListener("pointerdown", (e) => {
+      if (e.button === 0) this.events.dragStart(this, e);
+    });
+    const collapse = button({
+      icon: m.collapsed ? ChevronRight : ChevronDown,
+      cls: "ghost sm collapse-btn",
+      tip: m.collapsed ? "Expand" : "Collapse to the header line",
+      onClick: () => this.toggleCollapsed(),
+    });
     return h(
       "header",
       { class: "card-head" },
+      grip,
+      collapse,
       name,
       h(
         "button",
@@ -709,7 +754,7 @@ export class ValueCard implements StripHost {
       ui.named = named;
     }
     this.fieldUis.push(ui);
-    return h(
+    const row = h(
       "div",
       { class: `field-row${g.protected ? " protected" : ""}` },
       sw,
@@ -744,6 +789,9 @@ export class ValueCard implements StripHost {
         onClick: () => this.removed(() => m.removeGroup(g)),
       }),
     );
+    ui.row = row;
+    row.classList.toggle("match", this.fieldMatches.has(g.name));
+    return row;
   }
 
   /** The value in every base, each line editable and copyable. */
@@ -790,7 +838,7 @@ export class ValueCard implements StripHost {
     );
   }
 
-  private toggleBases() {
+  toggleBases() {
     play("toggle");
     this.model.setShowBases(!this.model.showBases);
   }
@@ -810,12 +858,81 @@ export class ValueCard implements StripHost {
     return this.statsBar.el;
   }
 
-  private async pasteBytes() {
+  async pasteBytes() {
     const v = await pasteBytes(this.model.width);
     if (v !== null) {
       this.model.setValue(v);
       play("op");
     }
+  }
+
+  /** Highlights fields that match a search (empty set clears). */
+  markMatches(names: Set<string>) {
+    this.fieldMatches = names;
+    for (const f of this.fieldUis) f.row?.classList.toggle("match", names.has(f.g.name));
+  }
+
+  // ------------------------------------------------------------ collapse & snapshots
+  toggleCollapsed(collapsed = !this.model.collapsed) {
+    play("toggle");
+    this.model.setCollapsed(collapsed);
+  }
+
+  private snapshotMenu(): MenuItem[] {
+    const m = this.model;
+    const time = (at: number) =>
+      at ? new Date(at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "";
+    const items: MenuItem[] = [{ label: "Take snapshot…", icon: Camera, action: () => this.takeSnapshot() }];
+    if (m.snapshots.length) items.push("sep");
+    for (const snap of [...m.snapshots].reverse()) {
+      items.push({
+        label: `${snap.name}  ·  ${formatInt(snap.value & m.mask, 16, m.width, { prefix: true, group: true })}`,
+        icon: History,
+        submenu: [
+          { label: time(snap.at) || "Snapshot", disabled: true },
+          "sep",
+          {
+            label: "Restore this value",
+            icon: Undo2,
+            action: () => {
+              m.setValue(snap.value);
+              play("op");
+              toast(`Restored “${snap.name}”`, "ok");
+            },
+          },
+          {
+            label: "Compare with current",
+            icon: GitCompareArrows,
+            action: () => {
+              m.compareWith(snap.value);
+              play("toggle");
+            },
+          },
+          "sep",
+          {
+            label: "Delete snapshot",
+            icon: Trash,
+            danger: true,
+            action: () => this.removed(() => m.removeSnapshot(snap)),
+          },
+        ],
+      });
+    }
+    return items;
+  }
+
+  async takeSnapshot() {
+    const m = this.model;
+    const name = await prompt(
+      "Take snapshot",
+      `Name for the current value of “${m.name || "value"}”`,
+      `Snapshot ${m.snapshots.length + 1}`,
+      Camera,
+    );
+    if (name === null) return;
+    const snap = m.takeSnapshot(name);
+    play("group");
+    toast(`Saved snapshot “${snap.name}”`, "ok");
   }
 
   // ------------------------------------------------------------ field features
@@ -854,7 +971,7 @@ export class ValueCard implements StripHost {
     }
   }
 
-  private async applyTemplate() {
+  async applyTemplate() {
     const m = this.model;
     const t = await pickTemplate(`Apply a template to “${m.name || "value"}”`, "Apply");
     if (!t) return;
@@ -892,7 +1009,7 @@ export class ValueCard implements StripHost {
     }
   }
 
-  private async saveAsTemplate() {
+  async saveAsTemplate() {
     const m = this.model;
     if (!m.groups.length) {
       toast("Create some fields first", "error");
@@ -907,7 +1024,7 @@ export class ValueCard implements StripHost {
     });
   }
 
-  private exportCode() {
+  exportCode() {
     void exportCode(this.model);
   }
 
