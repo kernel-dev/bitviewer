@@ -2,7 +2,7 @@
 name = "bitviewer"
 version = "2.1.1"
 description = "Inspect and edit 32/64-bit values bit by bit"
-edition = "2026"
+edition = "2021"
 
 [lib]
 name = "bitviewer_lib"
