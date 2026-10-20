@@ -833,6 +833,34 @@ body.painting, body.painting * { cursor: crosshair !important; }
 .help-search-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .help-search { flex: 1; height: 32px; }
 .help { max-height: 52vh; overflow: auto; padding-right: 4px; }
+.guide-link { color: var(--accent); cursor: pointer; text-decoration: none; }
+.guide-link:hover { text-decoration: underline; }
+.modal.guide-modal { width: min(1040px, 96vw); }
+.guide { display: flex; gap: 18px; height: 68vh; }
+.guide-nav { display: flex; flex-direction: column; gap: 2px; flex: 0 0 190px; }
+.guide-tab {
+  text-align: left; padding: 7px 10px; border-radius: 8px; border: 0; background: transparent;
+  color: var(--muted); font: inherit; cursor: pointer;
+}
+.guide-tab:hover { background: var(--accent-soft); color: var(--text); }
+.guide-tab.on { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.guide-page { flex: 1; min-width: 0; overflow: auto; padding-right: 6px; line-height: 1.6; user-select: text; }
+.guide-page h3 { margin: 0 0 8px; font-size: 18px; }
+.guide-page h4 { margin: 18px 0 4px; font-size: 14px; }
+.guide-page p, .guide-page li { color: var(--muted); }
+.guide-page p { margin: 6px 0; }
+.guide-page ul, .guide-page ol { margin: 6px 0; padding-left: 22px; }
+.guide-page code { font-family: var(--mono, ui-monospace, monospace); font-size: 0.92em; color: var(--text); }
+.guide-page figure { margin: 12px 0; }
+.guide-page figure img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+.guide-page figcaption { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.guide-table { border-collapse: collapse; margin: 8px 0; }
+.guide-table td, .guide-table th { padding: 5px 12px 5px 0; vertical-align: top; text-align: left; }
+.guide-table td:first-child { color: var(--text); white-space: nowrap; }
+@media (max-width: 760px) {
+  .guide { flex-direction: column; height: auto; }
+  .guide-nav { flex: none; flex-direction: row; flex-wrap: wrap; }
+}
 .tour-layer { position: fixed; inset: 0; z-index: 980; }
 .tour-ring {
   position: fixed; border-radius: 12px; pointer-events: none;

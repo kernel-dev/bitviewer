@@ -12,7 +12,7 @@ export function expressionBar(opts: {
   close: () => void;
   text: string;
   onText: (s: string) => void;
-}): HTMLElement {
+}): { el: HTMLElement; refresh: () => void } {
   // Everything the change callback touches must exist before the field is
   // created, because the field evaluates (and calls back) right away.
   const label = h("span", { class: "expr-target muted small" });
@@ -51,5 +51,5 @@ export function expressionBar(opts: {
     button({ icon: X, cls: "ghost sm", tip: "Close (Esc)", onClick: () => opts.close() }),
   );
   requestAnimationFrame(() => input.focus());
-  return bar;
+  return { el: bar, refresh: field.refresh };
 }

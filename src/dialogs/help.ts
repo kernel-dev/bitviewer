@@ -1,5 +1,5 @@
 // Help (searchable topics + shortcuts) and About dialogs.
-import { CircleQuestionMark, Info, Search, Sparkles } from "lucide";
+import { BookOpen, CircleQuestionMark, Info, Search, Sparkles } from "lucide";
 import pkg from "../../package.json";
 import type { CommandRegistry } from "../app/commands";
 import { button, h, icon, modal } from "../ui/kit";
@@ -13,90 +13,60 @@ export function keyCaps(spec: string): HTMLElement {
   return h("span", { class: "keys" }, ...parts.map((k) => h("kbd", {}, k)));
 }
 
-export const TOPICS: { title: string; body: string }[] = [
+/** Short reminders; `guide` is the page in docs/guide that explains the topic properly. */
+export const TOPICS: { title: string; body: string; guide?: string }[] = [
   {
     title: "Bits",
-    body:
-      "Click a bit to flip it. Drag across bits (also across rows) to select them; Shift+click extends the selection. " +
-      "In byte / nibble view, click a row label to select the row and Shift+click another to select consecutive rows. " +
-      "Right-click a bit for row operations. Clicking anywhere else clears an unnamed selection.",
-  },
-  {
-    title: "Keyboard control",
-    body:
-      "Click a bit (or Tab to the bits) to place the cursor. Arrow keys move it the way the bits are laid out, " +
-      "Space or Enter flips the bit, 0 and 1 set it, Shift+arrows select, Home / End jump to the top / bottom bit.",
-  },
-  {
-    title: "Paint mode",
-    body: "Hold Alt and drag across bits to set them all to 1; Alt+Shift+drag sets them to 0. A stroke is one undo step and skips read-only fields.",
+    body: "Click a bit to flip it, drag to select, Shift+click to extend. Right-click a bit for row operations.",
+    guide: "01-bits-and-values.md",
   },
   {
     title: "Typing values",
-    body:
-      "Type into any field in its selected base (BIN / OCT / DEC / HEX). Prefixes 0x / 0b / 0o override the base " +
-      "(in HEX, 0b… is read as hex). Spaces and _ are ignored. The whole-value field accepts negative decimals, stored as " +
-      "two's complement. Invalid input turns red with the reason in a tooltip; Esc reverts.",
+    body: "Type in the selected base. 0x / 0b / 0o prefixes override it; spaces and _ are ignored. Esc reverts.",
+    guide: "01-bits-and-values.md",
+  },
+  {
+    title: "Paint mode",
+    body: "Alt+drag sets bits to 1, Alt+Shift+drag sets them to 0.",
+    guide: "01-bits-and-values.md",
   },
   {
     title: "Expressions",
-    body:
-      "The ƒx button opens an expression bar: type e.g. 0x1F << 3 | bit(31) and press Enter. Operators: + - * / % ** " +
-      "<< >> & | ^ ~ !. Functions: min max abs bit(n) mask(n) popcount. Names: x (this value), this value's fields, " +
-      "other values; {braces} for names with spaces. Edit › New value from expression combines values.",
-  },
-  {
-    title: "Operations",
-    body:
-      "NOT, CLR, SET, ≪ and ≫ are on each value's toolbar; the ⌄ next to them has rotate, arithmetic shift, shift/rotate " +
-      "by N, swap bytes, reverse bits, negate, increment, decrement and AND / OR / XOR with a mask. When bits are selected, " +
-      "operations apply to the selection only.",
+    body: "The ƒx button opens an expression bar, e.g. 0x1F << 3 | bit(31). x is this value; field names work too.",
+    guide: "02-expressions.md",
   },
   {
     title: "Register fields",
-    body:
-      "Select bits and press Group selection (Ctrl+G). Fields may span rows but can't overlap. The sliders button opens " +
-      "field details: description, signed, a formula with a unit (e.g. x * 0.5 - 40 °C — linear formulas can be typed back " +
-      "in), named values (0 = Off, 1 = Auto…) and access. Read-only and reserved fields are hatched and ask before their " +
-      "bits change. Named fields are only ever removed by you.",
+    body: "Select bits and press Group selection (Ctrl+G). Right-click a field to rename, recolour or resize it.",
+    guide: "03-register-fields.md",
   },
   {
-    title: "Templates & code export",
-    body:
-      "Templates (fields panel, or Edit › Add value from template) apply ready-made layouts: IEEE-754 float32/64/16, " +
-      "bfloat16, RGB565, ARGB8888, IPv4, UTF-8 lead byte — or your own, saved from a value's ⋯ menu. Export code " +
-      "generates C macros, a C bitfield struct, Rust or Python for a value's fields.",
+    title: "Operations",
+    body: "NOT, CLR, SET and shifts are on the toolbar, more under ⌄. They act on the selection when there is one.",
+    guide: "04-operations-and-compare.md",
   },
   {
     title: "Compare rows & snapshots",
-    body:
-      "Compare opens a linked row with its own value; differing bits are outlined and the row shows Δ and XOR. Closing a " +
-      "compare row keeps its value for next time. ⋯ › Compare with fills compare rows from another value. Snapshots (⋯ menu) " +
-      "save named copies of a value to restore or compare later.",
+    body: "Compare adds a linked row that outlines differing bits. Snapshots are in a value's ⋯ menu.",
+    guide: "04-operations-and-compare.md",
   },
   {
-    title: "Floats, bytes and readouts",
-    body:
-      "Float chips (float16 / bfloat16 / float32 / float64) are editable: click and type 1.5. ⋯ › Paste bytes reads " +
-      "DE AD BE EF, {0xDE, 0xAD}, b'\\xde' in either byte order; Copy as bytes writes hex, C or Python. The + after the " +
-      "chips adds text, BCD, Gray code, one's complement, zero counts, parity and the highest set bit.",
+    title: "Templates & code export",
+    body: "Templates apply ready-made field layouts. Export code is in a value's ⋯ menu.",
+    guide: "05-templates-and-workspace.md",
   },
   {
     title: "Workspace",
-    body:
-      "Ctrl+Z / Ctrl+Y undo and redo anything. Work is auto-saved and restored after a restart or crash. File › Open recent " +
-      "lists recent workspaces; dropping a .bitview.json on the window opens it. Drag a value by its handle to reorder, " +
-      "collapse it with the chevron, Ctrl+F searches, Ctrl+K opens the command palette.",
-  },
-  {
-    title: "Customising",
-    body:
-      "Settings (Ctrl+,): dark / light / high-contrast theme, accent colour, compact mode, zoom (also Ctrl+wheel), bit order, " +
-      "layout and base for new values, optional sounds and which readouts show.",
+    body: "Ctrl+Z / Ctrl+Y undo and redo, work is auto-saved, Ctrl+F searches, Ctrl+K opens the command palette.",
+    guide: "05-templates-and-workspace.md",
   },
 ];
 
-export function showHelp(commands: CommandRegistry, startTour: () => void): Promise<void> {
+export function showHelp(
+  commands: CommandRegistry,
+  startTour: () => void,
+  openGuide: (page?: string) => void,
+): Promise<void> {
   const withKeys = commands.all().filter((c) => c.keys?.length && !c.hidden);
   return modal<void>({
     title: "Help",
@@ -114,13 +84,22 @@ export function showHelp(commands: CommandRegistry, startTour: () => void): Prom
           h("span", {}, ...(c.keys ?? []).flatMap((k, i) => (i ? [" ", keyCaps(k)] : [keyCaps(k)]))),
         ]),
       );
+      const guideLink = (page: string) => {
+        const a = h("a", { href: "#", class: "guide-link" }, "Learn more");
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          close();
+          setTimeout(() => openGuide(page), 150);
+        });
+        return a;
+      };
       const render = () => {
         const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
         const hit = (s: string) => words.every((w) => s.toLowerCase().includes(w));
         const topics = TOPICS.filter((t) => hit(`${t.title} ${t.body}`));
         const scRows = withKeys.filter((c) => hit(`${commands.label(c)} ${c.keys?.join(" ")} shortcut`));
         list.replaceChildren(
-          ...topics.flatMap((t) => [h("h4", {}, t.title), h("p", {}, t.body)]),
+          ...topics.flatMap((t) => [h("h4", {}, t.title), h("p", {}, t.body, " ", t.guide ? guideLink(t.guide) : "")]),
           scRows.length ? h("h4", {}, "Shortcuts") : "",
           scRows.length ? shortcuts : "",
           !topics.length && !scRows.length ? h("p", { class: "muted" }, "Nothing found — try another word.") : "",
@@ -137,6 +116,15 @@ export function showHelp(commands: CommandRegistry, startTour: () => void): Prom
       body.append(h("div", { class: "help-search-row" }, icon(Search, 15, "muted"), search), list);
       render();
       return [
+        button({
+          icon: BookOpen,
+          label: "Open the guide",
+          cls: "outline",
+          onClick: () => {
+            close();
+            setTimeout(() => openGuide(), 150);
+          },
+        }),
         button({
           icon: Sparkles,
           label: "Take the tour",

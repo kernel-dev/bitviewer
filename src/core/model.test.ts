@@ -241,6 +241,20 @@ describe("model", () => {
     expect(m.groupAt(0)).toBeUndefined();
   });
 
+  it("resizes a group without overlapping its neighbours", () => {
+    const m = new ValueModel({ width: 32, value: 0xabcd1234n });
+    const g = m.addGroup(4, 7, "FCD");
+    const next = m.addGroup(12, 15, "NEXT");
+    m.resizeGroup(g, 4, 11);
+    expect([g.lo, g.hi, g.width]).toEqual([4, 11, 8]);
+    expect(m.groupValue(g)).toBe(0x23n);
+    expect(() => m.resizeGroup(g, 4, 12)).toThrow(ModelError);
+    expect(() => m.resizeGroup(g, 0, 32)).toThrow(ModelError);
+    expect([g.lo, g.hi]).toEqual([4, 11]);
+    m.resizeGroup(g, 0, 7); // narrowing and moving down is fine too
+    expect(m.groups).toEqual([next, g]);
+  });
+
   it("round-trips through JSON", () => {
     const m = new ValueModel({
       width: 64,

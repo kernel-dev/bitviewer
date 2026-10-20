@@ -25,6 +25,7 @@ import {
   LayoutTemplate,
   Lock,
   MousePointerClick,
+  MoveHorizontal,
   Palette,
   PencilLine,
   RectangleHorizontal,
@@ -171,6 +172,8 @@ export class ValueCard implements StripHost {
   private statsBar: StatsBar;
   private exprOpen = false;
   private exprText = "";
+  /** Re-evaluates the open expression bar; null while it's closed. */
+  private exprRefresh: (() => void) | null = null;
   private listener = (k: ChangeKind) => this.onModel(k);
 
   constructor(
@@ -495,7 +498,7 @@ export class ValueCard implements StripHost {
   }
 
   private buildExprBar(): HTMLElement {
-    return expressionBar({
+    const bar = expressionBar({
       width: () => this.opWidth,
       lookup: this.lookup,
       target: () => (this.sel ? `bits [${this.sel[1]}:${this.sel[0]}]` : "value"),
@@ -510,6 +513,8 @@ export class ValueCard implements StripHost {
       },
       close: () => this.toggleExpr(false),
     });
+    this.exprRefresh = bar.refresh;
+    return bar.el;
   }
 
   toggleExpr(open = !this.exprOpen) {
@@ -1167,6 +1172,7 @@ export class ValueCard implements StripHost {
       edit.setFormat(m.width, edit.base);
       edit.setValue(m.value);
     }
+    if (this.exprOpen) this.exprRefresh?.();
     for (const f of this.fieldUis) {
       const raw = m.groupValue(f.g);
       f.seg.set(f.g.base);
@@ -1283,6 +1289,21 @@ export class ValueCard implements StripHost {
     this.clearSelection();
   }
 
+  /** Widens or narrows a field so it covers exactly the selected bits. */
+  private resizeGroupToSelection(g: Group) {
+    if (!this.sel) return;
+    try {
+      this.model.resizeGroup(g, this.sel[0], this.sel[1]);
+      play("group");
+    } catch (e) {
+      if (!(e instanceof ModelError)) throw e;
+      play("error");
+      toast(e.message, "error");
+      return;
+    }
+    this.clearSelection();
+  }
+
   private pickColor(g: Group, anchor: HTMLElement | { x: number; y: number }) {
     const custom = () => {
       const input = h("input", { type: "color", value: g.color, class: "hidden-color" });
@@ -1372,6 +1393,12 @@ export class ValueCard implements StripHost {
             ],
           },
           { label: `Select “${g.name}”`, icon: MousePointerClick, action: () => this.setSelection(g.lo, g.hi) },
+          {
+            label: `Resize “${g.name}” to selection`,
+            icon: MoveHorizontal,
+            disabled: !this.sel,
+            action: () => this.resizeGroupToSelection(g),
+          },
           {
             label: `Remove “${g.name}”`,
             icon: Trash,

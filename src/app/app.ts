@@ -2,6 +2,7 @@
 // undo history and session auto-save. Actions live in the command registry
 // (commands.ts); this file wires them up.
 import {
+  BookOpen,
   Camera,
   ChevronsUpDown,
   CircleQuestionMark,
@@ -41,6 +42,7 @@ import {
 import { ValueCard } from "../card/card";
 import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "../core/model";
 import { BASE_NAMES, BASE_ORDER, type Base } from "../core/numfmt";
+import { showGuide } from "../dialogs/guide";
 import { showAbout, showHelp } from "../dialogs/help";
 import { newValueFromExpression } from "../dialogs/newvalue";
 import { openSettings } from "../dialogs/settings";
@@ -314,7 +316,20 @@ export class App {
         label: "Controls & shortcuts",
         icon: CircleQuestionMark,
         keys: ["F1"],
-        run: () => showHelp(this.commands, () => this.runTour()),
+        run: () =>
+          showHelp(
+            this.commands,
+            () => this.runTour(),
+            (page) => showGuide(page),
+          ),
+      },
+      {
+        id: "help.guide",
+        group: "Help",
+        label: "Guide",
+        icon: BookOpen,
+        keywords: "docs documentation manual how to tutorial",
+        run: () => showGuide(),
       },
       { id: "help.about", group: "Help", label: "About Bit Viewer", icon: Info, run: () => showAbout() },
       {
@@ -499,7 +514,7 @@ export class App {
           "app.settings",
         ],
       ],
-      ["Help", ["app.palette", "help.controls", "help.tour", "sep", "help.updates", "help.about"]],
+      ["Help", ["app.palette", "help.controls", "help.guide", "help.tour", "sep", "help.updates", "help.about"]],
     ];
   }
 

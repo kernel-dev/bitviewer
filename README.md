@@ -22,6 +22,8 @@ A desktop app for viewing and editing values of 1–512 bits, one bit at a time.
 
 Press **F1** in the app for searchable help.
 
+New to it? Read the illustrated [guide](docs/guide/01-bits-and-values.md) (also under Help › Guide in the app). Changes are tracked in the [changelog](CHANGELOG.md).
+
 ## Install
 
 Download the latest build from [Releases](https://github.com/kernel-dev/bitviewer/releases/latest):
@@ -102,8 +104,9 @@ src/
   dialogs/        settings, help, field details, export…
   (tests sit next to the code as *.test.ts)
 e2e/              end-to-end tests
+docs/guide/       illustrated guide (markdown + screenshots, shown in the app too)
 src-tauri/        Rust shell: file access, plugins, config
-scripts/          release script
+scripts/          release script, guide screenshot generator (npm run docs:shots)
 ```
 
 </details>

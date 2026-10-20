@@ -660,6 +660,20 @@ export class ValueModel {
       this.emit("groups");
     }
   }
+  /** Moves a field's edges, e.g. to widen a 4-bit field to 8 bits. Other fields stay put. */
+  resizeGroup(g: Group, lo: number, hi: number): void {
+    [lo, hi] = [Math.min(lo, hi), Math.max(lo, hi)];
+    if (lo < 0 || hi >= this.width) throw new ModelError("Group outside the value");
+    const clash = this.overlapping(lo, hi).filter((o) => o !== g);
+    if (clash.length) {
+      throw new ModelError("Groups cannot overlap: " + clash.map((o) => `${o.name} ${o.label()}`).join(", "));
+    }
+    if (lo === g.lo && hi === g.hi) return;
+    g.lo = lo;
+    g.hi = hi;
+    this.groups.sort((a, b) => b.hi - a.hi);
+    this.emit("groups");
+  }
   updateGroup(g: Group, changes: { name?: string; color?: string; base?: Base }): void {
     let changed = false;
     if (changes.name !== undefined && changes.name !== g.name) {
