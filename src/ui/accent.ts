@@ -12,7 +12,7 @@ export const ACCENTS: { name: string; color: string }[] = [
   { name: "Pink", color: "#e64980" },
 ];
 
-const VARS = [
+const ACCENT_VARIABLES = [
   "--accent",
   "--accent-hover",
   "--accent-press",
@@ -27,18 +27,19 @@ const VARS = [
 
 /** Applies `color` (or the theme default for "") as the accent. High contrast keeps its own colours. */
 export function applyAccent(color: string, highContrast: boolean) {
-  const st = document.documentElement.style;
-  for (const v of VARS) st.removeProperty(v);
+  const style = document.documentElement.style;
+  for (const value of ACCENT_VARIABLES) style.removeProperty(value);
   if (!color || highContrast) return;
-  const mix = (pct: number, other: string) => `color-mix(in srgb, ${color} ${pct}%, ${other})`;
-  st.setProperty("--accent", color);
-  st.setProperty("--accent-hover", mix(85, "white"));
-  st.setProperty("--accent-press", mix(82, "black"));
-  st.setProperty("--accent-soft", mix(14, "transparent"));
-  st.setProperty("--accent-line", mix(50, "transparent"));
-  st.setProperty("--bit-on", color);
-  st.setProperty("--bit-on-2", mix(84, "black"));
-  st.setProperty("--bit-glow", `0 0 10px ${mix(28, "transparent")}`);
-  st.setProperty("--link", mix(70, "var(--muted)"));
-  st.setProperty("--cmp-on", mix(45, "var(--bg)"));
+  const mixWith = (percent: number, other: string) =>
+    `color-mix(in srgb, ${color} ${percent}%, ${other})`;
+  style.setProperty("--accent", color);
+  style.setProperty("--accent-hover", mixWith(85, "white"));
+  style.setProperty("--accent-press", mixWith(82, "black"));
+  style.setProperty("--accent-soft", mixWith(14, "transparent"));
+  style.setProperty("--accent-line", mixWith(50, "transparent"));
+  style.setProperty("--bit-on", color);
+  style.setProperty("--bit-on-2", mixWith(84, "black"));
+  style.setProperty("--bit-glow", `0 0 10px ${mixWith(28, "transparent")}`);
+  style.setProperty("--link", mixWith(70, "var(--muted)"));
+  style.setProperty("--cmp-on", mixWith(45, "var(--bg)"));
 }

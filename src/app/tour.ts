@@ -1,6 +1,6 @@
 // First-run tour: a spotlight on a few key parts of the window, with short
 // explanations. Shown once (until finished or skipped) and from Help.
-import { h } from "../ui/kit";
+import { html } from "../ui/kit";
 
 interface Step {
   target: string; // CSS selector; steps whose target isn't on screen are skipped
@@ -56,59 +56,85 @@ export function tourRunning(): boolean {
 export function startTour(): Promise<void> {
   if (running) return Promise.resolve();
   running = true;
-  const steps = STEPS.filter((s) => {
-    const el = document.querySelector(s.target);
-    return el && (el as HTMLElement).offsetParent !== null;
+
+  const steps = STEPS.filter((step) => {
+    const element = document.querySelector(step.target);
+    return element && (element as HTMLElement).offsetParent !== null;
   });
+
   return new Promise((resolve) => {
     if (!steps.length) {
       running = false;
       resolve();
       return;
     }
-    let i = 0;
-    const ring = h("div", { class: "tour-ring" });
-    const title = h("h3", {});
-    const text = h("p", {});
-    const count = h("span", { class: "muted small" });
-    const back = h("button", { type: "button", class: "btn ghost sm" }, "Back");
-    const next = h("button", { type: "button", class: "btn primary sm" }, "Next");
-    const skip = h("button", { type: "button", class: "btn ghost sm" }, "Skip tour");
-    const pop = h(
+
+    let stepIndex = 0;
+    const ringElement = html("div", { class: "tour-ring" });
+    const title = html("h3", {});
+    const text = html("p", {});
+    const count = html("span", { class: "muted small" });
+    const back = html(
+      "button",
+      { type: "button", class: "btn ghost sm" },
+      "Back",
+    );
+    const next = html(
+      "button",
+      { type: "button", class: "btn primary sm" },
+      "Next",
+    );
+    const skip = html(
+      "button",
+      { type: "button", class: "btn ghost sm" },
+      "Skip tour",
+    );
+    const popover = html(
       "div",
       { class: "tour-pop", role: "dialog", "aria-live": "polite" },
       title,
       text,
-      h("div", { class: "tour-actions" }, count, h("div", { class: "spacer" }), skip, back, next),
+      html(
+        "div",
+        { class: "tour-actions" },
+        count,
+        html("div", { class: "spacer" }),
+        skip,
+        back,
+        next,
+      ),
     );
-    const layer = h("div", { class: "tour-layer" }, ring, pop);
+    const layer = html("div", { class: "tour-layer" }, ringElement, popover);
 
     const place = () => {
-      const target = document.querySelector(steps[i].target) as HTMLElement | null;
+      const target = document.querySelector(
+        steps[stepIndex].target,
+      ) as HTMLElement | null;
       if (!target) return;
       target.scrollIntoView({ block: "nearest" });
-      const r = target.getBoundingClientRect();
-      const pad = 6;
-      Object.assign(ring.style, {
-        left: `${r.left - pad}px`,
-        top: `${r.top - pad}px`,
-        width: `${r.width + pad * 2}px`,
-        height: `${r.height + pad * 2}px`,
+      const rect = target.getBoundingClientRect();
+      const padding = 6;
+      Object.assign(ringElement.style, {
+        left: `${rect.left - padding}px`,
+        top: `${rect.top - padding}px`,
+        width: `${rect.width + padding * 2}px`,
+        height: `${rect.height + padding * 2}px`,
       });
-      title.textContent = steps[i].title;
-      text.textContent = steps[i].text;
-      count.textContent = `${i + 1} of ${steps.length}`;
-      back.disabled = i === 0;
-      next.textContent = i === steps.length - 1 ? "Done" : "Next";
+      title.textContent = steps[stepIndex].title;
+      text.textContent = steps[stepIndex].text;
+      count.textContent = `${stepIndex + 1} of ${steps.length}`;
+      back.disabled = stepIndex === 0;
+      next.textContent = stepIndex === steps.length - 1 ? "Done" : "Next";
       // below the target if there's room, else above
-      const pw = Math.min(360, innerWidth - 24);
-      const ph = pop.offsetHeight || 150;
-      const below = r.bottom + 14 + ph < innerHeight;
-      pop.style.width = `${pw}px`;
-      pop.style.left = `${Math.max(12, Math.min(r.left, innerWidth - pw - 12))}px`;
-      pop.style.top = `${below ? r.bottom + 14 : Math.max(12, r.top - ph - 14)}px`;
+      const popWidth = Math.min(360, innerWidth - 24);
+      const popHeight = popover.offsetHeight || 150;
+      const below = rect.bottom + 14 + popHeight < innerHeight;
+      popover.style.width = `${popWidth}px`;
+      popover.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - popWidth - 12))}px`;
+      popover.style.top = `${below ? rect.bottom + 14 : Math.max(12, rect.top - popHeight - 14)}px`;
       next.focus();
     };
+
     const finish = () => {
       running = false;
       document.removeEventListener("keydown", onKey, true);
@@ -116,21 +142,24 @@ export function startTour(): Promise<void> {
       layer.remove();
       resolve();
     };
-    const go = (d: number) => {
-      i += d;
-      if (i >= steps.length) finish();
+
+    const goBy = (delta: number) => {
+      stepIndex += delta;
+      if (stepIndex >= steps.length) finish();
       else place();
     };
-    const onKey = (e: KeyboardEvent) => {
-      e.stopPropagation();
-      if (e.key === "Escape") finish();
-      else if (e.key === "ArrowRight" || e.key === "Enter") {
-        e.preventDefault();
-        go(1);
-      } else if (e.key === "ArrowLeft" && i > 0) go(-1);
+
+    const onKey = (event: KeyboardEvent) => {
+      event.stopPropagation();
+      if (event.key === "Escape") finish();
+      else if (event.key === "ArrowRight" || event.key === "Enter") {
+        event.preventDefault();
+        goBy(1);
+      } else if (event.key === "ArrowLeft" && stepIndex > 0) goBy(-1);
     };
-    back.addEventListener("click", () => go(-1));
-    next.addEventListener("click", () => go(1));
+
+    back.addEventListener("click", () => goBy(-1));
+    next.addEventListener("click", () => goBy(1));
     skip.addEventListener("click", finish);
     document.addEventListener("keydown", onKey, true);
     window.addEventListener("resize", place);

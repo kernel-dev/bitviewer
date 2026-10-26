@@ -12,11 +12,13 @@ A desktop app for viewing and editing values of 1–512 bits, one bit at a time.
 - **Bits:** click to flip, drag to select, Alt+drag to paint. Full keyboard control.
 - **Values:** any width from 1 to 512 bits, typed in BIN / OCT / DEC / HEX, or as an expression (`0x1F << 3 | bit(31)`).
 - **Layouts:** one line across the window, or one row per byte or nibble.
-- **Register fields:** name a group of bits, then give it a formula and unit, named values and read-only / reserved access.
+- **Register fields:** name a group of bits, then give it a formula and unit, named values and read-only / reserved access (protected bits ask before they change).
 - **Operations:** NOT, shifts, rotates, byte swap, bit reverse, AND/OR/XOR. With bits selected, they act on the selection only.
 - **Readouts:** unsigned, signed, float16 / bfloat16 / float32 / float64, BCD, Gray code, parity and more.
 - **Compare:** compare rows with the differing bits highlighted, plus named snapshots.
-- **Templates and export:** built-in templates (IEEE-754, RGB565, IPv4…) or your own. Export fields as C macros, a C struct, Rust or Python.
+- **Templates and export:** built-in templates (IEEE-754, RGB565, IPv4…) or your own. Export fields as C macros, a C struct (split into 32 or 64-bit words), Rust or Python, or write your own export template for any language.
+- **CMSIS-SVD import:** load a microcontroller's `.svd` file and add its registers as values, with fields, reset values, access and named values, or save them as templates.
+- **Peripherals:** group registers into a block with a base address; each register shows its address, and the block exports as a C struct (with offset checks), C `#define`s or a Rust module.
 - **Workspace:** undo/redo, auto-save and crash restore, search (Ctrl+F), command palette (Ctrl+K).
 - **Look:** dark, light and high-contrast themes, accent colour, compact mode. Interface sounds are optional and off by default.
 
@@ -56,7 +58,7 @@ npm run tauri build   # installers in src-tauri/target/release/bundle/
 npm run dev          # UI only, in the browser at http://localhost:1420
 npm test             # unit tests (Vitest)
 npm run test:e2e     # end-to-end tests (Playwright, uses installed Microsoft Edge)
-npm run check        # types, lint, unit tests, rustfmt, clippy
+npm run check        # types, lint, unit tests, rustfmt, clippy, Rust tests
 npm run format       # Biome + rustfmt
 ```
 
@@ -71,7 +73,9 @@ Releases are built by GitHub Actions ([`.github/workflows/release.yml`](.github/
 2. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, and commit.
 3. Tag and push: `git tag v2.1.0 && git push origin v2.1.0`.
 
-The workflow checks that the tag matches the version, runs the tests, builds every platform and publishes the release with `latest.json` for the updater. `npm run release` still builds a Windows-only release locally.
+The workflow checks that the tag matches the version and that CHANGELOG.md has a section for it, runs all the tests, builds every platform and publishes the release with `latest.json` for the updater. The release notes (also shown by the in-app updater) are that changelog section. `npm run release` still builds a Windows-only release locally.
+
+Every push to `main` and every pull request runs the same checks and the end-to-end tests ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 Keep the signing key private and backed up: without it, installed copies can't verify future updates.
 
@@ -97,16 +101,26 @@ Keep the signing key private and backed up: without it, installed copies can't v
 ```
 src/
   main.ts         entry point
-  core/           logic with no UI: value model, number formats, expressions, code export
-  app/            window, menus, files, undo, session, settings, search, palette
-  card/           one value card: bit cells, toolbar, readouts
-  ui/             shared widgets, sounds, styles
-  dialogs/        settings, help, field details, export…
-  (tests sit next to the code as *.test.ts)
-e2e/              end-to-end tests
+  core/           logic with no UI (unit tested)
+    model/          the value model: values, fields, rows, operations, JSON
+    format/         integers in any base, floats and other readouts, field decoding
+    expr/           the expression language (integer and real)
+    export/         code export: templates, the template language, template data
+    svd/            CMSIS-SVD import (with a small XML reader)
+    templates.ts    field layout templates; workspace.ts peripherals; workspace-file.ts files
+  platform/       Tauri bridge (works in a browser too), settings, auto-saved session
+  ui/             UI kit (elements, menus, dialogs, tooltips, number input), sounds, styles/
+  card/           one value card: header, toolbar, bit rows, fields, bases, readouts, menus
+  app/            the window: App, workspace/, document (open/save), commands/, chrome/,
+                  undo history, search, palette, tour, updates
+  dialogs/        settings, help, guide, field details, export, SVD picker…
+tests/
+  unit/           unit tests (Vitest): npm test
+  e2e/            end-to-end tests (Playwright): npm run test:e2e
+  docs/           guide screenshot generator (npm run docs:shots)
 docs/guide/       illustrated guide (markdown + screenshots, shown in the app too)
 src-tauri/        Rust shell: file access, plugins, config
-scripts/          release script, guide screenshot generator (npm run docs:shots)
+scripts/          release script and changelog reader
 ```
 
 </details>

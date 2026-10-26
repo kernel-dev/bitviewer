@@ -54,9 +54,10 @@ export class History {
     // app also flushes before each new input/pointer event, so a pending step
     // never absorbs the start of a different kind of edit.)
     const active = document.activeElement;
-    const src = active instanceof HTMLInputElement ? active : null;
+    const source = active instanceof HTMLInputElement ? active : null;
     if (this.timer) return;
-    this.pendingSrc = src;
+    this.pendingSrc = source;
+
     this.timer = window.setTimeout(() => {
       this.timer = 0;
       this.capture();
@@ -74,10 +75,10 @@ export class History {
 
   undo(): boolean {
     this.flush();
-    const prev = this.past.pop();
-    if (prev === undefined) return false;
+    const previous = this.past.pop();
+    if (previous === undefined) return false;
     this.future.push(this.current);
-    this.restore(prev);
+    this.restore(previous);
     return true;
   }
 
@@ -101,31 +102,38 @@ export class History {
 
   private capture() {
     if (this.holds) return;
-    const snap = this.take();
-    if (snap === this.current) return;
+    const snapshot = this.take();
+    if (snapshot === this.current) return;
     const typing = this.pendingSrc;
     const now = performance.now();
-    const merge = typing !== null && typing === this.lastInput && now - this.lastTime < TYPING_MERGE_MS;
+    const merge =
+      typing !== null &&
+      typing === this.lastInput &&
+      now - this.lastTime < TYPING_MERGE_MS;
+
     if (!merge) {
       this.past.push(this.current);
       if (this.past.length > LIMIT) this.past.shift();
     }
-    this.current = snap;
+
+    this.current = snapshot;
     this.future = [];
     this.lastInput = typing;
     this.lastTime = now;
     this.changed();
   }
 
-  private restore(snap: string) {
-    this.current = snap;
+  private restore(snapshot: string) {
+    this.current = snapshot;
     this.restoring = true;
+
     try {
-      this.apply(snap);
+      this.apply(snapshot);
     } finally {
       this.restoring = false;
       this.lastInput = null;
     }
+
     this.changed();
   }
 }
