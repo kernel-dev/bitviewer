@@ -20,5 +20,5 @@ Built-in templates: IEEE-754 float32, float64 and float16, bfloat16, RGB565, ARG
 - Your work is saved automatically and restored after a restart or crash.
 - **File › Open recent** lists recent workspaces. Drop a `.bitview` file on the window to open it (a `.svd` file starts an [SVD import](08-importing-svd.md) instead).
 - Drag a value by its handle to reorder it. The chevron collapses it.
-- **Ctrl+F** searches values and fields. **Ctrl+K** opens the command palette.
+- **Ctrl+F** searches values and fields: type, then press Enter (or **Search**). Enter again goes to the next match. **Ctrl+K** opens the command palette.
 - **Settings** (Ctrl+,): theme, accent colour, compact mode, zoom, bit order, defaults for new values, sounds and readouts.

@@ -1,10 +1,12 @@
 // Ctrl+F search bar: filters values by name, fields, descriptions, named
-// values, snapshots or hex digits, and highlights matching fields.
+// values, snapshots or hex digits, and highlights matching fields. It searches
+// when Enter or the Search button is pressed, not on every keystroke.
 import { ChevronDown, ChevronUp, Search, X } from "lucide";
 import type { ValueCard } from "../card/card";
 import { formatInt } from "../core/format/integers";
 import type { ValueModel } from "../core/model";
 import { button, html, icon } from "../ui/kit";
+import { bringIntoView } from "./workspace/reveal";
 
 /** Does a value match the (lower-case) query? Field names that match are returned too. */
 export function matchValue(
@@ -38,23 +40,32 @@ export class SearchBar {
   private input: HTMLInputElement;
   private count: HTMLElement;
   private current = -1;
+  private matchCount = 0;
+  /** The query the workspace is filtered by (lower case; "" shows everything).
+   *  It changes on Enter or the Search button, not on every keystroke:
+   *  filtering a large workspace takes a moment. */
   query = "";
 
-  constructor(private cards: () => ValueCard[]) {
+  /** `shown` runs after filtering, when hidden values may have come back. */
+  constructor(
+    private cards: () => ValueCard[],
+    private shown: () => void = () => {},
+  ) {
     this.input = html("input", {
       class: "field search-input",
-      placeholder: "Search values, fields, descriptions, hex…",
+      placeholder: "Search values, fields, descriptions, hex… then press Enter",
       spellcheck: false,
     });
     this.count = html("span", { class: "muted small search-count" });
     this.input.addEventListener("input", () => {
-      this.current = -1;
-      this.apply();
+      // an emptied box shows everything again at once
+      if (!this.typed) this.search();
+      else this.showCount();
     });
     this.input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        this.step(event.shiftKey ? -1 : 1);
+        this.go(event.shiftKey ? -1 : 1);
       } else if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -66,18 +77,24 @@ export class SearchBar {
       { class: "search-bar", hidden: true },
       icon(Search, 15, "muted"),
       this.input,
+      button({
+        label: "Search",
+        className: "outline sm",
+        tip: "Search for what you typed (Enter)",
+        onClick: () => this.search(),
+      }),
       this.count,
       button({
         icon: ChevronUp,
         className: "ghost sm",
         tip: "Previous match (Shift+Enter)",
-        onClick: () => this.step(-1),
+        onClick: () => this.go(-1),
       }),
       button({
         icon: ChevronDown,
         className: "ghost sm",
         tip: "Next match (Enter)",
-        onClick: () => this.step(1),
+        onClick: () => this.go(1),
       }),
       button({
         icon: X,
@@ -92,17 +109,36 @@ export class SearchBar {
     return !this.element.hidden;
   }
 
+  /** What is typed in the box, as a query. */
+  private get typed(): string {
+    return this.input.value.trim().toLowerCase();
+  }
+
   open() {
     this.element.hidden = false;
     this.input.focus();
     this.input.select();
-    this.apply();
+    this.showCount();
   }
 
   close() {
     this.element.hidden = true;
     this.input.value = "";
+    this.search();
+  }
+
+  /** Filters the workspace for what is typed. */
+  search() {
+    this.current = -1;
+    this.query = this.typed;
     this.apply();
+  }
+
+  /** Enter / the arrows: search for new text, otherwise go to the next or
+   *  previous match. */
+  private go(direction: number) {
+    if (this.typed !== this.query) this.search();
+    else this.step(direction);
   }
 
   private matches(): ValueCard[] {
@@ -111,23 +147,36 @@ export class SearchBar {
 
   /** Filters the workspace for the current query. Call again after the cards change. */
   apply() {
-    this.query = this.isOpen ? this.input.value.trim().toLowerCase() : "";
+    if (!this.isOpen) this.query = "";
     // while searching, collapsed peripherals open so their matches show
     document.body.classList.toggle("searching", !!this.query);
-    let matchCount = 0;
+    this.matchCount = 0;
     for (const card of this.cards()) {
       const result = matchValue(card.model, this.query);
-      card.root.hidden = !result.hit;
+      // only touch cards whose state changes: each change restyles the card
+      if (card.root.hidden === result.hit) card.root.hidden = !result.hit;
       card.markMatches(result.fields);
-      if (result.hit) matchCount++;
+      if (result.hit) this.matchCount++;
     }
+    this.showCount();
+    this.shown();
+  }
+
+  /** "3 of 40 values", "No matches", or a reminder that new text isn't searched yet. */
+  private showCount() {
+    const pending = this.typed !== this.query;
     const total = this.cards().length;
-    this.count.textContent = !this.query
-      ? ""
-      : matchCount
-        ? `${matchCount} of ${total} value${total === 1 ? "" : "s"}`
-        : "No matches";
-    this.input.classList.toggle("invalid", !!this.query && matchCount === 0);
+    this.count.textContent = pending
+      ? "Press Enter to search"
+      : !this.query
+        ? ""
+        : this.matchCount
+          ? `${this.matchCount} of ${total} value${total === 1 ? "" : "s"}`
+          : "No matches";
+    this.input.classList.toggle(
+      "invalid",
+      !pending && !!this.query && this.matchCount === 0,
+    );
   }
 
   private step(direction: number) {
@@ -135,7 +184,7 @@ export class SearchBar {
     if (!list.length) return;
     this.current = (this.current + direction + list.length) % list.length;
     const card = list[this.current];
-    card.root.scrollIntoView({ block: "start", behavior: "smooth" });
+    bringIntoView(card.root, "start", this.shown);
     card.root.classList.remove("flash");
     void card.root.offsetWidth; // restart the animation
     card.root.classList.add("flash");

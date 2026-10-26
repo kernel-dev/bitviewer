@@ -101,11 +101,19 @@ Keep the signing key private and backed up: without it, installed copies can't v
 ```
 src/
   main.ts         entry point
-  core/           logic with no UI: value model, number formats, expressions, code export, SVD import
-  app/            window, menus, files, undo, session, settings, search, palette
-  card/           one value card: bit cells, toolbar, readouts
-  ui/             shared widgets, sounds, styles
-  dialogs/        settings, help, field details, export…
+  core/           logic with no UI (unit tested)
+    model/          the value model: values, fields, rows, operations, JSON
+    format/         integers in any base, floats and other readouts, field decoding
+    expr/           the expression language (integer and real)
+    export/         code export: templates, the template language, template data
+    svd/            CMSIS-SVD import (with a small XML reader)
+    templates.ts    field layout templates; workspace.ts peripherals; workspace-file.ts files
+  platform/       Tauri bridge (works in a browser too), settings, auto-saved session
+  ui/             UI kit (elements, menus, dialogs, tooltips, number input), sounds, styles/
+  card/           one value card: header, toolbar, bit rows, fields, bases, readouts, menus
+  app/            the window: App, workspace/, document (open/save), commands/, chrome/,
+                  undo history, search, palette, tour, updates
+  dialogs/        settings, help, guide, field details, export, SVD picker…
 tests/
   unit/           unit tests (Vitest): npm test
   e2e/            end-to-end tests (Playwright): npm run test:e2e

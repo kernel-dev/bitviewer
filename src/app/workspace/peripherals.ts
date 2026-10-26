@@ -5,7 +5,12 @@
 
 import type { ValueCard } from "../../card/card";
 import { ValueModel } from "../../core/model";
-import { freeName, moveBlock, nextOffset } from "../../core/workspace";
+import {
+  freeName,
+  moveBlock,
+  nextOffset,
+  peripheralToJSON,
+} from "../../core/workspace";
 import { exportCode } from "../../dialogs/export";
 import { appSettings } from "../../platform/settings";
 import { ask, html, type MenuItem, toast } from "../../ui/kit";
@@ -20,34 +25,71 @@ import {
 
 const hex = (value: bigint) => `0x${value.toString(16).toUpperCase()}`;
 
+/** A peripheral's block on screen. `shows` is what the header was drawn from. */
+interface Section {
+  element: HTMLElement;
+  header: HTMLElement;
+  body: HTMLElement;
+  shows: string;
+}
+
 export class PeripheralController {
+  /** Blocks by peripheral name, kept between layouts so only what changed is redrawn. */
+  private sections = new Map<string, Section>();
+
   constructor(private app: App) {}
 
   private get workspace() {
     return this.app.workspace;
   }
 
-  /** The block for one peripheral: header plus a body the cards go into. */
-  section(name: string): HTMLElement {
+  /** The block for one peripheral with `registerCount` registers: a header,
+   *  plus a body the cards go into. The same elements are returned each time;
+   *  the header is redrawn when the peripheral or its register count changed. */
+  section(
+    name: string,
+    registerCount: number,
+  ): { element: HTMLElement; body: HTMLElement } {
     const peripheral = this.workspace.peripherals.get(name)!;
-    const body = html("div", {
-      class: "periph-body",
-      role: "group",
-      "aria-label": `Registers of ${name}`,
-    });
-    return html(
-      "section",
-      {
-        class: `periph${peripheral.collapsed ? " collapsed" : ""}`,
-        "data-peripheral": name,
-      },
-      peripheralHeader(
+    const shows = JSON.stringify([peripheralToJSON(peripheral), registerCount]);
+    let section = this.sections.get(name);
+    if (!section) {
+      const header = peripheralHeader(
         peripheral,
-        this.workspace.members(name).length,
+        registerCount,
         this.actions(name),
-      ),
-      body,
-    );
+      );
+      const body = html("div", {
+        class: "periph-body",
+        role: "group",
+        "aria-label": `Registers of ${name}`,
+      });
+      const element = html(
+        "section",
+        { class: "periph", "data-peripheral": name },
+        header,
+        body,
+      );
+      section = { element, header, body, shows };
+      this.sections.set(name, section);
+    } else if (section.shows !== shows) {
+      const header = peripheralHeader(
+        peripheral,
+        registerCount,
+        this.actions(name),
+      );
+      section.header.replaceWith(header);
+      section.header = header;
+      section.shows = shows;
+    }
+    section.element.classList.toggle("collapsed", peripheral.collapsed);
+    return section;
+  }
+
+  /** Forgets the blocks of peripherals that are gone. */
+  keepSections(names: Set<string>) {
+    for (const name of [...this.sections.keys()])
+      if (!names.has(name)) this.sections.delete(name);
   }
 
   /** The "Peripheral" submenu of a value. */
@@ -215,7 +257,7 @@ export class PeripheralController {
         if (result.name !== name && model.name.startsWith(`${name}.`))
           model.setName(result.name + model.name.slice(name.length));
         model.setPeripheral(result.name, model.offset);
-        card.rebuild(); // the address badge depends on the base
+        card.rebuildWhenShown(); // the address badge depends on the base
       }
       workspace.relayout();
       history.touch();

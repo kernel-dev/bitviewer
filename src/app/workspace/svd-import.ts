@@ -18,6 +18,7 @@ import { ask, toast } from "../../ui/kit";
 import { play } from "../../ui/sound";
 import type { App } from "../app";
 import { rememberDir, showError } from "../document";
+import { bringIntoView } from "./reveal";
 
 /** Reads a CMSIS-SVD file (picked, or `file` when dropped) and adds the
  *  registers the user chooses as values, or saves them as templates. */
@@ -44,6 +45,7 @@ export async function importSvd(app: App, file?: P.OpenedFile) {
   }
   if (opened.path) rememberDir(opened.path);
   const choice = await pickSvdRegisters(device, opened.name);
+  console.log(device);
   if (!choice) return;
   if (choice.action === "templates") saveAsTemplates(choice.registers, device);
   else await addSvdValues(app, choice.registers, device);
@@ -92,55 +94,60 @@ async function addSvdValues(
     );
     if (answer !== "yes") return;
   }
-  let firstCard: ValueCard | null = null;
   const blocks = new Map<string, string>(); // SVD peripheral → workspace peripheral
   app.history.hold(); // one undo step for the whole import
+  let firstCard: ValueCard | null;
   try {
-    for (const register of registers) {
-      const source = device.peripherals.find(
-        (peripheral) => peripheral.name === register.peripheral,
-      )!;
-      let block = blocks.get(source.name);
-      if (!block) {
-        const existing = workspace.peripherals.get(source.name);
-        block =
-          existing && existing.base === source.baseAddress
-            ? source.name
-            : freeName(source.name, (name) => workspace.peripherals.has(name));
-        if (block !== source.name || !existing)
-          workspace.peripherals.set(block, {
-            name: block,
-            base: source.baseAddress,
-            description: source.description,
-            collapsed: false,
-          });
-        blocks.set(source.name, block);
+    // one layout for the whole import
+    firstCard = workspace.batch(() => {
+      let first: ValueCard | null = null;
+      for (const register of registers) {
+        const source = device.peripherals.find(
+          (peripheral) => peripheral.name === register.peripheral,
+        )!;
+        let block = blocks.get(source.name);
+        if (!block) {
+          const existing = workspace.peripherals.get(source.name);
+          block =
+            existing && existing.base === source.baseAddress
+              ? source.name
+              : freeName(source.name, (name) =>
+                  workspace.peripherals.has(name),
+                );
+          if (block !== source.name || !existing)
+            workspace.peripherals.set(block, {
+              name: block,
+              base: source.baseAddress,
+              description: source.description,
+              collapsed: false,
+            });
+          blocks.set(source.name, block);
+        }
+        const model = new ValueModel({
+          width: register.size,
+          value: register.resetValue,
+          name: register.path,
+          view: appSettings.get("default_view"),
+          defaultRowBase: appSettings.get("default_base"),
+        });
+        model.applyTemplate(registerTemplate(register, deviceName));
+        model.setPeripheral(block, register.address - source.baseAddress);
+        model.setDescription(register.description);
+        const members = workspace.members(block);
+        const index = members.length
+          ? workspace.cards.indexOf(members[members.length - 1]) + 1
+          : undefined;
+        const card = workspace.addValue(model.width, model, index, false);
+        first ??= card;
       }
-      const model = new ValueModel({
-        width: register.size,
-        value: register.resetValue,
-        name: register.path,
-        view: appSettings.get("default_view"),
-        defaultRowBase: appSettings.get("default_base"),
-      });
-      model.applyTemplate(registerTemplate(register, deviceName));
-      model.setPeripheral(block, register.address - source.baseAddress);
-      model.setDescription(register.description);
-      const members = workspace.members(block);
-      const index = members.length
-        ? workspace.cards.indexOf(members[members.length - 1]) + 1
-        : undefined;
-      const card = workspace.addValue(model.width, model, index, false);
-      firstCard ??= card;
-    }
+      return first;
+    });
   } finally {
     app.history.release();
   }
   play("add");
-  firstCard?.root.scrollIntoView({
-    block: "start",
-    behavior: "smooth",
-  });
+  if (firstCard)
+    bringIntoView(firstCard.root, "start", () => workspace.buildNearView());
   toast(
     `Added ${registers.length} value${registers.length === 1 ? "" : "s"} from ${deviceName}`,
     "ok",

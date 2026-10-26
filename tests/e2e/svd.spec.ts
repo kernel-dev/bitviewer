@@ -46,6 +46,11 @@ test("import registers from a CMSIS-SVD file", async ({ app, page }) => {
   });
   const dialog = page.locator(".modal", { hasText: "Import from DEMO" });
   await expect(dialog).toBeVisible();
+  // everything starts selected; the toggle clears it
+  await expect(dialog.locator(".svd-count")).toHaveText("2 registers selected");
+  await dialog
+    .getByRole("button", { name: "Unselect all", exact: true })
+    .click();
   await expect(dialog.locator(".svd-count")).toHaveText(
     "1 peripherals · 2 registers",
   );
@@ -103,4 +108,39 @@ test("save SVD registers as templates", async ({ app, page }) => {
       ),
     )
     .toBe("DEMO UART0.CTRL,DEMO UART0.DATA");
+});
+
+test("select / unselect all, for everything or for what the filter shows", async ({
+  app,
+  page,
+}) => {
+  const chooser = page.waitForEvent("filechooser");
+  await app.run("window.__app.commands.run('file.importSvd')");
+  await (await chooser).setFiles({
+    name: "demo.svd",
+    mimeType: "application/xml",
+    buffer: Buffer.from(SVD),
+  });
+  const dialog = page.locator(".modal", { hasText: "Import from DEMO" });
+  const toggle = dialog.locator(".svd-all");
+  const count = dialog.locator(".svd-count");
+  await expect(toggle).toHaveText("Unselect all");
+
+  // with a filter, it only acts on the matching registers
+  await dialog.locator(".svd-search").fill("data");
+  await expect(toggle).toHaveText("Unselect all matching");
+  await toggle.click();
+  await expect(count).toHaveText("1 register selected");
+  await expect(toggle).toHaveText("Select all matching");
+
+  await dialog.locator(".svd-search").fill("");
+  await expect(toggle).toHaveText("Select all");
+  await toggle.click();
+  await expect(count).toHaveText("2 registers selected");
+  await expect(toggle).toHaveText("Unselect all");
+  await toggle.click();
+  await expect(count).toHaveText("1 peripherals · 2 registers");
+  await expect(
+    dialog.getByRole("button", { name: "Add value" }),
+  ).toBeDisabled();
 });

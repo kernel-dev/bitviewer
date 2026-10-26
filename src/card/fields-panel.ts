@@ -63,6 +63,24 @@ function expandColor(color: string): string {
     : color;
 }
 
+/** The lock in front of a read-only or reserved field's range, with a tooltip
+ *  saying what that means. */
+function lockIcon(group: Group): SVGElement {
+  const text =
+    group.access === "ro"
+      ? "Read-only field: changing its bits asks first, and Alt+drag painting skips it. Change this in Field details."
+      : "Reserved field (don't touch): changing its bits asks first, and Alt+drag painting skips it. Change this in Field details.";
+  const lock = icon(Lock, 12, "lock");
+  lock.removeAttribute("aria-hidden");
+  lock.setAttribute("role", "img");
+  lock.setAttribute(
+    "aria-label",
+    group.access === "ro" ? "Read-only" : "Reserved",
+  );
+  setTip(lock, text);
+  return lock;
+}
+
 export class FieldsPanel {
   private fieldUis: FieldUi[] = [];
   /** Field names matching the current search, highlighted. */
@@ -204,7 +222,7 @@ export class FieldsPanel {
       html(
         "span",
         { class: "muted mono small range" },
-        group.protected ? icon(Lock, 12, "lock") : null,
+        group.protected ? lockIcon(group) : null,
         `${group.label()} · ${group.width} bit${group.width > 1 ? "s" : ""}`,
       ),
       baseControl.element,

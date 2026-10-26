@@ -60,6 +60,15 @@ describe("workspace files", () => {
     );
   });
 
+  it("reads bit positions written as digit strings", () => {
+    // the check for digits had lost its backslash and rejected "0" … "7"
+    const model = valueFromJSON({
+      width: 8,
+      groups: [{ lo: "0", hi: " 3 ", name: "A" }],
+    });
+    expect([model.groups[0].lo, model.groups[0].hi]).toEqual([0, 3]);
+  });
+
   it("replaces colours that aren't #rgb / #rrggbb", () => {
     const model = valueFromJSON({
       width: 8,

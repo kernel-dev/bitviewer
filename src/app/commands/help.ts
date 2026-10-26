@@ -10,7 +10,7 @@ import {
 } from "lucide";
 import { showGuide } from "../../dialogs/guide";
 import { showAbout, showHelp } from "../../dialogs/help";
-import { showWhatsNew } from "../../dialogs/whatsnew";
+import { showWhatsNew } from "../../dialogs/whats-new";
 import { toast } from "../../ui/kit";
 import type { App } from "../app";
 import { checkForUpdates } from "../updates";

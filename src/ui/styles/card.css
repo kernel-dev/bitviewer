@@ -6,6 +6,11 @@
   padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 12px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 6px 20px rgba(0, 0, 0, 0.18);
   flex: none;
+  /* Cards out of view aren't laid out or painted, so large workspaces stay
+     fast. Until a card has been shown, it counts as tall as the room it
+     reserves for itself (estimatedHeight in card.ts), or as this. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
 }
 .card.enter { animation: card-in 0.22s ease-out; }
 @keyframes card-in { from { opacity: 0; transform: translateY(6px); } }

@@ -4,6 +4,7 @@
 import { BookmarkPlus, Camera, PencilLine, Tag } from "lucide";
 import { type Group, ModelError } from "../core/model";
 import { pasteBytes as askForBytes } from "../dialogs/bytes";
+import { pickCompareValue } from "../dialogs/compare";
 import { exportCode as openExportDialog } from "../dialogs/export";
 import { editField } from "../dialogs/field";
 import { pickTemplate, saveTemplate } from "../dialogs/templates";
@@ -34,6 +35,25 @@ export async function takeSnapshot(card: ValueCard) {
   const snap = model.takeSnapshot(name);
   play("group");
   toast(`Saved snapshot “${snap.name}”`, "ok");
+}
+
+/** Fills compare rows on every row with a value the user types or picks. */
+export async function compareWith(card: ValueCard) {
+  const model = card.model;
+  const value = await pickCompareValue({
+    name: model.name,
+    width: model.width,
+    value: model.value,
+    lookup: card.lookup,
+    candidates: card.events.others(card).map((other) => ({
+      name: other.model.name || "(unnamed)",
+      width: other.model.width,
+      value: other.model.value,
+    })),
+  });
+  if (value === null) return;
+  model.compareWith(value);
+  play("toggle");
 }
 
 export async function pasteBytes(card: ValueCard) {
@@ -108,7 +128,7 @@ export async function renameGroup(card: ValueCard, group: Group) {
   );
   if (name?.trim()) {
     card.model.updateGroup(group, { name: name.trim() });
-    card.rebuild();
+    card.rebuildWhenShown();
   }
 }
 

@@ -2,7 +2,7 @@
 // over other values) and changing a value's width.
 
 import type { ValueCard } from "../../card/card";
-import { newValueFromExpression } from "../../dialogs/newvalue";
+import { newValueFromExpression } from "../../dialogs/new-value";
 import { pickTemplate } from "../../dialogs/templates";
 import { pickWidth } from "../../dialogs/width";
 import { appSettings } from "../../platform/settings";
@@ -26,7 +26,7 @@ export async function addValueFromTemplate(workspace: Workspace) {
   const card = workspace.addValue(template.width);
   card.model.setName(template.name);
   card.model.applyTemplate(template);
-  card.rebuild();
+  card.rebuildWhenShown();
 }
 
 export async function addValueFromExpression(workspace: Workspace) {
@@ -46,7 +46,7 @@ export async function addValueFromExpression(workspace: Workspace) {
   const card = workspace.addValue(result.width);
   card.model.setValue(result.value);
   if (result.name) card.model.setName(result.name);
-  card.rebuild();
+  card.rebuildWhenShown();
 }
 
 /** Asks for a new width. Named fields that don't fit are never dropped: the

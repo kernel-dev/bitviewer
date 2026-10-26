@@ -45,7 +45,7 @@ import {
   resizeGroupToSelection,
 } from "./actions";
 import type { ValueCard } from "./card";
-import { moreOpsMenu } from "./ops-ui";
+import { moreOpsMenu } from "./more-ops";
 import { copyToClipboard, copyValue, removed } from "./widgets";
 
 const ROW_OPS: [Op, string][] = [
@@ -59,7 +59,6 @@ const ROW_OPS: [Op, string][] = [
 /** The "More" menu in the card header. */
 export function cardMenu(card: ValueCard): MenuItem[] {
   const model = card.model;
-  const others = card.events.others(card);
   return [
     {
       label: model.collapsed ? "Expand" : "Collapse",
@@ -138,16 +137,9 @@ export function cardMenu(card: ValueCard): MenuItem[] {
       submenu: copyBytesMenu(() => model.value, model.width, copyToClipboard),
     },
     {
-      label: "Compare with",
+      label: "Compare with…",
       icon: GitCompareArrows,
-      disabled: others.length === 0,
-      submenu: others.map((otherCard) => ({
-        label: `${otherCard.model.name || "(unnamed)"}  ·  ${otherCard.model.width}-bit`,
-        action: () => {
-          model.compareWith(otherCard.model.value);
-          play("toggle");
-        },
-      })),
+      action: () => void card.compareWith(),
     },
     "sep",
     {

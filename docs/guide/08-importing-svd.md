@@ -5,7 +5,7 @@ Chip vendors describe every register of an Arm Cortex-M microcontroller in a **C
 ## Importing
 
 1. **File › Import CMSIS-SVD…** (or drop a `.svd` file on the window).
-2. Pick the registers: tick a peripheral to take all of its registers, or open it with the arrow and tick single registers. The filter matches peripheral and register names and descriptions.
+2. Pick the registers. Everything starts selected; **Unselect all** / **Select all** toggles every register at once. Tick a peripheral to take all of its registers, or open it with the arrow and tick single registers. The filter matches peripheral and register names and descriptions, and while it is in use the toggle only acts on what it shows (**Select all matching**).
 3. **Add values** adds each register as a value, or **Save as templates** keeps the layouts for later.
 
 ![Picking UART0's CTRL and BAUD registers from a device description](img/svd-import.png)

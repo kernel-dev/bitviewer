@@ -18,7 +18,31 @@ import { logoSvg } from "../../ui/logo";
 import { play } from "../../ui/sound";
 import type { App } from "../app";
 import { dragCard } from "./drag";
+import { bringIntoView } from "./reveal";
 import { resizeValue } from "./value-dialogs";
+
+/** Makes `parent`'s children exactly `wanted`, in order. Nodes already in
+ *  place stay put: moving every card on each change would make the browser
+ *  restyle the whole workspace. */
+function setChildren(parent: Element, wanted: Node[]) {
+  const keep = new Set(wanted);
+  let current = parent.firstChild;
+  for (const node of wanted) {
+    // drop what doesn't belong here any more, so it isn't counted as "in place"
+    while (current && current !== node && !keep.has(current)) {
+      const next = current.nextSibling;
+      current.remove();
+      current = next;
+    }
+    if (current === node) current = current.nextSibling;
+    else parent.insertBefore(node, current);
+  }
+  while (current) {
+    const next: ChildNode | null = current.nextSibling;
+    current.remove();
+    current = next;
+  }
+}
 
 export class Workspace {
   cards: ValueCard[] = [];
@@ -29,6 +53,13 @@ export class Workspace {
   readonly element: HTMLElement;
   private empty: HTMLElement;
   readonly blockOf = (card: ValueCard) => card.model.block;
+  /** While above 0, relayout() only notes that a layout is due (see batch()). */
+  private layoutHolds = 0;
+  private layoutDue = false;
+  /** Builds cards that come within a screen of the view and empties those
+   *  that leave it, so only those hold elements. */
+  private nearView: IntersectionObserver;
+  private cardOf = new WeakMap<Element, ValueCard>();
 
   constructor(private app: App) {
     const run = (id: string) => () => app.commands.run(id);
@@ -62,6 +93,13 @@ export class Workspace {
       ),
     );
     this.element = html("main", { class: "workspace" }, this.empty);
+    this.nearView = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          this.cardOf.get(entry.target)?.setNearView(entry.isIntersecting);
+      },
+      { root: this.element, rootMargin: "100% 0px" },
+    );
   }
 
   // ================================================================ JSON
@@ -78,11 +116,47 @@ export class Workspace {
     return JSON.stringify(this.toJSON());
   }
 
-  /** Rebuilds the workspace from a snapshot (undo / redo), keeping the scroll position. */
+  /** Puts the workspace back to a snapshot (undo / redo), keeping the scroll
+   *  position. Cards whose value is the same in the snapshot are kept, so an
+   *  undo only rebuilds what it changes, and those cards keep their selection,
+   *  cursor and expression bar. */
   restore(snapshotJson: string) {
     const scroll = this.element.scrollTop;
     const data = JSON.parse(snapshotJson);
-    this.replace(data.values, data.peripherals);
+    const peripherals = peripheralsFromJSON(data.peripherals);
+    const reusable = new Map<string, ValueCard[]>();
+    for (const card of this.cards) {
+      const key = JSON.stringify(valueToJSON(card.model));
+      reusable.set(key, [...(reusable.get(key) ?? []), card]);
+    }
+    const kept = new Set<ValueCard>();
+    const next = (data.values as unknown[]).map((serialized) => {
+      const card = reusable.get(JSON.stringify(serialized))?.shift();
+      if (card) {
+        kept.add(card);
+        return card;
+      }
+      return this.createCard(valueFromJSON(serialized));
+    });
+    // a kept register shows its peripheral's base address: redraw it when that changed
+    const describe = (map: Map<string, Peripheral>, name: string) => {
+      const peripheral = map.get(name);
+      return peripheral ? JSON.stringify(peripheralToJSON(peripheral)) : "";
+    };
+    const changedBlocks = new Set(
+      [...new Set([...this.peripherals.keys(), ...peripherals.keys()])].filter(
+        (name) =>
+          describe(this.peripherals, name) !== describe(peripherals, name),
+      ),
+    );
+    this.batch(() => {
+      for (const card of [...this.cards]) if (!kept.has(card)) this.drop(card);
+      this.peripherals = peripherals;
+      this.cards = next;
+      for (const card of kept)
+        if (changedBlocks.has(card.model.block)) card.rebuildWhenShown();
+      this.relayout();
+    });
     this.element.scrollTop = scroll;
   }
 
@@ -90,10 +164,26 @@ export class Workspace {
   replace(values: unknown[], peripherals: unknown) {
     const models = values.map((serialized) => valueFromJSON(serialized));
     const blocks = peripheralsFromJSON(peripherals);
-    this.clear();
-    this.peripherals = blocks;
-    for (const model of models)
-      this.addValue(model.width, model, undefined, false);
+    this.batch(() => {
+      this.clear();
+      this.peripherals = blocks;
+      for (const model of models)
+        this.addValue(model.width, model, undefined, false);
+    });
+  }
+
+  /** Runs `change` and lays the workspace out once at the end, instead of
+   *  after every value it adds or removes. Batches can nest. */
+  batch<T>(change: () => T): T {
+    this.layoutHolds++;
+    try {
+      return change();
+    } finally {
+      if (--this.layoutHolds === 0 && this.layoutDue) {
+        this.layoutDue = false;
+        this.relayout();
+      }
+    }
   }
 
   /** Peripherals that have registers, in workspace order. */
@@ -126,6 +216,22 @@ export class Workspace {
         defaultRowBase: appSettings.get("default_base"),
       });
     }
+    const card = this.createCard(model);
+    this.cards.splice(index ?? this.cards.length, 0, card);
+    this.relayout();
+    this.app.history.touch();
+    if (reveal) {
+      play("add");
+      card.root.classList.add("enter");
+      requestAnimationFrame(() =>
+        bringIntoView(card.root, "nearest", () => this.buildNearView()),
+      );
+    }
+    return card;
+  }
+
+  /** A card for `model`, connected to this workspace (not placed yet). */
+  private createCard(model: ValueModel): ValueCard {
     const app = this.app;
     const history = app.history;
     const card = new ValueCard(model, {
@@ -142,16 +248,8 @@ export class Workspace {
       editOffset: (card) => void app.peripherals.editOffset(card),
     });
     model.subscribe(() => history.touch());
-    this.cards.splice(index ?? this.cards.length, 0, card);
-    this.relayout();
-    history.touch();
-    if (reveal) {
-      play("add");
-      card.root.classList.add("enter");
-      requestAnimationFrame(() =>
-        card.root.scrollIntoView({ block: "nearest", behavior: "smooth" }),
-      );
-    }
+    this.cardOf.set(card.root, card);
+    this.nearView.observe(card.root);
     return card;
   }
 
@@ -177,6 +275,7 @@ export class Workspace {
 
   /** Takes a card out without relayout or undo step (for batch changes). */
   drop(card: ValueCard) {
+    this.nearView.unobserve(card.root);
     card.detach();
     this.cards.splice(this.cards.indexOf(card), 1);
     card.root.remove();
@@ -245,33 +344,57 @@ export class Workspace {
   // ================================================================ layout
   /** Puts the cards on screen in order, each peripheral's registers in its block. */
   relayout() {
+    if (this.layoutHolds) {
+      this.layoutDue = true;
+      return;
+    }
     if (this.activeCard && !this.cards.includes(this.activeCard))
       this.activeCard = null;
     this.tidyPeripherals();
     const focused = document.activeElement;
+    // what goes where: loose cards and peripheral blocks in the workspace,
+    // each peripheral's cards in its block (they are next to each other)
     const children: HTMLElement[] = [];
-    let body: HTMLElement | null = null;
-    let block = "";
+    const blocks: { name: string; cards: HTMLElement[] }[] = [];
     for (const card of this.cards) {
-      if (!card.model.block) {
-        children.push(card.root);
-        block = "";
-        continue;
+      const block = card.model.block;
+      if (!block) children.push(card.root);
+      else if (blocks.at(-1)?.name === block)
+        blocks.at(-1)!.cards.push(card.root);
+      else {
+        blocks.push({ name: block, cards: [card.root] });
+        children.push(card.root); // stands for the block until it exists
       }
-      if (card.model.block !== block) {
-        block = card.model.block;
-        const section = this.app.peripherals.section(block);
-        body = section.querySelector(".periph-body");
-        children.push(section);
-      }
-      body!.append(card.root);
     }
-    this.element.replaceChildren(
-      ...(this.cards.length ? children : [this.empty]),
-    );
-    if (focused instanceof HTMLElement && this.element.contains(focused))
+    for (const { name, cards } of blocks) {
+      const section = this.app.peripherals.section(name, cards.length);
+      setChildren(section.body, cards);
+      children[children.indexOf(cards[0])] = section.element;
+    }
+    this.app.peripherals.keepSections(new Set(blocks.map(({ name }) => name)));
+    setChildren(this.element, this.cards.length ? children : [this.empty]);
+    if (
+      focused instanceof HTMLElement &&
+      focused !== document.activeElement &&
+      this.element.contains(focused)
+    )
       focused.focus({ preventScroll: true });
     if (this.app.search.isOpen) this.app.search.apply();
+    this.buildNearView();
+  }
+
+  /** Builds the cards on or near the screen right away, so they never show
+   *  empty (the observer takes over when scrolling). */
+  buildNearView() {
+    const view = this.element.getBoundingClientRect();
+    for (const card of this.cards) {
+      if (card.built) continue;
+      // hidden: in a collapsed peripheral, or filtered out by a search
+      if (!card.root.offsetParent && view.height) continue;
+      const rect = card.root.getBoundingClientRect();
+      if (rect.top > view.bottom + view.height) break; // the rest is further down
+      if (rect.bottom >= view.top - view.height) card.setNearView(true);
+    }
   }
 
   /** Every value's peripheral exists, unused ones are gone, and each
@@ -286,7 +409,7 @@ export class Workspace {
           description: "",
           collapsed: false,
         });
-        card.rebuild(); // its header shows the peripheral's address
+        card.rebuildWhenShown(); // its header shows the peripheral's address
       }
     }
     for (const name of [...this.peripherals.keys()])

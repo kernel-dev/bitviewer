@@ -5,6 +5,7 @@ import {
   Camera,
   ChevronsUpDown,
   FileCode2,
+  GitCompareArrows,
   LayoutTemplate,
   Ruler,
   SquareFunction,
@@ -115,6 +116,15 @@ export function valueCommands(app: App): Command[] {
       label: named("Clear to 0"),
       enabled: has,
       run: runOnActiveCard((card) => card.applyOp("clear")),
+    },
+    {
+      id: "card.compare",
+      group: "Value",
+      label: named("Compare with…"),
+      icon: GitCompareArrows,
+      keywords: "diff xor difference",
+      enabled: has,
+      run: runOnActiveCard((card) => card.compareWith()),
     },
     {
       id: "card.duplicate",

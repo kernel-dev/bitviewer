@@ -154,3 +154,22 @@ kbd {
 .svd-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .svd-more { margin: 0; padding: 10px 12px; }
 .guide-url { user-select: text; }
+
+/* Compare with… : the other values to pick from (secondary, collapsed) */
+.compare-pick { margin-top: 14px; }
+.compare-pick summary { cursor: pointer; color: var(--muted); padding: 2px 0; }
+.compare-pick summary:hover { color: var(--text); }
+.compare-filter { width: 100%; height: 32px; margin: 8px 0; }
+.compare-list {
+  display: flex; flex-direction: column; max-height: 34vh; overflow: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+}
+.compare-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px; min-width: 0;
+  border: 0; border-bottom: 1px solid var(--border); background: none;
+  color: var(--text); font: inherit; text-align: left;
+}
+.compare-item:hover { background: var(--surface-3); }
+.compare-item.on { background: var(--accent-soft); }
+.compare-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-more { margin: 0; padding: 8px 10px; }

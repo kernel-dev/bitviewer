@@ -22,6 +22,12 @@ Add each change under **Unreleased** as you make it. When a version is released,
 - The app only opens `.bitview`, `.json`, `.svd` and `.xml` files (up to 64 MB) and won't write program files such as `.exe` or `.bat`.
 - Dialogs keep keyboard focus inside them, and messages are announced to screen readers.
 - Descriptions say 1–512 bits instead of 32/64-bit.
+- Large workspaces are much faster and stay responsive: opening the 1,540 registers of an STM32F407 takes a tenth of a second instead of over two minutes, everything you do there shows within a frame or two, and importing many SVD registers no longer slows down with each one. Only the values on or near the screen are built (a large workspace used to hold over a million page elements, which made the whole app sluggish); the others are built as you scroll to them. Jumping to a value far away no longer scrolls smoothly past all the others.
+- The lock in front of a read-only or reserved field explains itself when you point at it.
+- Search (Ctrl+F) runs when you press Enter or **Search** instead of on every keystroke, so typing stays smooth in large workspaces. Enter again goes to the next match; clearing the box shows everything again.
+- CMSIS-SVD import: every register starts selected, and a **Select all / Unselect all** button toggles them all at once. With a filter typed, it acts on the matching registers only.
+- **⋯ › Compare with…** opens a dialog: type any number or expression to compare with (`x` is the value itself), or pick another value from a filterable list. Also in the command palette.
+- Internal: the source is reorganised into small modules by topic (the value model, the UI kit, the card, the main window and the stylesheet were each one large file). Nothing changes for users.
 
 ### Fixed
 - Undo, auto-save and the unsaved-changes prompt stopped working for the rest of the session if an Alt+drag paint stroke was interrupted (for example by Alt+Tab), so closing the app could lose work without asking.
@@ -40,6 +46,7 @@ Add each change under **Unreleased** as you make it. When a version is released,
 - Right-click in the template editor shows the usual copy / paste menu.
 - Paste bytes: Python literals with escapes such as `b'\n\t\\'` are read correctly.
 - Cancelling the custom colour picker no longer leaves a hidden element behind.
+- A submenu with no room to the right of its menu now opens on the left instead of covering the menu.
 
 ## [2.1.2] - 2026-10-21
 

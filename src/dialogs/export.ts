@@ -28,7 +28,7 @@ import {
 import { appSettings } from "../platform/settings";
 import { button, html, modal, segmented, toast, toggleSwitch } from "../ui/kit";
 import { play } from "../ui/sound";
-import { editExportTemplate } from "./exportedit";
+import { editExportTemplate } from "./export-editor";
 
 /** What is being exported: one value (perhaps a register of a peripheral), or a whole peripheral. */
 export type ExportTarget =

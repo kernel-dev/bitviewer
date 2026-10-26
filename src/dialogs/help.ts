@@ -83,7 +83,7 @@ export const TOPICS: { title: string; body: string; guide?: string }[] = [
   },
   {
     title: "Workspace",
-    body: "Ctrl+Z / Ctrl+Y undo and redo, work is auto-saved, Ctrl+F searches, Ctrl+K opens the command palette.",
+    body: "Ctrl+Z / Ctrl+Y undo and redo, work is auto-saved, Ctrl+F searches (type, then press Enter), Ctrl+K opens the command palette.",
     guide: "05-templates-and-workspace.md",
   },
 ];

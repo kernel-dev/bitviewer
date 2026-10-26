@@ -44,11 +44,20 @@ const FLEX_NIB = 7;
 const FLEX_BYTE = 13;
 const FIXED_NIB = 10;
 
+/** The width of the line-view strip measured last: the best guess for a new one. */
+let lastFlexWidth = 0;
+
+type BarSegment = { group: Group; startX: number; endX: number };
+
 export class BitStrip {
   element: HTMLElement;
   private cells = new Map<number, HTMLElement>();
   private perLine = 0;
   private sizer = html("div", { class: "strip-sizer", "aria-hidden": "true" });
+  /** Available width as last reported by the resize observer (0 = not laid out). */
+  private width = 0;
+  /** The width changed how many bits fit on a line: rebuild in the next frame. */
+  private rebuildDue = false;
 
   /** Bits per visual line (for moving the keyboard cursor up/down). */
   get lineBits(): number {
@@ -56,6 +65,35 @@ export class BitStrip {
   }
   private resizeObserver?: ResizeObserver;
   private lines: HTMLElement[] = [];
+
+  // Resizes are handled once per frame for all strips together: first any
+  // rebuilds, then every measurement for the field bars, then every bar is
+  // drawn. Measuring between writes would make the browser lay out the whole
+  // page again for each strip, which is very slow with thousands of strips.
+  private static due = new Set<BitStrip>();
+  private static frameRequested = false;
+
+  private static schedule(strip: BitStrip) {
+    BitStrip.due.add(strip);
+    if (BitStrip.frameRequested) return;
+    BitStrip.frameRequested = true;
+    requestAnimationFrame(() => {
+      BitStrip.frameRequested = false;
+      const strips = [...BitStrip.due].filter(
+        (candidate) => candidate.element.isConnected,
+      );
+      BitStrip.due.clear();
+      for (const candidate of strips)
+        if (candidate.rebuildDue) {
+          candidate.rebuildDue = false;
+          candidate.build(candidate.lineLength(candidate.width));
+        }
+      const plans = strips.map((candidate) => candidate.measureBars());
+      strips.forEach((candidate, index) => {
+        candidate.drawBars(plans[index]);
+      });
+    });
+  }
 
   constructor(
     private host: StripHost,
@@ -74,13 +112,28 @@ export class BitStrip {
         y: event.clientY,
       });
     });
-    // Watch a zero-height sizer rather than the strip: building the bits
-    // changes the strip's height, which (if observed) makes the browser report
-    // a ResizeObserver loop. The sizer only changes with the available width,
-    // so layout can run right away and the bits never flash empty.
+    // Watch a zero-height sizer rather than the strip: it only changes with the
+    // available width. The observer just records the width (reading it from
+    // the DOM would force a layout); changes to the bits wait for the next
+    // frame, since changing heights inside the observer makes the browser
+    // report a ResizeObserver loop.
     this.element.append(this.sizer);
-    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver = new ResizeObserver((entries) => {
+      const width = Math.round(
+        entries[entries.length - 1]?.contentRect.width ?? 0,
+      );
+      if (!width) return; // not laid out, e.g. a card far out of view
+      this.width = width;
+      if (flex) lastFlexWidth = width;
+      if (this.lineLength(width) !== this.perLine) this.rebuildDue = true;
+      BitStrip.schedule(this);
+    });
     this.resizeObserver.observe(this.sizer);
+    // Build right away, so the card has its full height at once (and the bits
+    // never flash empty): byte and nibble rows don't depend on the width, and
+    // in line view the last strip's width is a good guess.
+    const guess = flex ? lastFlexWidth : 1;
+    if (guess) this.build(this.lineLength(guess));
   }
 
   /** Bits in this row (the top byte/nibble row can be short). */
@@ -118,17 +171,15 @@ export class BitStrip {
     return options;
   }
 
-  private layout() {
-    const avail = this.sizer.clientWidth;
-    if (!avail) return;
+  /** How many bits go on a line when `avail` pixels are available. */
+  private lineLength(avail: number): number {
     const options = this.lineOptions();
-    const per =
+    return (
       options.find(
         (candidate) =>
           (avail - this.fixedSpace(candidate)) / candidate >= MIN_CELL,
-      ) ?? options[options.length - 1];
-    if (per !== this.perLine) this.build(per);
-    else this.placeBars();
+      ) ?? options[options.length - 1]
+    );
   }
 
   /** Builds the cells. Each line covers `slots` bit positions aligned to a
@@ -197,20 +248,17 @@ export class BitStrip {
     }
     for (const line of this.lines) line.append(html("div", { class: "bars" }));
     this.update();
-    requestAnimationFrame(() => this.placeBars());
+    // the field bars are placed once the strip has been laid out (see schedule)
   }
 
-  /** Group bars under the cells, one segment per run of bits on a line. */
-  private placeBars() {
+  /** Where the field bars go: one segment per run of a field's bits on each
+   *  line. Only reads the layout. */
+  private measureBars(): BarSegment[][] {
     const model = this.host.model;
-    for (const line of this.lines) {
-      const bars = line.querySelector<HTMLElement>(".bars")!;
-      bars.replaceChildren();
-      line.classList.toggle("has-bars", model.groups.length > 0);
-      if (!model.groups.length) continue;
-      type Seg = { group: Group; startX: number; endX: number };
-      let currentSegment: Seg | null = null;
-      const segments: Seg[] = [];
+    return this.lines.map((line) => {
+      const segments: BarSegment[] = [];
+      if (!model.groups.length) return segments;
+      let currentSegment: BarSegment | null = null;
       for (const cell of line.querySelectorAll<HTMLElement>(".bit:not(.pad)")) {
         const group = model.groupAt(Number(cell.dataset.bit));
         const startX = cell.offsetLeft;
@@ -221,8 +269,17 @@ export class BitStrip {
           segments.push((currentSegment = { group, startX, endX }));
         else currentSegment = null;
       }
-      for (const segment of segments) {
-        bars.append(
+      return segments;
+    });
+  }
+
+  /** Draws the field bars measured by measureBars(). Only writes. */
+  private drawBars(plan: BarSegment[][]) {
+    const hasGroups = this.host.model.groups.length > 0;
+    this.lines.forEach((line, index) => {
+      line.classList.toggle("has-bars", hasGroups);
+      line.querySelector<HTMLElement>(".bars")!.replaceChildren(
+        ...(plan[index] ?? []).map((segment) =>
           html(
             "div",
             {
@@ -232,9 +289,9 @@ export class BitStrip {
             },
             html("span", {}, segment.group.name),
           ),
-        );
-      }
-    }
+        ),
+      );
+    });
   }
 
   // ------------------------------------------------------------ state

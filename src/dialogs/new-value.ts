@@ -1,7 +1,7 @@
 // "New value from expression…": compute a value from other values.
 import { SquareFunction } from "lucide";
 import { MAX_WIDTH, MIN_WIDTH } from "../core/model";
-import { exprField, type Lookup } from "../ui/exprfield";
+import { exprField, type Lookup } from "../ui/expr-field";
 import { button, html, modal, segmented } from "../ui/kit";
 
 export interface NewValue {

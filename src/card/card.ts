@@ -24,7 +24,7 @@ import { play } from "../ui/sound";
 import * as actions from "./actions";
 import { BasesPanel } from "./bases-panel";
 import type { StripHost } from "./bitstrip";
-import { expressionBar } from "./exprbar";
+import { expressionBar } from "./expr-bar";
 import { FieldsPanel } from "./fields-panel";
 import { CardHeader } from "./header";
 import { rowMenu } from "./menus";
@@ -33,6 +33,20 @@ import { bitTip, RowsView } from "./rows";
 import { BitSelection } from "./selection";
 import { StatsBar } from "./stats";
 import { CardToolbar } from "./toolbar";
+
+/** About how tall a card is once built, in pixels: measured on the default
+ *  look (compact mode is a little shorter). Only used until it is built. */
+export function estimatedHeight(model: ValueModel): number {
+  if (model.collapsed) return 56;
+  const rows =
+    model.view === "line"
+      ? 77 * Math.ceil(model.width / 32)
+      : 71 * model.rowLos().length;
+  const fields = model.groups.length ? 36 + 36 * model.groups.length : 0;
+  return (
+    207 + rows + fields + 56 * model.compares.size + (model.showBases ? 210 : 0)
+  );
+}
 
 /** What a card asks of the workspace around it. */
 export interface CardEvents {
@@ -75,7 +89,13 @@ export class ValueCard implements StripHost {
   /** Re-evaluates the open expression bar; null while it's closed. */
   private exprRefresh: (() => void) | null = null;
   private listener = (kind: ChangeKind) => this.onModel(kind);
+  /** Whether the card's contents exist. A card far out of view is an empty
+   *  box (the workspace builds it when it comes near, see setNearView), so a
+   *  large workspace doesn't hold a million elements. */
+  built = false;
 
+  /** The card starts empty: the workspace builds it once it is placed near
+   *  the screen. */
   constructor(
     public model: ValueModel,
     readonly events: CardEvents,
@@ -85,7 +105,33 @@ export class ValueCard implements StripHost {
     this.toolbar = new CardToolbar(this);
     this.statsBar = new StatsBar(model, (value) => this.commit(value));
     model.subscribe(this.listener);
-    this.rebuild();
+    this.reserveSpace();
+  }
+
+  /** The card came near the screen (build it) or went far away (empty it,
+   *  unless something in it has the keyboard focus). */
+  setNearView(near: boolean) {
+    if (near && !this.built) this.rebuild();
+    else if (!near && this.built && !this.root.contains(document.activeElement))
+      this.unbuild();
+  }
+
+  /** While the card is empty, the room it will take once built, so the
+   *  scroll bar and the positions of other cards are about right. The
+   *  browser remembers the real size once the card has been shown. */
+  private reserveSpace() {
+    const height = estimatedHeight(this.model);
+    this.root.style.minHeight = `${height}px`;
+    // the content box: without the card's padding and border
+    this.root.style.containIntrinsicSize = `auto ${height - 32}px`;
+  }
+
+  private unbuild() {
+    this.rows.destroy();
+    this.fields.clear();
+    this.root.replaceChildren();
+    this.reserveSpace();
+    this.built = false;
   }
 
   /** Resolves a name in an expression: x / this / value, this card's fields, then other values. */
@@ -196,14 +242,23 @@ export class ValueCard implements StripHost {
     this.rows.destroy();
   }
 
+  // an empty card needs no updates: it is built from the model when it comes near
   private onModel(kind: ChangeKind) {
-    if (kind === "structure" || kind === "groups") this.rebuild();
+    if (!this.built && kind !== "value") this.reserveSpace();
+    if (kind === "structure" || kind === "groups") this.rebuildWhenShown();
     else if (kind !== "meta") this.refresh();
+  }
+
+  /** Rebuilds the contents if they exist (an empty card is built up to date later). */
+  rebuildWhenShown() {
+    if (this.built) this.rebuild();
   }
 
   // ================================================================ drawing
   /** Builds the card's contents from scratch. */
   rebuild() {
+    this.built = true;
+    this.root.style.minHeight = "";
     this.rows.destroy();
     const model = this.model;
     const focusedName =
@@ -243,6 +298,7 @@ export class ValueCard implements StripHost {
 
   /** Shows the current value everywhere, without rebuilding. */
   refresh() {
+    if (!this.built) return;
     this.header.update();
     this.rows.update();
     this.bases.update();
@@ -380,6 +436,7 @@ export class ValueCard implements StripHost {
   }
 
   private selectionChanged() {
+    if (!this.built) return;
     this.rows.repaint();
     this.toolbar.update(this.selection);
   }
@@ -403,6 +460,10 @@ export class ValueCard implements StripHost {
 
   pasteBytes() {
     return actions.pasteBytes(this);
+  }
+
+  compareWith() {
+    return actions.compareWith(this);
   }
 
   exportCode() {

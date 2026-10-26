@@ -11,7 +11,7 @@ import {
   Sigma,
 } from "lucide";
 import type { Op } from "../core/model";
-import { type ExprResult, exprField, type Lookup } from "../ui/exprfield";
+import { type ExprResult, exprField, type Lookup } from "../ui/expr-field";
 import { button, html, type MenuItem, modal, segmented } from "../ui/kit";
 
 export type ApplyOp = (operation: Op, argument?: bigint) => void;

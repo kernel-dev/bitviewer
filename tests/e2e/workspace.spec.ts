@@ -38,6 +38,7 @@ test("collapse, search and the command palette", async ({ app, page }) => {
 
   await page.keyboard.press("Control+f");
   await page.keyboard.type("bet");
+  await page.keyboard.press("Enter");
   await expect(page.locator(".search-count")).toHaveText("1 of 3 values");
   await page.keyboard.press("Escape");
   await expect(page.locator(".card:visible")).toHaveCount(3);
@@ -69,4 +70,62 @@ test("unsaved work comes back after a reload", async ({ app, page }) => {
   await expect(page.locator(".toast")).toContainText(
     "Restored unsaved changes",
   );
+});
+
+test("search runs on Enter or the Search button, not while typing", async ({
+  page,
+}) => {
+  await page.keyboard.press("Control+f");
+  await page.keyboard.type("gam");
+  await expect(page.locator(".search-count")).toHaveText(
+    "Press Enter to search",
+  );
+  await expect(page.locator(".card:visible")).toHaveCount(3);
+  await page
+    .locator(".search-bar")
+    .getByRole("button", { name: "Search" })
+    .click();
+  await expect(page.locator(".card:visible")).toHaveCount(1);
+  await expect(page.locator(".search-count")).toHaveText("1 of 3 values");
+  // new text waits for Enter again; an emptied box shows everything at once
+  await page.locator(".search-input").fill("alp");
+  await expect(page.locator(".card:visible")).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".card:visible")).toHaveCount(1);
+  expect(await page.locator(".card:visible .name-edit").inputValue()).toBe(
+    "Alpha",
+  );
+  await page.locator(".search-input").fill("");
+  await expect(page.locator(".card:visible")).toHaveCount(3);
+});
+
+test("compare with a typed value, or with another value picked from a list", async ({
+  app,
+  page,
+}) => {
+  await app.setValue("0xff", 0);
+  await app.setValue("0x0f", 2);
+  const card = page.locator(".card").nth(0);
+  await card.locator(".more-btn").click();
+  await app.menu("Compare with…");
+  const dialog = page.locator(".modal", { hasText: "Compare “Alpha” with…" });
+  // typed: an expression where x is the value itself
+  await dialog.locator(".expr-input").fill("x ^ 0b11");
+  await dialog.getByRole("button", { name: "Compare" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(
+    await app.run("window.__app.cards[0].model.compareValue(0).toString(16)"),
+  ).toBe("fc");
+
+  // picked: the other values are listed (filterable) in a collapsed section
+  await card.locator(".more-btn").click();
+  await app.menu("Compare with…");
+  await dialog.locator(".compare-pick summary").click();
+  await dialog.locator(".compare-filter").fill("gam");
+  await expect(dialog.locator(".compare-item")).toHaveCount(1);
+  await dialog.locator(".compare-item").dblclick();
+  await expect(dialog).toHaveCount(0);
+  expect(
+    await app.run("window.__app.cards[0].model.compareValue(0).toString(16)"),
+  ).toBe("f");
 });

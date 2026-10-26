@@ -11,7 +11,7 @@
 
 import type { ValueCard } from "../card/card";
 import { VERSION } from "../dialogs/help";
-import { showWhatsNew } from "../dialogs/whatsnew";
+import { showWhatsNew } from "../dialogs/whats-new";
 import * as P from "../platform/native";
 import { saveSessionNow, saveSessionSoon } from "../platform/session";
 import { appSettings } from "../platform/settings";
@@ -38,7 +38,10 @@ export class App {
     (text) => this.workspace.restore(text),
     () => this.onHistoryChange(),
   );
-  readonly search = new SearchBar(() => this.workspace.cards);
+  readonly search = new SearchBar(
+    () => this.workspace.cards,
+    () => this.workspace.buildNearView(),
+  );
   readonly workspace = new Workspace(this);
   readonly peripherals = new PeripheralController(this);
   readonly document = new WorkspaceDocument(this);
@@ -133,7 +136,7 @@ export class App {
         key,
       )
     ) {
-      for (const card of this.workspace.cards) card.rebuild();
+      for (const card of this.workspace.cards) card.rebuildWhenShown();
     }
   }
 }

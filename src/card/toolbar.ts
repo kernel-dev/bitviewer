@@ -20,8 +20,8 @@ import {
 import type { Op, View } from "../core/model";
 import { button, html, openMenu, segmented } from "../ui/kit";
 import type { ValueCard } from "./card";
-import { moreOpsMenu } from "./ops-ui";
-import { SelectionBar } from "./selbar";
+import { moreOpsMenu } from "./more-ops";
+import { SelectionBar } from "./selection-bar";
 
 const VIEW_UI: { value: View; label: string; icon: IconNode; tip: string }[] = [
   {

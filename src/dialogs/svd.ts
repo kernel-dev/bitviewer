@@ -23,7 +23,9 @@ export function pickSvdRegisters(
   device: SvdDevice,
   fileName: string,
 ): Promise<SvdChoice | null> {
-  const selected = new Set<SvdRegister>();
+  const selected = new Set<SvdRegister>(
+    device.peripherals.flatMap((peripheral) => peripheral.registers),
+  );
   const expanded = new Set<SvdPeripheral>();
   return modal<SvdChoice | null>({
     title: `Import from ${device.name}`,
@@ -60,6 +62,54 @@ export function pickSvdRegisters(
         onClick: () => finish("templates"),
       });
 
+      const query = () => search.value.trim().toLowerCase();
+      /** The peripherals the filter lets through, each with its registers
+       *  that do (all of them when the peripheral itself matches). */
+      const filtered = () => {
+        const text = query();
+        return device.peripherals.flatMap((peripheral) => {
+          const peripheralHit =
+            !text ||
+            matches(
+              text,
+              peripheral.name,
+              peripheral.groupName,
+              peripheral.description,
+            );
+          const registers = peripheralHit
+            ? peripheral.registers
+            : peripheral.registers.filter((register) =>
+                matches(
+                  text,
+                  register.name,
+                  register.path,
+                  register.description,
+                ),
+              );
+          return peripheralHit || registers.length
+            ? [{ peripheral, peripheralHit, registers }]
+            : [];
+        });
+      };
+
+      // "Select all" acts on what the filter shows (everything when empty)
+      const inScope = () => filtered().flatMap((entry) => entry.registers);
+      const allSelected = (registers: SvdRegister[]) =>
+        registers.length > 0 &&
+        registers.every((register) => selected.has(register));
+      const allButton = button({
+        label: "Select all",
+        className: "outline svd-all",
+        tip: "Select or unselect every register the filter shows",
+        onClick: () => {
+          const registers = inScope();
+          const unselect = allSelected(registers);
+          for (const register of registers)
+            unselect ? selected.delete(register) : selected.add(register);
+          render();
+        },
+      });
+
       const finish = (action: SvdChoice["action"]) => {
         if (!selected.size) return;
         // keep the file's order
@@ -77,6 +127,9 @@ export function pickSvdRegisters(
         addButton.disabled = templatesButton.disabled = chosen === 0;
         addButton.textContent =
           chosen > 1 ? `Add ${chosen} values` : "Add value";
+        const registers = inScope();
+        allButton.textContent = `${allSelected(registers) ? "Unselect" : "Select"} all${query() ? " matching" : ""}`;
+        allButton.disabled = !registers.length;
       };
 
       const peripheralBox = (peripheral: SvdPeripheral) => {
@@ -137,33 +190,14 @@ export function pickSvdRegisters(
       };
 
       const render = () => {
-        const query = search.value.trim().toLowerCase();
         const scroll = list.scrollTop;
         list.replaceChildren();
         let rows = 0;
         let hidden = 0;
-        for (const peripheral of device.peripherals) {
-          const peripheralHit =
-            !query ||
-            matches(
-              query,
-              peripheral.name,
-              peripheral.groupName,
-              peripheral.description,
-            );
-          const registers = peripheralHit
-            ? peripheral.registers
-            : peripheral.registers.filter((register) =>
-                matches(
-                  query,
-                  register.name,
-                  register.path,
-                  register.description,
-                ),
-              );
-          if (!peripheralHit && !registers.length) continue;
+        for (const { peripheral, peripheralHit, registers } of filtered()) {
           // a search that only matches registers opens their peripheral
-          const open = expanded.has(peripheral) || (!!query && !peripheralHit);
+          const open =
+            expanded.has(peripheral) || (!!query() && !peripheralHit);
           const head = html(
             "div",
             {
@@ -239,7 +273,7 @@ export function pickSvdRegisters(
           `${fileName}${device.description ? ` — ${device.description}` : ""}. ` +
             "Tick registers to add them as values (named after the register, set to its reset value, with its fields), or save their layouts as templates.",
         ),
-        html("div", { class: "svd-top" }, search, count),
+        html("div", { class: "svd-top" }, search, allButton, count),
         list,
         problems
           ? html(
