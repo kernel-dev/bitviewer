@@ -2,8 +2,8 @@
 // values, snapshots or hex digits, and highlights matching fields.
 import { ChevronDown, ChevronUp, Search, X } from "lucide";
 import type { ValueCard } from "../card/card";
+import { formatInt } from "../core/format/integers";
 import type { ValueModel } from "../core/model";
-import { formatInt } from "../core/numfmt";
 import { button, html, icon } from "../ui/kit";
 
 /** Does a value match the (lower-case) query? Field names that match are returned too. */

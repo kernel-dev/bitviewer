@@ -15,7 +15,7 @@ import {
   Trash,
   Ungroup,
 } from "lucide";
-import { ParseError, parseValue } from "../core/numfmt";
+import { ParseError, parseValue } from "../core/format/integers";
 import type { Peripheral } from "../core/workspace";
 import { button, html, icon, modal, openMenu } from "../ui/kit";
 

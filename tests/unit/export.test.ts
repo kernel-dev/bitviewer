@@ -5,8 +5,8 @@ import {
   generate,
   renderExport,
   usesWords,
-} from "../../src/core/codegen";
-import { exportContext } from "../../src/core/exportdata";
+} from "../../src/core/export/codegen";
+import { exportContext } from "../../src/core/export/register-data";
 import { ValueModel } from "../../src/core/model";
 
 const options = { prefix: "CTRL", includeValue: false };

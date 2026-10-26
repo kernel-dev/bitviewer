@@ -6,7 +6,7 @@ import {
   registerTemplate,
   SvdError,
 } from "../../src/core/svd";
-import { parseXml, XmlError } from "../../src/core/xml";
+import { parseXml, XmlError } from "../../src/core/svd/xml";
 
 describe("xml", () => {
   it("reads elements, attributes, text, entities and CDATA", () => {

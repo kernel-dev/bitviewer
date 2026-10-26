@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { decodeFloat, formatFloatKind } from "../../src/core/formats";
-import { applyOp, ModelError, ValueModel } from "../../src/core/model";
 import {
   formatInt,
   ParseError,
   parseValue,
   toSigned,
-} from "../../src/core/numfmt";
+} from "../../src/core/format/integers";
+import {
+  decodeFloat,
+  formatFloatKind,
+} from "../../src/core/format/interpretations";
+import {
+  applyOp,
+  ModelError,
+  ValueModel,
+  valueFromJSON,
+  valueToJSON,
+} from "../../src/core/model";
 
 describe("parse", () => {
   it("handles every base", () => {
@@ -124,7 +133,7 @@ describe("model", () => {
       "after reset",
       "Snapshot 2",
     ]);
-    const back = ValueModel.fromJSON(JSON.parse(JSON.stringify(model)));
+    const back = valueFromJSON(JSON.parse(JSON.stringify(valueToJSON(model))));
     expect(back.collapsed).toBe(true);
     expect(back.snapshots).toEqual([
       { name: "after reset", value: 0x1234n, at: 1000 },
@@ -133,7 +142,7 @@ describe("model", () => {
     model.removeSnapshot(snapshot);
     expect(model.snapshots.length).toBe(1);
     expect(
-      ValueModel.fromJSON({
+      valueFromJSON({
         width: 8,
         snapshots: [
           { name: "x", value: "zz" },
@@ -155,7 +164,9 @@ describe("model", () => {
 
     // survives save / load while closed
     model.removeCompare(0);
-    const loaded = ValueModel.fromJSON(JSON.parse(JSON.stringify(model)));
+    const loaded = valueFromJSON(
+      JSON.parse(JSON.stringify(valueToJSON(model))),
+    );
     expect(loaded.hasCompare(0)).toBe(false);
     loaded.addCompare(0);
     expect(loaded.compareValue(0)).toBe(0x80001n);
@@ -252,8 +263,8 @@ describe("model", () => {
     expect(model.value).toBe(0xbeefn);
     expect(model.rowLos()[0]).toBe(96);
     expect(model.rowWidthAt(96)).toBe(4);
-    const json = JSON.parse(JSON.stringify(model));
-    expect(ValueModel.fromJSON(json).toJSON()).toEqual(model.toJSON());
+    const json = JSON.parse(JSON.stringify(valueToJSON(model)));
+    expect(valueToJSON(valueFromJSON(json))).toEqual(valueToJSON(model));
   });
 
   it("manages groups", () => {
@@ -296,12 +307,12 @@ describe("model", () => {
     model.setCompare(8, 3n);
     model.addGroup(0, 7, "LOW");
     model.setShowBases(true);
-    const json = JSON.parse(JSON.stringify(model));
-    expect(ValueModel.fromJSON(json).toJSON()).toEqual(model.toJSON());
+    const json = JSON.parse(JSON.stringify(valueToJSON(model)));
+    expect(valueToJSON(valueFromJSON(json))).toEqual(valueToJSON(model));
   });
 
   it("reads files written by the Python version", () => {
-    const model = ValueModel.fromJSON({
+    const model = valueFromJSON({
       name: "Legacy",
       width: 32,
       value: "0x3FC00000",
@@ -321,12 +332,12 @@ describe("model", () => {
   });
 
   it("rejects bad input", () => {
-    expect(() => ValueModel.fromJSON({ width: 600 })).toThrow(ModelError);
+    expect(() => valueFromJSON({ width: 600 })).toThrow(ModelError);
     expect(() =>
-      ValueModel.fromJSON({ width: 16, compares: { "3": "0x1" } }),
+      valueFromJSON({ width: 16, compares: { "3": "0x1" } }),
     ).toThrow(ModelError);
     expect(() =>
-      ValueModel.fromJSON({ width: 32, groups: [{ lo: 0, hi: 40 }] }),
+      valueFromJSON({ width: 32, groups: [{ lo: 0, hi: 40 }] }),
     ).toThrow(ModelError);
   });
 });

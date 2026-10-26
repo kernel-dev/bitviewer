@@ -1,8 +1,8 @@
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
-import "./ui/styles.css";
+import "./ui/styles/index.css";
 import { App } from "./app/app";
-import { appSettings } from "./app/settings";
+import { appSettings } from "./platform/settings";
 import { html, installMenus, installTooltips, toast } from "./ui/kit";
 
 installTooltips();

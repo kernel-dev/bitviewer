@@ -5,8 +5,8 @@
 // `flex` strips (the "line" view) stretch their cells to fill the width and
 // wrap onto 2 or 4 lines when the cells would get too narrow.
 
-import { appSettings } from "../app/settings";
 import type { Group, ValueModel } from "../core/model";
+import { appSettings } from "../platform/settings";
 import { html, setTip } from "../ui/kit";
 import { play } from "../ui/sound";
 

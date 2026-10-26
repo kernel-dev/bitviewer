@@ -2,9 +2,9 @@
 // and named values.
 import { Plus, SlidersVertical, Trash } from "lucide";
 import { ExprError } from "../core/expr";
-import { compileFormula, formatReal } from "../core/fieldfmt";
+import { compileFormula, formatReal } from "../core/format/fields";
+import { maxValue } from "../core/format/integers";
 import type { Access, FieldDetails, Group, NamedValue } from "../core/model";
-import { maxValue } from "../core/numfmt";
 import { button, html, modal, segmented, toggleSwitch } from "../ui/kit";
 
 function parseInteger(text: string): bigint {

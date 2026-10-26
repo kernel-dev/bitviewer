@@ -1,0 +1,156 @@
+/* The content of particular dialogs: width, settings, help, about, what's
+   new, field details, templates, export code, SVD import and the guide. */
+
+.width-row { display: flex; align-items: center; gap: 10px; }
+.width-input { width: 120px; height: 36px; font-size: 16px !important; }
+.width-input::-webkit-inner-spin-button { opacity: 0.6; }
+.width-error { min-height: 18px; margin-top: 6px; color: var(--error); font-size: 12px; }
+.presets-label { margin-top: 4px; }
+.width-presets .seg-btn { min-width: 40px; justify-content: center; font-family: var(--mono); }
+
+.set-section h4 {
+  margin: 14px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--muted);
+}
+.set-section:first-child h4 { margin-top: 4px; }
+.set-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 0 14px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; }
+.set-row + .set-row { border-top: 1px solid var(--border); }
+.set-label { font-size: 13.5px; }
+.set-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.zoom-ctl { display: flex; align-items: center; gap: 10px; }
+.zoom-val { width: 44px; text-align: right; color: var(--muted); }
+
+.help h4 { margin: 14px 0 4px; font-size: 13px; color: var(--text); }
+.help h4:first-child { margin-top: 2px; }
+.help p { margin: 0; color: var(--muted); line-height: 1.55; user-select: text; }
+.shortcuts { display: grid; grid-template-columns: 1fr auto; gap: 7px 16px; align-items: center; color: var(--muted); }
+kbd {
+  display: inline-block; min-width: 20px; padding: 2px 6px; margin: 0 1px; text-align: center;
+  font: 500 11px/1.4 var(--mono); color: var(--text);
+  background: var(--surface-3); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px;
+}
+.about { display: flex; gap: 16px; align-items: center; padding: 4px 0 8px; }
+.about h3 { margin: 0; font-size: 18px; }
+.about p { margin: 2px 0; }
+.whatsnew { max-height: 55vh; overflow: auto; user-select: text; line-height: 1.55; }
+.whatsnew p { margin: 0 0 6px; }
+.whatsnew h3 { margin: 14px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.whatsnew ul { margin: 0; padding-left: 20px; }
+.whatsnew li { margin: 4px 0; }
+.whatsnew code { padding: 1px 5px; border-radius: 5px; background: var(--input); border: 1px solid var(--border); font-size: 0.9em; }
+.bytes-area { width: 100%; height: auto; min-height: 72px; padding: 8px 10px; resize: vertical; line-height: 1.5; }
+
+.formula-row { display: flex; gap: 8px; }
+.formula-row .field.mono { flex: 1; }
+.unit-input { width: 90px; }
+.named-table { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.named-row { display: flex; gap: 8px; align-items: center; }
+.named-row .named-value { width: 110px; }
+.named-row .field:not(.named-value) { flex: 1; }
+
+/* ------------------------------------------------------------ templates & export */
+.tpl-list { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow: auto; padding-right: 4px; }
+.tpl-section { margin: 10px 0 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.tpl-item {
+  display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+}
+.tpl-item:hover { border-color: var(--border-strong); }
+.tpl-item.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tpl-head { display: flex; align-items: center; gap: 10px; }
+.tpl-bar { display: flex; gap: 2px; height: 16px; }
+.tpl-field {
+  background: var(--g); border-radius: 3px; color: #fff; font: 700 9.5px/16px var(--ui);
+  text-align: center; overflow: hidden; white-space: nowrap; min-width: 3px;
+}
+.tpl-gap { background: var(--track); border-radius: 3px; }
+.export-opts { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.export-opt { display: inline-flex; align-items: center; gap: 8px; }
+.export-opt .field { width: 140px; height: 28px; }
+.export-help { margin: 0 0 8px; }
+.export-templates { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.export-error { margin: 4px 0 8px; white-space: pre-wrap; user-select: text; }
+.export-error:empty { display: none; }
+.tpl-source { width: 100%; min-height: 240px; padding: 10px 12px; resize: vertical; line-height: 1.5; font-size: 12.5px; white-space: pre; overflow: auto; height: auto; }
+.tpl-cheat { margin: 0 0 8px; }
+.tpl-cheat summary { cursor: pointer; padding: 2px 0; }
+.tpl-cheat pre { margin: 6px 0 0; padding: 10px 12px; background: var(--input); border: 1px solid var(--border); border-radius: 10px; color: var(--text); user-select: text; overflow: auto; }
+.tpl-preview { max-height: 30vh; }
+.tpl-preview.stale { opacity: 0.45; }
+.code-preview {
+  margin: 0; padding: 12px 14px; max-height: 48vh; overflow: auto; white-space: pre;
+  background: var(--input); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 12px; line-height: 1.55; user-select: text; color: var(--text);
+}
+
+/* ------------------------------------------------------------ accent picker */
+.accent-pick { display: flex; gap: 6px; align-items: center; }
+.accent-swatch {
+  width: 22px; height: 22px; border-radius: 50%; padding: 0; border: 2px solid var(--surface-2);
+  background: var(--sw); box-shadow: 0 0 0 1px var(--border-strong); cursor: pointer; position: relative; flex: none;
+}
+.accent-swatch.on { box-shadow: 0 0 0 2px var(--text); }
+.accent-swatch.custom {
+  background: conic-gradient(#e5383b, #f59f00, #2fb344, #0ca678, #3b82f6, #8b5cf6, #e64980, #e5383b);
+  display: grid; place-items: center; overflow: hidden;
+}
+.accent-swatch.custom.on { background: var(--sw); }
+.accent-custom-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------ help & guide */
+.help-search-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.help-search { flex: 1; height: 32px; }
+.help { max-height: 52vh; overflow: auto; padding-right: 4px; }
+.guide-link { color: var(--accent); cursor: pointer; text-decoration: none; }
+.guide-link:hover { text-decoration: underline; }
+.modal.guide-modal { width: min(1040px, 96vw); }
+.guide { display: flex; gap: 18px; height: 68vh; }
+.guide-nav { display: flex; flex-direction: column; gap: 2px; flex: 0 0 190px; }
+.guide-tab {
+  text-align: left; padding: 7px 10px; border-radius: 8px; border: 0; background: transparent;
+  color: var(--muted); font: inherit; cursor: pointer;
+}
+.guide-tab:hover { background: var(--accent-soft); color: var(--text); }
+.guide-tab.on { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.guide-page { flex: 1; min-width: 0; overflow: auto; padding-right: 6px; line-height: 1.6; user-select: text; }
+.guide-page h3 { margin: 0 0 8px; font-size: 18px; }
+.guide-page h4 { margin: 18px 0 4px; font-size: 14px; }
+.guide-page p, .guide-page li { color: var(--muted); }
+.guide-page p { margin: 6px 0; }
+.guide-page ul, .guide-page ol { margin: 6px 0; padding-left: 22px; }
+.guide-page code { font-family: var(--mono, ui-monospace, monospace); font-size: 0.92em; color: var(--text); }
+.guide-page figure { margin: 12px 0; }
+.guide-page figure img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+.guide-page figcaption { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.guide-page .guide-code {
+  margin: 10px 0; padding: 10px 12px; overflow: auto; white-space: pre; font-size: 12px; line-height: 1.5;
+  background: var(--input); border: 1px solid var(--border); border-radius: 10px; color: var(--text);
+}
+.guide-table { border-collapse: collapse; margin: 8px 0; }
+.guide-table td, .guide-table th { padding: 5px 12px 5px 0; vertical-align: top; text-align: left; }
+.guide-table td:first-child { color: var(--text); white-space: nowrap; }
+@media (max-width: 760px) {
+  .guide { flex-direction: column; height: auto; }
+  .guide-nav { flex: none; flex-direction: row; flex-wrap: wrap; }
+}
+
+/* CMSIS-SVD import */
+.svd-top { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
+.svd-search { flex: 1; height: 34px; }
+.svd-count { white-space: nowrap; }
+.svd-list {
+  display: flex; flex-direction: column; max-height: 52vh; overflow: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+}
+.svd-periph, .svd-reg {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; min-width: 0;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.svd-periph { position: sticky; top: 0; z-index: 1; background: var(--surface-2); }
+.svd-periph:hover, .svd-reg:hover { background: var(--surface-3); }
+.svd-reg { padding-left: 38px; background: var(--surface); }
+.svd-check { accent-color: var(--accent); margin: 0; flex: none; }
+.svd-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svd-more { margin: 0; padding: 10px 12px; }
+.guide-url { user-select: text; }

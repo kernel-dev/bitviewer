@@ -1,11 +1,11 @@
 // Regression tests for bugs found in the October 2026 review.
 import { describe, expect, it } from "vitest";
-import { generate } from "../../src/core/codegen";
-import { renderSource, TemplateError } from "../../src/core/exportlang";
+import { generate } from "../../src/core/export/codegen";
+import { renderSource, TemplateError } from "../../src/core/export/language";
 import { ExprError, evalInt, evalReal, parseExpr } from "../../src/core/expr";
-import { decodeField } from "../../src/core/fieldfmt";
-import { parseBytes } from "../../src/core/formats";
-import { ModelError, ValueModel } from "../../src/core/model";
+import { decodeField } from "../../src/core/format/fields";
+import { parseBytes } from "../../src/core/format/interpretations";
+import { ModelError, ValueModel, valueFromJSON } from "../../src/core/model";
 import { validTemplate } from "../../src/core/templates";
 
 const none = () => undefined;
@@ -50,18 +50,18 @@ describe("workspace files", () => {
   it("rejects bit positions that aren't whole numbers", () => {
     for (const lo of ["abc", 1.5, null])
       expect(() =>
-        ValueModel.fromJSON({
+        valueFromJSON({
           width: 8,
           groups: [{ lo, hi: 3, name: "A" }],
         }),
       ).toThrow(ModelError);
-    expect(() =>
-      ValueModel.fromJSON({ width: 8, row_bases: { abc: 2 } }),
-    ).toThrow(ModelError);
+    expect(() => valueFromJSON({ width: 8, row_bases: { abc: 2 } })).toThrow(
+      ModelError,
+    );
   });
 
   it("replaces colours that aren't #rgb / #rrggbb", () => {
-    const model = ValueModel.fromJSON({
+    const model = valueFromJSON({
       width: 8,
       groups: [
         { lo: 0, hi: 3, name: "A", color: "red;background:url(x)" },
@@ -80,7 +80,7 @@ describe("workspace files", () => {
   });
 
   it("keeps named values inside the field", () => {
-    const model = ValueModel.fromJSON({
+    const model = valueFromJSON({
       width: 8,
       groups: [
         {

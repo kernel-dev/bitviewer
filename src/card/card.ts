@@ -40,11 +40,22 @@ import {
   Undo2,
   X,
 } from "lucide";
-import { copyText } from "../app/platform";
-import { appSettings } from "../app/settings";
 import { ExprError } from "../core/expr";
-import { decodeField, isInvertible, rawFromNumber } from "../core/fieldfmt";
-import { parseFloatText } from "../core/formats";
+import {
+  decodeField,
+  isInvertible,
+  rawFromNumber,
+} from "../core/format/fields";
+import {
+  BASE_NAMES,
+  BASE_ORDER,
+  type Base,
+  formatInt,
+  maxValue,
+  ParseError,
+  popcount,
+} from "../core/format/integers";
+import { parseFloatText } from "../core/format/interpretations";
 import {
   applyOp,
   type ChangeKind,
@@ -55,20 +66,13 @@ import {
   type ValueModel,
   type View,
 } from "../core/model";
-import {
-  BASE_NAMES,
-  BASE_ORDER,
-  type Base,
-  formatInt,
-  maxValue,
-  ParseError,
-  popcount,
-} from "../core/numfmt";
 import { addressOf, type Peripheral } from "../core/workspace";
 import { copyBytesMenu, pasteBytes } from "../dialogs/bytes";
 import { exportCode } from "../dialogs/export";
 import { editField } from "../dialogs/field";
 import { pickTemplate, saveTemplate } from "../dialogs/templates";
+import { copyText } from "../platform/native";
+import { appSettings } from "../platform/settings";
 import {
   ask,
   button,

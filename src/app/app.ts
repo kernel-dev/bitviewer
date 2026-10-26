@@ -42,8 +42,15 @@ import {
   ZoomOut,
 } from "lucide";
 import { ValueCard } from "../card/card";
-import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "../core/model";
-import { BASE_NAMES, BASE_ORDER, type Base } from "../core/numfmt";
+import { BASE_NAMES, BASE_ORDER, type Base } from "../core/format/integers";
+import {
+  MAX_WIDTH,
+  MIN_WIDTH,
+  ModelError,
+  ValueModel,
+  valueFromJSON,
+  valueToJSON,
+} from "../core/model";
 import {
   parseSvd,
   registerTemplate,
@@ -69,6 +76,14 @@ import { pickSvdRegisters } from "../dialogs/svd";
 import { pickTemplate } from "../dialogs/templates";
 import { showWhatsNew } from "../dialogs/whatsnew";
 import { pickWidth } from "../dialogs/width";
+import * as P from "../platform/native";
+import {
+  loadSession,
+  type Session,
+  saveSessionNow,
+  saveSessionSoon,
+} from "../platform/session";
+import { appSettings, ZOOM_STEP } from "../platform/settings";
 import { applyAccent } from "../ui/accent";
 import {
   ask,
@@ -93,15 +108,7 @@ import {
   type PeripheralActions,
   peripheralHeader,
 } from "./peripherals";
-import * as P from "./platform";
 import { SearchBar } from "./search";
-import {
-  loadSession,
-  type Session,
-  saveSessionNow,
-  saveSessionSoon,
-} from "./session";
-import { appSettings, ZOOM_STEP } from "./settings";
 import { startTour, tourRunning } from "./tour";
 import { checkForUpdates } from "./updates";
 
@@ -1026,7 +1033,7 @@ export class App {
   /** The values and their peripherals, as saved in files, sessions and undo steps. */
   private workspaceJSON() {
     return {
-      values: this.cards.map((card) => card.model.toJSON()),
+      values: this.cards.map((card) => valueToJSON(card.model)),
       peripherals: this.usedPeripherals().map(peripheralToJSON),
     };
   }
@@ -1046,7 +1053,7 @@ export class App {
     const scroll = this.workspace.scrollTop;
     const data = JSON.parse(snapshotJson);
     const models = (data.values as unknown[]).map((serialized) =>
-      ValueModel.fromJSON(serialized),
+      valueFromJSON(serialized),
     );
     this.clearCards();
     this.peripherals = peripheralsFromJSON(data.peripherals);
@@ -1389,11 +1396,11 @@ export class App {
   }
 
   private duplicateValue(card: ValueCard) {
-    const serialized = card.model.toJSON();
+    const serialized = valueToJSON(card.model);
     serialized.name = `${card.model.name} copy`;
     this.addValue(
       card.model.width,
-      ValueModel.fromJSON(serialized),
+      valueFromJSON(serialized),
       this.cards.indexOf(card) + 1,
     );
   }
@@ -1973,7 +1980,7 @@ export class App {
       if (!Array.isArray(values))
         throw new ModelError("The file's values aren't a list");
       // validate everything before replacing the workspace
-      for (const serialized of values) ValueModel.fromJSON(serialized);
+      for (const serialized of values) valueFromJSON(serialized);
       peripheralsFromJSON(data.peripherals);
       peripherals = data.peripherals;
     } catch (error) {
@@ -2009,7 +2016,7 @@ export class App {
     name: string,
     peripherals?: unknown,
   ) {
-    const models = values.map((serialized) => ValueModel.fromJSON(serialized));
+    const models = values.map((serialized) => valueFromJSON(serialized));
     const blocks = peripheralsFromJSON(peripherals);
     this.clearCards();
     this.peripherals = blocks;

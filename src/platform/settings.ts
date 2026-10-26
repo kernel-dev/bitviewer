@@ -1,11 +1,11 @@
 // Persisted app settings. They live in `settings.json` in the app's config
 // folder (localStorage in the browser). Older versions kept them in the
 // webview's localStorage; those are migrated on first start.
-import type { SavedExportTemplate } from "../core/codegen";
+import type { SavedExportTemplate } from "../core/export/codegen";
+import { BASE_ORDER, type Base } from "../core/format/integers";
 import type { View } from "../core/model";
-import { BASE_ORDER, type Base } from "../core/numfmt";
 import { type Template, validTemplate } from "../core/templates";
-import { isTauri, readAppFile, writeAppFile } from "./platform";
+import { isTauri, readAppFile, writeAppFile } from "./native";
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 3.0;

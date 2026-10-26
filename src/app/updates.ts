@@ -1,8 +1,8 @@
 // Auto-updates through Tauri's updater: signed installers and a latest.json
 // published with each GitHub release (see `npm run release` in the README).
 import { CloudDownload } from "lucide";
+import { isTauri } from "../platform/native";
 import { ask, button, html, modal, toast } from "../ui/kit";
-import { isTauri } from "./platform";
 
 /** Checks for a newer version. `manual` reports "up to date" and errors; the
  *  start-up check stays silent unless an update exists. `prepare` runs before

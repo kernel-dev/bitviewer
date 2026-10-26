@@ -1,5 +1,6 @@
 // Paste a value as bytes, and the "Copy as bytes" menu entries.
 import { ClipboardPaste } from "lucide";
+import { formatInt, ParseError } from "../core/format/integers";
 import {
   type ByteOrder,
   type ByteStyle,
@@ -7,8 +8,7 @@ import {
   formatBytes,
   parseBytes,
   valueToBytes,
-} from "../core/formats";
-import { formatInt, ParseError } from "../core/numfmt";
+} from "../core/format/interpretations";
 import { button, html, type MenuItem, modal, segmented } from "../ui/kit";
 
 /** Asks for bytes and returns the value they make, or null when cancelled. */

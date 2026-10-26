@@ -3,14 +3,6 @@
 // the user copy or save it.
 import { Copy, Download, FileCode2, Pencil, Plus } from "lucide";
 import {
-  basename,
-  copyText,
-  joinPath,
-  pickSavePath,
-  writeText,
-} from "../app/platform";
-import { appSettings } from "../app/settings";
-import {
   BUILTIN_EXPORTS,
   customExport,
   defaultPrefix,
@@ -22,10 +14,18 @@ import {
   renderPeripheralExport,
   TemplateError,
   usesWords,
-} from "../core/codegen";
-import type { TemplateScope } from "../core/exportlang";
+} from "../core/export/codegen";
+import type { TemplateScope } from "../core/export/language";
 import type { ValueModel } from "../core/model";
 import type { Peripheral } from "../core/workspace";
+import {
+  basename,
+  copyText,
+  joinPath,
+  pickSavePath,
+  writeText,
+} from "../platform/native";
+import { appSettings } from "../platform/settings";
 import { button, html, modal, segmented, toast, toggleSwitch } from "../ui/kit";
 import { play } from "../ui/sound";
 import { editExportTemplate } from "./exportedit";

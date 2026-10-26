@@ -1,7 +1,7 @@
 // An input that evaluates an integer expression as you type and previews the
 // result for a given bit width.
 import { ExprError, evalInt, parseExpr } from "../core/expr";
-import { formatInt, maxValue, ParseError } from "../core/numfmt";
+import { formatInt, maxValue, ParseError } from "../core/format/integers";
 import { html } from "./kit";
 
 export type Lookup = (name: string) => bigint | undefined;

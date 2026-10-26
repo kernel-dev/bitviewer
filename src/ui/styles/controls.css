@@ -1,0 +1,100 @@
+/* Buttons, segmented controls, text fields, switches and sliders. */
+
+/* ------------------------------------------------------------ buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent;
+  background: transparent; color: var(--text); font-size: 13px; font-weight: 500; white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+  flex: none;
+}
+.btn.icon-only { width: 30px; padding: 0; }
+.btn.sm { height: 26px; padding: 0 8px; font-size: 12px; border-radius: 7px; }
+.btn.sm.icon-only { width: 26px; padding: 0; }
+.btn.xs { height: 22px; width: 22px; padding: 0; border-radius: 6px; }
+.btn:disabled { color: var(--faint); cursor: default; }
+.btn.ghost:hover:not(:disabled) { background: var(--surface-3); }
+.btn.ghost .ico { color: var(--muted); }
+.btn.ghost:hover .ico { color: var(--text); }
+.btn.outline { border-color: var(--border-strong); }
+.btn.outline:hover { border-color: var(--muted); background: var(--surface-2); }
+.btn.on { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.btn.on .ico { color: var(--accent); }
+.btn.primary {
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+  color: var(--on-accent); font-weight: 600; border-color: var(--accent-press);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 10px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.primary:active { background: var(--accent-press); }
+.btn.primary:disabled {
+  background: var(--surface-3); border-color: var(--border-strong); color: var(--faint); box-shadow: none;
+}
+.btn.accent-ghost { color: var(--accent); font-weight: 600; }
+.btn.accent-ghost:hover:not(:disabled) { background: var(--accent-soft); }
+.btn.accent-ghost:disabled { color: var(--faint); }
+.btn.danger:hover { color: var(--error); background: var(--error-bg); }
+.btn.danger:hover .ico { color: var(--error); }
+.btn.danger-btn { background: var(--error); color: #fff; font-weight: 600; }
+.btn.danger-btn:hover { filter: brightness(1.1); }
+
+/* ------------------------------------------------------------ segmented control */
+.seg {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  background: var(--track); border: 1px solid var(--border); border-radius: 9px; flex: none;
+}
+.seg-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none;
+  color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.on {
+  background: var(--seg-on); color: var(--text);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.seg-btn.on .ico { color: var(--accent); }
+.seg.ops .seg-btn:hover, .toolbar .seg .seg-btn:hover { background: var(--surface-3); }
+.seg.ops .seg-btn:active, .toolbar .seg .seg-btn:active { background: var(--accent-soft); color: var(--accent); }
+.seg.sm .seg-btn { height: 24px; padding: 0 8px; font-size: 11.5px; }
+.seg.xs { border-radius: 8px; }
+.seg.xs .seg-btn { height: 22px; padding: 0 7px; font-size: 10.5px; border-radius: 6px; }
+
+/* ------------------------------------------------------------ inputs */
+.field {
+  height: 30px; padding: 0 10px; border-radius: 8px;
+  background: var(--input); border: 1px solid var(--border-strong); color: var(--text);
+  outline: none; transition: border-color 0.12s, box-shadow 0.12s; min-width: 0; user-select: text;
+}
+.field.mono { font-family: var(--mono); font-size: 13px; }
+.field:hover { border-color: var(--muted); }
+.field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field.invalid { border-color: var(--error); background: var(--error-bg); }
+.field.invalid:focus { box-shadow: 0 0 0 3px rgba(255, 93, 108, 0.18); }
+
+.switch { position: relative; width: 38px; height: 22px; flex: none; cursor: pointer; }
+.switch-input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch-track {
+  position: absolute; inset: 0; border-radius: 11px; background: var(--border-strong);
+  transition: background 0.15s; pointer-events: none;
+}
+.switch-knob {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: transform 0.15s;
+}
+.switch-input:checked + .switch-track { background: var(--accent); }
+.switch-input:checked + .switch-track .switch-knob { transform: translateX(16px); }
+.switch-input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.slider {
+  appearance: none; width: 170px; height: 4px; border-radius: 2px; outline: none; margin: 0;
+  background: linear-gradient(to right, var(--accent) var(--p, 0%), var(--track) var(--p, 0%));
+}
+.slider::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--border-strong); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.slider:hover::-webkit-slider-thumb { border-color: var(--accent); }
+.slider:disabled { opacity: 0.4; }
+.slider:disabled::-webkit-slider-thumb { cursor: default; }

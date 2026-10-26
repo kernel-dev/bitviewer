@@ -1,7 +1,7 @@
 // The Settings dialog. Every change applies immediately.
 import { Contrast, Moon, SlidersHorizontal, Sun, Volume2 } from "lucide";
-import { appSettings, ZOOM_MAX, ZOOM_MIN } from "../app/settings";
-import { BASE_NAMES, BASE_ORDER } from "../core/numfmt";
+import { BASE_NAMES, BASE_ORDER } from "../core/format/integers";
+import { appSettings, ZOOM_MAX, ZOOM_MIN } from "../platform/settings";
 import { ACCENTS } from "../ui/accent";
 import { button, html, modal, segmented, toggleSwitch } from "../ui/kit";
 import { play } from "../ui/sound";

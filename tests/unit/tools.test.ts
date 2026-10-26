@@ -22,7 +22,7 @@ import {
   parseBytes,
   parseFloatText,
   valueToBytes,
-} from "../../src/core/formats";
+} from "../../src/core/format/interpretations";
 import { applyOp, ModelError, ValueModel } from "../../src/core/model";
 
 describe("operations", () => {

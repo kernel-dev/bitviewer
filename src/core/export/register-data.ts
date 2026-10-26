@@ -2,9 +2,14 @@
 // Everything is plain strings, numbers, booleans, lists and objects, so templates
 // never need to do bigint maths: values and masks arrive as Num, which prints as
 // hex and also has .bin, .dec and .oct.
-import { Num } from "./exportlang";
-import type { Group, ValueModel } from "./model";
-import { byteSize, type Peripheral } from "./workspace";
+//
+// This file builds the data for one register (a value); peripheral-data.ts
+// builds it for a whole peripheral.
+
+import type { Group, ValueModel } from "../model";
+import type { Peripheral } from "../workspace";
+import { Num } from "./language";
+import { fieldIds, ident } from "./naming";
 
 export interface ExportOptions {
   prefix: string; // e.g. "CTRL", used in names
@@ -16,13 +21,16 @@ export interface ExportOptions {
 }
 
 /** Bits needed for addresses: 32, or 64 when one doesn't fit in 32. */
-const addressBits = (...addresses: (bigint | null)[]) =>
+export const addressBits = (...addresses: (bigint | null)[]) =>
   addresses.some((address) => address !== null && address > 0xffffffffn)
     ? 64
     : 32;
 
 /** The address facts every register export gets. */
-function placement(model: ValueModel, peripheral: Peripheral | undefined) {
+export function placement(
+  model: ValueModel,
+  peripheral: Peripheral | undefined,
+) {
   const base = peripheral?.base ?? null;
   const address =
     model.offset !== null && base !== null ? base + model.offset : null;
@@ -38,42 +46,10 @@ function placement(model: ValueModel, peripheral: Peripheral | undefined) {
   };
 }
 
-/** UPPER_SNAKE identifier from free text ("Value 1" → "VALUE_1"). */
-export function ident(text: string, fallback = "REG"): string {
-  let id = text
-    .trim()
-    .replace(/[^A-Za-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .toUpperCase();
-  if (!id) id = fallback;
-  if (/^[0-9]/.test(id)) id = `_${id}`;
-  return id;
-}
-
-/** A prefix for a value: its name as an identifier, or REG for unnamed ones ("Value 1" is the app's default). */
-export function defaultPrefix(model: ValueModel): string {
-  const name = model.name.trim();
-  return !name || /^value \d+$/i.test(name) ? "REG" : ident(name);
-}
-
 const maskOf = (width: number) => (1n << BigInt(width)) - 1n;
 const rangeOf = (lo: number, hi: number) =>
   hi > lo ? `[${hi}:${lo}]` : `[${lo}]`;
 const STORAGE = [8, 16, 32, 64];
-
-/** Identifier for each field; duplicates get _2, _3… so the output always compiles. */
-function fieldIds(fields: Group[]): Map<Group, string> {
-  const used = new Set<string>();
-  const ids = new Map<Group, string>();
-  for (const group of fields) {
-    const base = ident(group.name, "FIELD");
-    let id = base;
-    for (let suffix = 2; used.has(id); suffix++) id = `${base}_${suffix}`;
-    used.add(id);
-    ids.set(group, id);
-  }
-  return ids;
-}
 
 /** The pieces of a field's description: [range, access, signed, formula/unit, description]. */
 function describe(group: Group): { comment: string; note: string } {
@@ -296,133 +272,3 @@ export function exportContext(
     ...placement(model, options.peripheral),
   };
 }
-
-/** C-style storage for a register: the unsigned type that holds it, or an
- *  array of 32-bit words when it is wider than 64 bits. */
-function storageOf(width: number): {
-  bits: number;
-  count: number;
-  bytes: number;
-} {
-  const bits = [8, 16, 32, 64].find((size) => size >= width);
-  if (bits) return { bits, count: 1, bytes: bits / 8 };
-  const count = Math.ceil(width / 32);
-  return { bits: 32, count, bytes: count * 4 };
-}
-
-/** The data a peripheral-scope template reads: the peripheral, its registers
- *  (in offset order) and a byte layout with gaps, for structs. */
-export function peripheralContext(
-  peripheral: Peripheral,
-  models: ValueModel[],
-  options: Pick<ExportOptions, "prefix" | "includeValue">,
-): Record<string, unknown> {
-  const prefix = ident(options.prefix);
-  const sorted = [...models].sort((first, second) =>
-    first.offset === null
-      ? 1
-      : second.offset === null
-        ? -1
-        : first.offset < second.offset
-          ? -1
-          : first.offset > second.offset
-            ? 1
-            : 0,
-  );
-  const used = new Set<string>();
-  const ownName = (model: ValueModel) =>
-    model.name.startsWith(`${peripheral.name}.`)
-      ? model.name.slice(peripheral.name.length + 1)
-      : model.name;
-  const registers = sorted.map((model) => {
-    let base = ident(ownName(model), "REG");
-    if (RESERVED_REGISTER_NAMES.has(base)) base = `${base}_REG`;
-    let id = base;
-    for (let suffix = 2; used.has(id); suffix++) id = `${base}_${suffix}`;
-    used.add(id);
-    const storage = storageOf(model.width);
-    const context = exportContext(model, {
-      prefix: `${prefix}_${id}`,
-      includeValue: options.includeValue,
-      peripheral,
-    });
-    return {
-      ...context,
-      ...placement(model, peripheral),
-      id,
-      name: model.name,
-      bytes: byteSize(model.width),
-      storage: storage.bits,
-      count: storage.count,
-      // C member type and array suffix: uint32_t, or uint32_t …[3] above 64 bits
-      type: `uint${storage.bits}_t`,
-      array: storage.count > 1 ? `[${storage.count}]` : "",
-      rust_type:
-        storage.count > 1 ? `[u32; ${storage.count}]` : `u${storage.bits}`,
-      member_bytes: storage.bytes,
-    };
-  });
-
-  // Byte layout for structs: registers at their offsets, gaps padded, and
-  // registers that start inside the one before them marked as overlapping.
-  const layout: Record<string, unknown>[] = [];
-  let cursor = 0n;
-  let gaps = 0;
-  for (const register of registers) {
-    if (!register.has_offset) continue;
-    const offset = (register.offset as Num).big;
-    if (offset < cursor) {
-      layout.push({ ...register, member: false, gap: false, overlap: true });
-      continue;
-    }
-    if (offset > cursor) {
-      layout.push({
-        gap: true,
-        member: false,
-        overlap: false,
-        id: `RESERVED${gaps++}`,
-        offset: Num.of(cursor, 0),
-        bytes: Number(offset - cursor),
-        range: `${Num.of(cursor, 0).hex}–${Num.of(offset - 1n, 0).hex}`,
-        declaration: `RESERVED${gaps - 1}[${Number(offset - cursor)}]`,
-      });
-    }
-    layout.push({
-      ...register,
-      member: true,
-      gap: false,
-      overlap: false,
-      declaration: register.id + register.array,
-    });
-    cursor = offset + BigInt(register.member_bytes);
-  }
-  const base = peripheral.base;
-  return {
-    name: peripheral.name,
-    prefix,
-    description: peripheral.description,
-    has_base: base !== null,
-    base: Num.of(base ?? 0n, 0),
-    address_bits: addressBits(
-      base,
-      ...registers.map((register) =>
-        register.has_address ? (register.address as Num).big : null,
-      ),
-    ),
-    include_value: options.includeValue,
-    registers,
-    layout,
-    unplaced: registers
-      .filter((register) => !register.has_offset)
-      .map((register) => register.id),
-    size: Number(cursor),
-    // longest "NAME[n]" in the struct, to line up the comments
-    name_width: Math.max(
-      4,
-      ...layout.map((item) => String(item.declaration ?? item.id).length),
-    ),
-  };
-}
-
-/** Register ids that would clash with the names the built-in peripheral templates add. */
-const RESERVED_REGISTER_NAMES = new Set(["BASE"]);

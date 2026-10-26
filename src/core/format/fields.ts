@@ -1,8 +1,8 @@
 // Field interpretation: signed values, unit formulas (e.g. "x * 0.5 - 40 °C")
 // and turning a typed real-world value back into raw bits.
-import { ExprError, evalReal, linearity, parseExpr } from "./expr";
-import type { Group } from "./model";
-import { maxValue } from "./numfmt";
+import { ExprError, evalReal, linearity, parseExpr } from "../expr";
+import type { Group } from "../model";
+import { maxValue } from "./integers";
 
 export interface Formula {
   evaluate: (x: number) => number;

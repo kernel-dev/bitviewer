@@ -1,30 +1,27 @@
 // Code export. Every output, built-in or the user's own, is an export template
-// (see exportlang.ts) rendered against the data from exportdata.ts.
+// (see language/) rendered against the data from register-data.ts or
+// peripheral-data.ts.
 
-import {
-  defaultPrefix,
-  type ExportOptions,
-  exportContext,
-  ident,
-  peripheralContext,
-} from "./exportdata";
+import type { ValueModel } from "../model";
+import type { Peripheral } from "../workspace";
 import {
   compileTemplate,
   renderTemplate,
   type TemplateMeta,
   type TemplateScope,
-} from "./exportlang";
-import cMacros from "./exports/c-macros.tpl?raw";
-import cPeripheral from "./exports/c-peripheral.tpl?raw";
-import cPeripheralMacros from "./exports/c-peripheral-macros.tpl?raw";
-import cStruct from "./exports/c-struct.tpl?raw";
-import python from "./exports/python.tpl?raw";
-import rust from "./exports/rust.tpl?raw";
-import rustPeripheral from "./exports/rust-peripheral.tpl?raw";
-import type { ValueModel } from "./model";
-import type { Peripheral } from "./workspace";
+} from "./language";
+import { defaultPrefix, ident } from "./naming";
+import { peripheralContext } from "./peripheral-data";
+import { type ExportOptions, exportContext } from "./register-data";
+import cMacros from "./templates/c-macros.tpl?raw";
+import cPeripheral from "./templates/c-peripheral.tpl?raw";
+import cPeripheralMacros from "./templates/c-peripheral-macros.tpl?raw";
+import cStruct from "./templates/c-struct.tpl?raw";
+import python from "./templates/python.tpl?raw";
+import rust from "./templates/rust.tpl?raw";
+import rustPeripheral from "./templates/rust-peripheral.tpl?raw";
 
-export { TemplateError } from "./exportlang";
+export { TemplateError } from "./language";
 export { defaultPrefix, type ExportOptions, ident };
 
 /** A template the dialog can offer: a built-in one or one the user wrote. */

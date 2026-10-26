@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { defaultPrefix, generate, ident } from "../../src/core/codegen";
+import { defaultPrefix, generate, ident } from "../../src/core/export/codegen";
 import {
   decodeField,
   isInvertible,
   rawFromNumber,
-} from "../../src/core/fieldfmt";
-import { ValueModel } from "../../src/core/model";
+} from "../../src/core/format/fields";
+import { ValueModel, valueFromJSON, valueToJSON } from "../../src/core/model";
 import { BUILTIN_TEMPLATES, validTemplate } from "../../src/core/templates";
 
 function regWithFields() {
@@ -37,7 +37,7 @@ function regWithFields() {
 describe("field details", () => {
   it("round-trips through JSON and stays compact when unused", () => {
     const { model } = regWithFields();
-    const json = JSON.parse(JSON.stringify(model));
+    const json = JSON.parse(JSON.stringify(valueToJSON(model)));
     expect(json.groups.find((group: any) => group.name === "EN")).toEqual({
       lo: 0,
       hi: 0,
@@ -45,8 +45,8 @@ describe("field details", () => {
       color: expect.any(String),
       base: 2,
     });
-    const back = ValueModel.fromJSON(json);
-    expect(back.toJSON()).toEqual(model.toJSON());
+    const back = valueFromJSON(json);
+    expect(valueToJSON(back)).toEqual(valueToJSON(model));
     const mode = back.groups.find((group) => group.name === "MODE")!;
     expect(mode.nameOf(1n)).toBe("Auto");
     expect(mode.description).toBe("Operating mode");
@@ -56,7 +56,7 @@ describe("field details", () => {
   });
 
   it("ignores malformed details in files", () => {
-    const model = ValueModel.fromJSON({
+    const model = valueFromJSON({
       width: 8,
       groups: [
         {

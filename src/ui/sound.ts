@@ -1,6 +1,6 @@
 // Optional interface sounds, synthesized with Web Audio (no audio files).
 // Silent unless the "sounds" setting is on — it is off by default.
-import { appSettings } from "../app/settings";
+import { appSettings } from "../platform/settings";
 
 export type Sound =
   | "bitOn"

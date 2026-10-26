@@ -1,7 +1,8 @@
 // Selection readout in a card's toolbar: the selected range plus an editable
 // value for just those bits, in a base of your choice.
+
+import { BASE_NAMES, type Base } from "../core/format/integers";
 import type { ValueModel } from "../core/model";
-import { BASE_NAMES, type Base } from "../core/numfmt";
 import { html, NumberInput, segmented } from "../ui/kit";
 
 const BASES: Base[] = [16, 10, 2];

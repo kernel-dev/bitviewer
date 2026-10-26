@@ -3,8 +3,13 @@ import {
   BUILTIN_EXPORTS,
   generate,
   renderPeripheralExport,
-} from "../../src/core/codegen";
-import { ModelError, ValueModel } from "../../src/core/model";
+} from "../../src/core/export/codegen";
+import {
+  ModelError,
+  ValueModel,
+  valueFromJSON,
+  valueToJSON,
+} from "../../src/core/model";
 import {
   addressOf,
   freeName,
@@ -142,14 +147,14 @@ describe("peripherals", () => {
     const model = new ValueModel({ width: 32, name: "UART0.CTRL" });
     model.setPeripheral("UART0", 0x10n);
     model.setDescription("Control");
-    const copy = ValueModel.fromJSON(JSON.parse(JSON.stringify(model)));
+    const copy = valueFromJSON(JSON.parse(JSON.stringify(valueToJSON(model))));
     expect([copy.block, copy.offset, copy.description]).toEqual([
       "UART0",
       0x10n,
       "Control",
     ]);
     // plain values don't grow new keys
-    expect(Object.keys(new ValueModel().toJSON())).not.toContain("block");
+    expect(Object.keys(valueToJSON(new ValueModel()))).not.toContain("block");
     expect(() => model.setPeripheral("UART0", -1n)).toThrow(ModelError);
   });
 });

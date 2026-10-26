@@ -4,7 +4,7 @@ import {
   Num,
   renderSource,
   TemplateError,
-} from "../../src/core/exportlang";
+} from "../../src/core/export/language";
 
 const context = {
   name: "Ctrl",

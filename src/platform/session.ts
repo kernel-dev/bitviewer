@@ -1,6 +1,6 @@
 // Auto-save of the open workspace to the app's data folder, so a crash or an
 // unexpected restart brings everything back, including unsaved changes.
-import { deleteAppFile, readAppFile, writeAppFile } from "./platform";
+import { deleteAppFile, readAppFile, writeAppFile } from "./native";
 
 const FILE = "session.json";
 const DELAY_MS = 1000;

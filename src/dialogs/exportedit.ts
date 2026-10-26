@@ -6,8 +6,8 @@ import {
   BUILTIN_EXPORTS,
   type SavedExportTemplate,
   TemplateError,
-} from "../core/codegen";
-import { compileTemplate, type TemplateScope } from "../core/exportlang";
+} from "../core/export/codegen";
+import { compileTemplate, type TemplateScope } from "../core/export/language";
 import { button, html, modal } from "../ui/kit";
 
 export type EditResult =

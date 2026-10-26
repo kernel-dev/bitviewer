@@ -1,7 +1,7 @@
 // Extra interpretations of a value: IEEE-754 floats (half, bfloat16, single,
 // double), byte sequences in either byte order, and assorted readouts
 // (BCD, Gray code, one's complement, bit counts, text).
-import { formatInt, maxValue, ParseError } from "./numfmt";
+import { formatInt, maxValue, ParseError } from "./integers";
 
 // ------------------------------------------------------------------ floats
 export type FloatKind = "f16" | "bf16" | "f32" | "f64";
