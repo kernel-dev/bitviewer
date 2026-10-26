@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ExprError, evalInt, evalReal, linearity, parseExpr } from "./expr";
+import {
+  ExprError,
+  evalInt,
+  evalReal,
+  linearity,
+  parseExpr,
+} from "../../src/core/expr";
 import {
   bcdDecode,
   bytesAsText,
   bytesToValue,
-  clz,
-  ctz,
+  countLeadingZeros,
+  countTrailingZeros,
   decodeFloat,
   encodeFloat,
   floatBreakdown,
@@ -16,8 +22,8 @@ import {
   parseBytes,
   parseFloatText,
   valueToBytes,
-} from "./formats";
-import { applyOp, ModelError, ValueModel } from "./model";
+} from "../../src/core/formats";
+import { applyOp, ModelError, ValueModel } from "../../src/core/model";
 
 describe("operations", () => {
   it("rotates, shifts and swaps", () => {
@@ -49,66 +55,76 @@ describe("operations", () => {
   });
 
   it("applies to a bit range", () => {
-    const m = new ValueModel({ width: 32, value: 0x12345678n });
-    m.opBits(8, 15, "invert");
-    expect(m.value).toBe(0x1234a978n);
-    m.opBits(0, 7, "rol", 4n);
-    expect(m.value).toBe(0x1234a987n);
+    const model = new ValueModel({ width: 32, value: 0x12345678n });
+    model.opBits(8, 15, "invert");
+    expect(model.value).toBe(0x1234a978n);
+    model.opBits(0, 7, "rol", 4n);
+    expect(model.value).toBe(0x1234a987n);
   });
 });
 
 describe("expressions", () => {
-  const vars: Record<string, bigint> = { x: 10n, CTRL: 0xf0n, "Value 1": 3n };
-  const int = (s: string) => evalInt(parseExpr(s), (n) => vars[n]);
+  const variables: Record<string, bigint> = {
+    x: 10n,
+    CTRL: 0xf0n,
+    "Value 1": 3n,
+  };
+  const evaluateInteger = (text: string) =>
+    evalInt(parseExpr(text), (name) => variables[name]);
 
   it("follows C-like precedence", () => {
-    expect(int("1 + 2 * 3")).toBe(7n);
-    expect(int("(1 + 2) * 3")).toBe(9n);
-    expect(int("1 << 4 | 1")).toBe(17n);
-    expect(int("0x1F << 3 | (1 << 31)")).toBe(0x800000f8n);
-    expect(int("2 ** 3 ** 2")).toBe(512n);
-    expect(int("-2 ** 2")).toBe(-4n);
-    expect(int("~0 & 0xff")).toBe(0xffn);
-    expect(int("7 / 2")).toBe(3n);
-    expect(int("-7 / 2")).toBe(-3n);
-    expect(int("!0 + !5")).toBe(1n);
-    expect(int("1_000 + 0b1010 + 0o17")).toBe(1025n);
+    expect(evaluateInteger("1 + 2 * 3")).toBe(7n);
+    expect(evaluateInteger("(1 + 2) * 3")).toBe(9n);
+    expect(evaluateInteger("1 << 4 | 1")).toBe(17n);
+    expect(evaluateInteger("0x1F << 3 | (1 << 31)")).toBe(0x800000f8n);
+    expect(evaluateInteger("2 ** 3 ** 2")).toBe(512n);
+    expect(evaluateInteger("-2 ** 2")).toBe(-4n);
+    expect(evaluateInteger("~0 & 0xff")).toBe(0xffn);
+    expect(evaluateInteger("7 / 2")).toBe(3n);
+    expect(evaluateInteger("-7 / 2")).toBe(-3n);
+    expect(evaluateInteger("!0 + !5")).toBe(1n);
+    expect(evaluateInteger("1_000 + 0b1010 + 0o17")).toBe(1025n);
   });
 
   it("resolves names and functions", () => {
-    expect(int("x + 1")).toBe(11n);
-    expect(int("CTRL >> 4")).toBe(0xfn);
-    expect(int("{Value 1} * 2")).toBe(6n);
-    expect(int("`Value 1` + bit(4)")).toBe(19n);
-    expect(int("mask(8) ^ CTRL")).toBe(0x0fn);
-    expect(int("min(5, x, 7) + max(1, 2)")).toBe(7n);
-    expect(int("popcount(0xff)")).toBe(8n);
-    expect(int("2 ** 511")).toBe(1n << 511n);
+    expect(evaluateInteger("x + 1")).toBe(11n);
+    expect(evaluateInteger("CTRL >> 4")).toBe(0xfn);
+    expect(evaluateInteger("{Value 1} * 2")).toBe(6n);
+    expect(evaluateInteger("`Value 1` + bit(4)")).toBe(19n);
+    expect(evaluateInteger("mask(8) ^ CTRL")).toBe(0x0fn);
+    expect(evaluateInteger("min(5, x, 7) + max(1, 2)")).toBe(7n);
+    expect(evaluateInteger("popcount(0xff)")).toBe(8n);
+    expect(evaluateInteger("2 ** 511")).toBe(1n << 511n);
   });
 
   it("reports errors clearly", () => {
-    expect(() => int("1 +")).toThrow(/ends too early/);
-    expect(() => int("(1 + 2")).toThrow(/Missing "\)"/);
-    expect(() => int("y + 1")).toThrow(/Unknown name "y"/);
-    expect(() => int("1 / 0")).toThrow(/Division by zero/);
-    expect(() => int("1.5 + 1")).toThrow(/not a whole number/);
-    expect(() => int("2 ** 100000")).toThrow(/too large/);
-    expect(() => int("1 $ 2")).toThrow(ExprError);
-    expect(() => int("foo(1)")).toThrow(/Unknown function/);
+    expect(() => evaluateInteger("1 +")).toThrow(/ends too early/);
+    expect(() => evaluateInteger("(1 + 2")).toThrow(/Missing "\)"/);
+    expect(() => evaluateInteger("y + 1")).toThrow(/Unknown name "y"/);
+    expect(() => evaluateInteger("1 / 0")).toThrow(/Division by zero/);
+    expect(() => evaluateInteger("1.5 + 1")).toThrow(/not a whole number/);
+    expect(() => evaluateInteger("2 ** 100000")).toThrow(/too large/);
+    expect(() => evaluateInteger("1 $ 2")).toThrow(ExprError);
+    expect(() => evaluateInteger("foo(1)")).toThrow(/Unknown function/);
   });
 
   it("evaluates real formulas and detects linear ones", () => {
-    const f = (src: string) => {
-      const e = parseExpr(src);
-      return (x: number) => evalReal(e, (n) => (n === "x" ? x : undefined));
+    const compile = (source: string) => {
+      const expression = parseExpr(source);
+      return (x: number) =>
+        evalReal(expression, (name) => (name === "x" ? x : undefined));
     };
-    expect(f("x * 0.5 - 40")(100)).toBe(10);
-    expect(f("sqrt(x)")(16)).toBe(4);
-    expect(f("pi * 2")(0)).toBeCloseTo(6.283185, 5);
-    expect(linearity(f("x * 0.5 - 40"), [2, 7, 1000])).toEqual([0.5, -40]);
-    expect(linearity(f("x / 4 + 1.25"), [2, 7, 1000])).toEqual([0.25, 1.25]);
-    expect(linearity(f("x * x"), [2, 7, 1000])).toBeNull();
-    expect(linearity(f("sqrt(x)"), [2, 7, 1000])).toBeNull();
+    expect(compile("x * 0.5 - 40")(100)).toBe(10);
+    expect(compile("sqrt(x)")(16)).toBe(4);
+    expect(compile("pi * 2")(0)).toBeCloseTo(6.283185, 5);
+    expect(linearity(compile("x * 0.5 - 40"), [2, 7, 1000])).toEqual([
+      0.5, -40,
+    ]);
+    expect(linearity(compile("x / 4 + 1.25"), [2, 7, 1000])).toEqual([
+      0.25, 1.25,
+    ]);
+    expect(linearity(compile("x * x"), [2, 7, 1000])).toBeNull();
+    expect(linearity(compile("sqrt(x)"), [2, 7, 1000])).toBeNull();
   });
 });
 
@@ -122,9 +138,9 @@ describe("floats", () => {
       [0x0400, 2 ** -14],
       [0x3555, 0.333251953125],
     ];
-    for (const [bits, f] of cases) {
-      expect(decodeFloat(BigInt(bits), "f16")).toBe(f);
-      expect(encodeFloat(f, "f16")).toBe(BigInt(bits));
+    for (const [bits, floatValue] of cases) {
+      expect(decodeFloat(BigInt(bits), "f16")).toBe(floatValue);
+      expect(encodeFloat(floatValue, "f16")).toBe(BigInt(bits));
     }
     expect(encodeFloat(1 / 3, "f16")).toBe(0x3555n);
     expect(encodeFloat(65520, "f16")).toBe(0x7c00n); // rounds to infinity
@@ -171,8 +187,12 @@ describe("bytes", () => {
   });
 
   it("converts in both byte orders", () => {
-    expect(valueToBytes(0x12345678n, 32, "be")).toEqual([0x12, 0x34, 0x56, 0x78]);
-    expect(valueToBytes(0x12345678n, 32, "le")).toEqual([0x78, 0x56, 0x34, 0x12]);
+    expect(valueToBytes(0x12345678n, 32, "be")).toEqual([
+      0x12, 0x34, 0x56, 0x78,
+    ]);
+    expect(valueToBytes(0x12345678n, 32, "le")).toEqual([
+      0x78, 0x56, 0x34, 0x12,
+    ]);
     expect(bytesToValue([0x78, 0x56, 0x34, 0x12], 32, "le")).toBe(0x12345678n);
     expect(bytesToValue([0xab], 32, "be")).toBe(0xabn); // zero-extended
     expect(() => bytesToValue([1, 2, 3], 16, "be")).toThrow();
@@ -191,9 +211,9 @@ describe("extra readouts", () => {
     expect(grayToBinary(0b110n)).toBe(0b100n);
     expect(onesComplement(0xfen, 8)).toBe(-1n);
     expect(onesComplement(0x05n, 8)).toBe(5n);
-    expect(clz(0x00ffn, 16)).toBe(8);
-    expect(ctz(0x0100n, 16)).toBe(8);
-    expect(ctz(0n, 16)).toBe(16);
+    expect(countLeadingZeros(0x00ffn, 16)).toBe(8);
+    expect(countTrailingZeros(0x0100n, 16)).toBe(8);
+    expect(countTrailingZeros(0n, 16)).toBe(16);
     expect(bytesAsText(0x4869n, 32)).toBe("Hi");
     expect(bytesAsText(0x48ff69n, 32)).toBe("H·i");
     expect(bytesAsText(0xe282acn, 32)).toBe("€");

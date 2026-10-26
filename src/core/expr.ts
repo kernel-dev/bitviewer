@@ -12,16 +12,34 @@
 export class ExprError extends Error {}
 
 export type Expr =
-  | { t: "num"; int: bigint | null; real: number; text: string }
-  | { t: "name"; name: string }
-  | { t: "unary"; op: string; a: Expr }
-  | { t: "binary"; op: string; a: Expr; b: Expr }
-  | { t: "call"; fn: string; args: Expr[] };
+  | { kind: "num"; integer: bigint | null; real: number; text: string }
+  | { kind: "name"; name: string }
+  | { kind: "unary"; operator: string; operand: Expr }
+  | { kind: "binary"; operator: string; left: Expr; right: Expr }
+  | { kind: "call"; functionName: string; argumentExpressions: Expr[] };
 
-type Tok = { k: "num" | "name" | "op" | "end"; s: string; pos: number };
+type Tok = {
+  kind: "num" | "name" | "op" | "end";
+  text: string;
+  position: number;
+};
 
-const OPS3 = new Set(["**", "<<", ">>"]);
-const OPS1 = new Set(["+", "-", "*", "/", "%", "&", "|", "^", "~", "!", "(", ")", ","]);
+const TWO_CHARACTER_OPERATORS = new Set(["**", "<<", ">>"]);
+const SINGLE_CHARACTER_OPERATORS = new Set([
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "&",
+  "|",
+  "^",
+  "~",
+  "!",
+  "(",
+  ")",
+  ",",
+]);
 const BINARY_PREC: Record<string, number> = {
   "|": 1,
   "^": 2,
@@ -36,248 +54,325 @@ const BINARY_PREC: Record<string, number> = {
 };
 const MAX_BITS = 4096; // guards against 2 ** 1e9 style requests
 
-function tokenize(src: string): Tok[] {
+function tokenize(source: string): Tok[] {
   const out: Tok[] = [];
-  let i = 0;
-  while (i < src.length) {
-    const c = src[i];
-    if (/\s/.test(c)) {
-      i++;
+  let cursor = 0;
+  while (cursor < source.length) {
+    const character = source[cursor];
+    if (/\s/.test(character)) {
+      cursor++;
       continue;
     }
-    const start = i;
-    if (c === "{" || c === "`") {
-      const close = c === "{" ? "}" : "`";
-      const j = src.indexOf(close, i + 1);
-      if (j < 0) throw new ExprError(`Missing ${close} for the name at position ${i + 1}`);
-      out.push({ k: "name", s: src.slice(i + 1, j).trim(), pos: start });
-      i = j + 1;
+    const start = cursor;
+    if (character === "{" || character === "`") {
+      const close = character === "{" ? "}" : "`";
+      const closeIndex = source.indexOf(close, cursor + 1);
+      if (closeIndex < 0)
+        throw new ExprError(
+          `Missing ${close} for the name at position ${cursor + 1}`,
+        );
+      out.push({
+        kind: "name",
+        text: source.slice(cursor + 1, closeIndex).trim(),
+        position: start,
+      });
+      cursor = closeIndex + 1;
       continue;
     }
-    const num = /^(0x[0-9a-f_]+|0b[01_]+|0o[0-7_]+|(\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(e[+-]?\d+)?)/i.exec(src.slice(i));
-    if (num && /[0-9.]/.test(c)) {
-      out.push({ k: "num", s: num[0], pos: start });
-      i += num[0].length;
+    const numberMatch =
+      /^(0x[0-9a-f_]+|0b[01_]+|0o[0-7_]+|(\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(e[+-]?\d+)?)/i.exec(
+        source.slice(cursor),
+      );
+    if (numberMatch && /[0-9.]/.test(character)) {
+      out.push({ kind: "num", text: numberMatch[0], position: start });
+      cursor += numberMatch[0].length;
       continue;
     }
-    const name = /^[A-Za-z_][A-Za-z0-9_.]*/.exec(src.slice(i));
+    const name = /^[A-Za-z_][A-Za-z0-9_.]*/.exec(source.slice(cursor));
     if (name) {
-      out.push({ k: "name", s: name[0], pos: start });
-      i += name[0].length;
+      out.push({ kind: "name", text: name[0], position: start });
+      cursor += name[0].length;
       continue;
     }
-    const two = src.slice(i, i + 2);
-    if (OPS3.has(two)) {
-      out.push({ k: "op", s: two, pos: start });
-      i += 2;
+    const two = source.slice(cursor, cursor + 2);
+    if (TWO_CHARACTER_OPERATORS.has(two)) {
+      out.push({ kind: "op", text: two, position: start });
+      cursor += 2;
       continue;
     }
-    if (OPS1.has(c)) {
-      out.push({ k: "op", s: c, pos: start });
-      i++;
+    if (SINGLE_CHARACTER_OPERATORS.has(character)) {
+      out.push({ kind: "op", text: character, position: start });
+      cursor++;
       continue;
     }
-    throw new ExprError(`Unexpected "${c}" at position ${i + 1}`);
+    throw new ExprError(`Unexpected "${character}" at position ${cursor + 1}`);
   }
-  out.push({ k: "end", s: "", pos: src.length });
+  out.push({ kind: "end", text: "", position: source.length });
   return out;
 }
 
 function numberNode(text: string): Expr {
-  const s = text.replace(/_/g, "").toLowerCase();
-  if (/^0[xbo]/.test(s)) {
-    const v = BigInt(s); // BigInt understands 0x / 0b / 0o
-    return { t: "num", int: v, real: Number(v), text };
+  const cleaned = text.replace(/_/g, "").toLowerCase();
+  if (/^0[xbo]/.test(cleaned)) {
+    if (cleaned.length < 3)
+      throw new ExprError(`"${text}" needs digits after the prefix`);
+    const value = BigInt(cleaned); // BigInt understands 0x / 0b / 0o
+    return { kind: "num", integer: value, real: Number(value), text };
   }
-  if (/[.e]/.test(s)) {
-    const real = Number(s);
+  if (/[.e]/.test(cleaned)) {
+    const real = Number(cleaned);
     if (Number.isNaN(real)) throw new ExprError(`"${text}" is not a number`);
-    return { t: "num", int: Number.isInteger(real) && Math.abs(real) < 2 ** 53 ? BigInt(real) : null, real, text };
+    return {
+      kind: "num",
+      integer:
+        Number.isInteger(real) && Math.abs(real) < 2 ** 53
+          ? BigInt(real)
+          : null,
+      real,
+      text,
+    };
   }
-  const v = BigInt(s);
-  return { t: "num", int: v, real: Number(v), text };
+  const newValue = BigInt(cleaned);
+  return { kind: "num", integer: newValue, real: Number(newValue), text };
 }
 
-export function parseExpr(src: string): Expr {
-  const toks = tokenize(src);
-  let p = 0;
-  const peek = () => toks[p];
-  const next = () => toks[p++];
-  const expect = (s: string) => {
-    const t = next();
-    if (t.s !== s) throw new ExprError(t.k === "end" ? `Missing "${s}"` : `Expected "${s}" at position ${t.pos + 1}`);
+export function parseExpr(source: string): Expr {
+  const tokens = tokenize(source);
+  let position = 0;
+  const peek = () => tokens[position];
+  const next = () => tokens[position++];
+  const expect = (expected: string) => {
+    const token = next();
+    if (token.text !== expected)
+      throw new ExprError(
+        token.kind === "end"
+          ? `Missing "${expected}"`
+          : `Expected "${expected}" at position ${token.position + 1}`,
+      );
   };
 
-  const primary = (): Expr => {
-    const t = next();
-    if (t.k === "num") return numberNode(t.s);
-    if (t.k === "name") {
-      if (peek().s === "(") {
+  const parsePrimary = (): Expr => {
+    const token = next();
+    if (token.kind === "num") return numberNode(token.text);
+    if (token.kind === "name") {
+      if (peek().text === "(") {
         next();
-        const args: Expr[] = [];
-        if (peek().s !== ")") {
-          args.push(binary(1));
-          while (peek().s === ",") {
+        const argumentExpressions: Expr[] = [];
+        if (peek().text !== ")") {
+          argumentExpressions.push(parseBinary(1));
+          while (peek().text === ",") {
             next();
-            args.push(binary(1));
+            argumentExpressions.push(parseBinary(1));
           }
         }
         expect(")");
-        return { t: "call", fn: t.s.toLowerCase(), args };
+        return {
+          kind: "call",
+          functionName: token.text.toLowerCase(),
+          argumentExpressions,
+        };
       }
-      return { t: "name", name: t.s };
+      return { kind: "name", name: token.text };
     }
-    if (t.s === "(") {
-      const e = binary(1);
+    if (token.text === "(") {
+      const expression = parseBinary(1);
       expect(")");
-      return e;
+      return expression;
     }
     throw new ExprError(
-      t.k === "end" ? "The expression ends too early" : `Unexpected "${t.s}" at position ${t.pos + 1}`,
+      token.kind === "end"
+        ? "The expression ends too early"
+        : `Unexpected "${token.text}" at position ${token.position + 1}`,
     );
   };
-  const power = (): Expr => {
-    const base = primary();
-    if (peek().s === "**") {
+  const parsePower = (): Expr => {
+    const base = parsePrimary();
+    if (peek().text === "**") {
       next();
-      return { t: "binary", op: "**", a: base, b: unary() }; // right-associative, binds tighter than unary minus on the left
+      return {
+        kind: "binary",
+        operator: "**",
+        left: base,
+        right: parseUnary(),
+      }; // right-associative, binds tighter than unary minus on the left
     }
     return base;
   };
-  const unary = (): Expr => {
-    const t = peek();
-    if (t.k === "op" && ["-", "+", "~", "!"].includes(t.s)) {
+  const parseUnary = (): Expr => {
+    const token = peek();
+    if (token.kind === "op" && ["-", "+", "~", "!"].includes(token.text)) {
       next();
-      return { t: "unary", op: t.s, a: unary() };
+      return { kind: "unary", operator: token.text, operand: parseUnary() };
     }
-    return power();
+    return parsePower();
   };
-  const binary = (minPrec: number): Expr => {
-    let left = unary();
+  const parseBinary = (minPrec: number): Expr => {
+    let left = parseUnary();
     for (;;) {
-      const t = peek();
-      const prec = t.k === "op" ? BINARY_PREC[t.s] : undefined;
-      if (prec === undefined || prec < minPrec) return left;
+      const token = peek();
+      const precedence =
+        token.kind === "op" ? BINARY_PREC[token.text] : undefined;
+      if (precedence === undefined || precedence < minPrec) return left;
       next();
-      left = { t: "binary", op: t.s, a: left, b: binary(prec + 1) };
+      left = {
+        kind: "binary",
+        operator: token.text,
+        left: left,
+        right: parseBinary(precedence + 1),
+      };
     }
   };
 
-  if (peek().k === "end") throw new ExprError("Enter an expression");
-  const e = binary(1);
-  if (peek().k !== "end") throw new ExprError(`Unexpected "${peek().s}" at position ${peek().pos + 1}`);
-  return e;
+  if (peek().kind === "end") throw new ExprError("Enter an expression");
+  const parsed = parseBinary(1);
+  if (peek().kind !== "end")
+    throw new ExprError(
+      `Unexpected "${peek().text}" at position ${peek().position + 1}`,
+    );
+  return parsed;
 }
 
 /** Names the expression refers to (not counting function names). */
-export function namesIn(e: Expr, out = new Set<string>()): Set<string> {
-  if (e.t === "name") out.add(e.name);
-  else if (e.t === "unary") namesIn(e.a, out);
-  else if (e.t === "binary") {
-    namesIn(e.a, out);
-    namesIn(e.b, out);
-  } else if (e.t === "call") for (const a of e.args) namesIn(a, out);
+export function namesIn(
+  expression: Expr,
+  out = new Set<string>(),
+): Set<string> {
+  if (expression.kind === "name") out.add(expression.name);
+  else if (expression.kind === "unary") namesIn(expression.operand, out);
+  else if (expression.kind === "binary") {
+    namesIn(expression.left, out);
+    namesIn(expression.right, out);
+  } else if (expression.kind === "call")
+    for (const argument of expression.argumentExpressions)
+      namesIn(argument, out);
   return out;
 }
 
 // ------------------------------------------------------------------ integer evaluation
-function guardBits(v: bigint): bigint {
-  const bits = (v < 0n ? -v : v).toString(2).length;
-  if (bits > MAX_BITS) throw new ExprError(`The result is too large (over ${MAX_BITS} bits)`);
-  return v;
+function guardBits(value: bigint): bigint {
+  const bits = (value < 0n ? -value : value).toString(2).length;
+  if (bits > MAX_BITS)
+    throw new ExprError(`The result is too large (over ${MAX_BITS} bits)`);
+  return value;
 }
 
-function smallInt(v: bigint, what: string): number {
-  if (v < 0n || v > BigInt(MAX_BITS)) throw new ExprError(`${what} must be between 0 and ${MAX_BITS}`);
-  return Number(v);
+function smallInt(value: bigint, description: string): number {
+  if (value < 0n || value > BigInt(MAX_BITS))
+    throw new ExprError(`${description} must be between 0 and ${MAX_BITS}`);
+  return Number(value);
 }
 
-export function evalInt(e: Expr, lookup: (name: string) => bigint | undefined): bigint {
-  const ev = (x: Expr): bigint => evalInt(x, lookup);
-  switch (e.t) {
+export function evalInt(
+  expression: Expr,
+  lookup: (name: string) => bigint | undefined,
+): bigint {
+  const evaluate = (expression: Expr): bigint => evalInt(expression, lookup);
+  switch (expression.kind) {
     case "num":
-      if (e.int === null) throw new ExprError(`${e.text} is not a whole number`);
-      return e.int;
+      if (expression.integer === null)
+        throw new ExprError(`${expression.text} is not a whole number`);
+      return expression.integer;
     case "name": {
-      const v = lookup(e.name);
-      if (v === undefined) throw new ExprError(`Unknown name "${e.name}"`);
-      return v;
+      const value = lookup(expression.name);
+      if (value === undefined)
+        throw new ExprError(`Unknown name "${expression.name}"`);
+      return value;
     }
     case "unary": {
-      const a = ev(e.a);
-      if (e.op === "-") return -a;
-      if (e.op === "+") return a;
-      if (e.op === "~") return ~a;
-      return a === 0n ? 1n : 0n; // !
+      const operand = evaluate(expression.operand);
+      if (expression.operator === "-") return -operand;
+      if (expression.operator === "+") return operand;
+      if (expression.operator === "~") return ~operand;
+      return operand === 0n ? 1n : 0n; // !
     }
     case "binary": {
-      const a = ev(e.a);
-      const b = ev(e.b);
-      switch (e.op) {
+      const left = evaluate(expression.left);
+      const right = evaluate(expression.right);
+      switch (expression.operator) {
         case "+":
-          return guardBits(a + b);
+          return guardBits(left + right);
         case "-":
-          return guardBits(a - b);
+          return guardBits(left - right);
         case "*":
-          return guardBits(a * b);
+          return guardBits(left * right);
         case "/":
-          if (b === 0n) throw new ExprError("Division by zero");
-          return a / b;
+          if (right === 0n) throw new ExprError("Division by zero");
+          return left / right;
         case "%":
-          if (b === 0n) throw new ExprError("Division by zero");
-          return a % b;
+          if (right === 0n) throw new ExprError("Division by zero");
+          return left % right;
         case "**": {
-          if (b < 0n) throw new ExprError("Negative exponents don't give whole numbers");
-          const bits = (a < 0n ? -a : a).toString(2).length;
-          if (a > 1n && Number(b) * bits > MAX_BITS)
-            throw new ExprError(`The result is too large (over ${MAX_BITS} bits)`);
-          return a ** b;
+          if (right < 0n)
+            throw new ExprError("Negative exponents don't give whole numbers");
+          const magnitude = left < 0n ? -left : left;
+          const bits = magnitude.toString(2).length;
+          if (magnitude > 1n && Number(right) * bits > MAX_BITS)
+            throw new ExprError(
+              `The result is too large (over ${MAX_BITS} bits)`,
+            );
+          return left ** right;
         }
         case "<<":
-          return guardBits(a << BigInt(smallInt(b, "Shift amount")));
+          return guardBits(left << BigInt(smallInt(right, "Shift amount")));
         case ">>":
-          return a >> BigInt(smallInt(b, "Shift amount"));
+          return left >> BigInt(smallInt(right, "Shift amount"));
         case "&":
-          return a & b;
+          return left & right;
         case "|":
-          return a | b;
+          return left | right;
         case "^":
-          return a ^ b;
+          return left ^ right;
       }
-      throw new ExprError(`Unknown operator ${e.op}`);
+      throw new ExprError(`Unknown operator ${expression.operator}`);
     }
     case "call": {
-      const args = e.args.map(ev);
-      const need = (n: number) => {
-        if (args.length !== n) throw new ExprError(`${e.fn}() takes ${n} argument${n > 1 ? "s" : ""}`);
+      const argumentValues = expression.argumentExpressions.map(evaluate);
+      const requireArgumentCount = (expected: number) => {
+        if (argumentValues.length !== expected)
+          throw new ExprError(
+            `${expression.functionName}() takes ${expected} argument${expected > 1 ? "s" : ""}`,
+          );
       };
-      switch (e.fn) {
+      switch (expression.functionName) {
         case "min":
         case "max":
-          if (!args.length) throw new ExprError(`${e.fn}() needs at least one argument`);
-          return args.reduce((m, v) => ((e.fn === "min" ? v < m : v > m) ? v : m));
+          if (!argumentValues.length)
+            throw new ExprError(
+              `${expression.functionName}() needs at least one argument`,
+            );
+          return argumentValues.reduce((best, value) =>
+            (expression.functionName === "min" ? value < best : value > best)
+              ? value
+              : best,
+          );
         case "abs":
-          need(1);
-          return args[0] < 0n ? -args[0] : args[0];
+          requireArgumentCount(1);
+          return argumentValues[0] < 0n
+            ? -argumentValues[0]
+            : argumentValues[0];
         case "bit":
-          need(1);
-          return 1n << BigInt(smallInt(args[0], "Bit number"));
+          requireArgumentCount(1);
+          return 1n << BigInt(smallInt(argumentValues[0], "Bit number"));
         case "mask":
-          need(1);
-          return (1n << BigInt(smallInt(args[0], "Mask width"))) - 1n;
+          requireArgumentCount(1);
+          return (1n << BigInt(smallInt(argumentValues[0], "Mask width"))) - 1n;
         case "popcount": {
-          need(1);
-          if (args[0] < 0n) throw new ExprError("popcount() needs a non-negative number");
-          return BigInt(args[0].toString(2).replace(/0/g, "").length);
+          requireArgumentCount(1);
+          if (argumentValues[0] < 0n)
+            throw new ExprError("popcount() needs a non-negative number");
+          return BigInt(argumentValues[0].toString(2).replace(/0/g, "").length);
         }
       }
-      throw new ExprError(`Unknown function ${e.fn}() — try min, max, abs, bit, mask, popcount`);
+      throw new ExprError(
+        `Unknown function ${expression.functionName}() — try min, max, abs, bit, mask, popcount`,
+      );
     }
   }
 }
 
 // ------------------------------------------------------------------ real evaluation
-const REAL_FUNCS: Record<string, (...a: number[]) => number> = {
+// Looked up with Object.hasOwn, so names like "constructor" are not functions.
+const REAL_FUNCS: Record<string, (...numbers: number[]) => number> = {
   abs: Math.abs,
   min: Math.min,
   max: Math.max,
@@ -293,74 +388,101 @@ const REAL_FUNCS: Record<string, (...a: number[]) => number> = {
 };
 const REAL_CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E };
 
-function asInteger(v: number, op: string): bigint {
-  if (!Number.isInteger(v)) throw new ExprError(`"${op}" needs whole numbers`);
-  return BigInt(v);
+function asInteger(value: number, operator: string): bigint {
+  if (!Number.isInteger(value))
+    throw new ExprError(`"${operator}" needs whole numbers`);
+  return BigInt(value);
 }
 
-export function evalReal(e: Expr, lookup: (name: string) => number | undefined): number {
-  const ev = (x: Expr): number => evalReal(x, lookup);
-  switch (e.t) {
+/** Shift amount for real mode: a whole number from 0 to MAX_BITS. */
+function shiftAmount(value: number): bigint {
+  return BigInt(smallInt(asInteger(value, "shift"), "Shift amount"));
+}
+
+export function evalReal(
+  expression: Expr,
+  lookup: (name: string) => number | undefined,
+): number {
+  const evaluate = (expression: Expr): number => evalReal(expression, lookup);
+  switch (expression.kind) {
     case "num":
-      return e.real;
+      return expression.real;
     case "name": {
-      const v = lookup(e.name) ?? REAL_CONSTS[e.name.toLowerCase()];
-      if (v === undefined) throw new ExprError(`Unknown name "${e.name}"`);
-      return v;
+      const constant = expression.name.toLowerCase();
+      const value =
+        lookup(expression.name) ??
+        (Object.hasOwn(REAL_CONSTS, constant)
+          ? REAL_CONSTS[constant]
+          : undefined);
+      if (value === undefined)
+        throw new ExprError(`Unknown name "${expression.name}"`);
+      return value;
     }
     case "unary": {
-      const a = ev(e.a);
-      if (e.op === "-") return -a;
-      if (e.op === "+") return a;
-      if (e.op === "!") return a === 0 ? 1 : 0;
-      return Number(~asInteger(a, "~"));
+      const operand = evaluate(expression.operand);
+      if (expression.operator === "-") return -operand;
+      if (expression.operator === "+") return operand;
+      if (expression.operator === "!") return operand === 0 ? 1 : 0;
+      return Number(~asInteger(operand, "~"));
     }
     case "binary": {
-      const a = ev(e.a);
-      const b = ev(e.b);
-      switch (e.op) {
+      const left = evaluate(expression.left);
+      const right = evaluate(expression.right);
+      switch (expression.operator) {
         case "+":
-          return a + b;
+          return left + right;
         case "-":
-          return a - b;
+          return left - right;
         case "*":
-          return a * b;
+          return left * right;
         case "/":
-          return a / b;
+          return left / right;
         case "%":
-          return a % b;
+          return left % right;
         case "**":
-          return a ** b;
+          return left ** right;
         case "<<":
-          return Number(asInteger(a, "<<") << asInteger(b, "<<"));
+          return Number(asInteger(left, "<<") << shiftAmount(right));
         case ">>":
-          return Number(asInteger(a, ">>") >> asInteger(b, ">>"));
+          return Number(asInteger(left, ">>") >> shiftAmount(right));
         case "&":
-          return Number(asInteger(a, "&") & asInteger(b, "&"));
+          return Number(asInteger(left, "&") & asInteger(right, "&"));
         case "|":
-          return Number(asInteger(a, "|") | asInteger(b, "|"));
+          return Number(asInteger(left, "|") | asInteger(right, "|"));
         case "^":
-          return Number(asInteger(a, "^") ^ asInteger(b, "^"));
+          return Number(asInteger(left, "^") ^ asInteger(right, "^"));
       }
-      throw new ExprError(`Unknown operator ${e.op}`);
+      throw new ExprError(`Unknown operator ${expression.operator}`);
     }
     case "call": {
-      const f = REAL_FUNCS[e.fn];
-      if (!f) throw new ExprError(`Unknown function ${e.fn}() — try ${Object.keys(REAL_FUNCS).join(", ")}`);
-      return f(...e.args.map(ev));
+      const realFunction = Object.hasOwn(REAL_FUNCS, expression.functionName)
+        ? REAL_FUNCS[expression.functionName]
+        : undefined;
+      if (!realFunction)
+        throw new ExprError(
+          `Unknown function ${expression.functionName}() — try ${Object.keys(REAL_FUNCS).join(", ")}`,
+        );
+      return realFunction(...expression.argumentExpressions.map(evaluate));
     }
   }
 }
 
 /** If `f(x)` is linear (f(x) = a·x + b) over the sample points, returns [a, b]. */
-export function linearity(f: (x: number) => number, samples: number[]): [number, number] | null {
-  const b = f(0);
-  const a = f(1) - b;
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return null;
+export function linearity(
+  evaluate: (x: number) => number,
+  samples: number[],
+): [number, number] | null {
+  const intercept = evaluate(0);
+  const slope = evaluate(1) - intercept;
+  if (!Number.isFinite(slope) || !Number.isFinite(intercept) || slope === 0)
+    return null;
   for (const x of samples) {
-    const want = a * x + b;
-    const got = f(x);
-    if (!(Math.abs(got - want) <= 1e-9 * Math.max(1, Math.abs(want)))) return null;
+    const expected = slope * x + intercept;
+    const actual = evaluate(x);
+    if (
+      !(Math.abs(actual - expected) <= 1e-9 * Math.max(1, Math.abs(expected)))
+    )
+      return null;
   }
-  return [a, b];
+  return [slope, intercept];
 }

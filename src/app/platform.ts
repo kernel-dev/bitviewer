@@ -1,17 +1,41 @@
 // Thin bridge to Tauri. Every function also works in a plain browser
 // (npm run dev) so the UI can be developed without the native shell.
 
-export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const FILTERS = [
   { name: "Bit Viewer workspace", extensions: ["bitview", "json"] },
   { name: "All files", extensions: ["*"] },
 ];
 
-async function core() {
+/** What the open dialog asks for. */
+export interface OpenOptions {
+  title: string;
+  filters: { name: string; extensions: string[] }[];
+  /** File types for the browser's file picker, e.g. ".svd,.xml". */
+  accept: string;
+}
+
+const WORKSPACE_OPEN: OpenOptions = {
+  title: "Open workspace",
+  filters: FILTERS,
+  accept: ".bitview,.json",
+};
+
+export const SVD_OPEN: OpenOptions = {
+  title: "Import CMSIS-SVD",
+  filters: [
+    { name: "CMSIS-SVD register description", extensions: ["svd", "xml"] },
+    { name: "All files", extensions: ["*"] },
+  ],
+  accept: ".svd,.xml",
+};
+
+async function loadCoreApi() {
   return import("@tauri-apps/api/core");
 }
-async function win() {
+async function currentWindow() {
   return (await import("@tauri-apps/api/window")).getCurrentWindow();
 }
 
@@ -34,30 +58,41 @@ export async function defaultDir(): Promise<string | undefined> {
   }
 }
 
-export function joinPath(dir: string, name: string): string {
-  if (/[\\/]$/.test(dir)) return dir + name;
-  const sep = dir.includes("\\") || !dir.includes("/") ? "\\" : "/";
-  return `${dir}${sep}${name}`;
+export function joinPath(directory: string, name: string): string {
+  if (/[\\/]$/.test(directory)) return directory + name;
+  const separator =
+    directory.includes("\\") || !directory.includes("/") ? "\\" : "/";
+  return `${directory}${separator}${name}`;
 }
 
 export function basename(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
-export async function pickAndRead(startDir?: string): Promise<OpenedFile | null> {
+export async function pickAndRead(
+  startDir?: string,
+  options: OpenOptions = WORKSPACE_OPEN,
+): Promise<OpenedFile | null> {
   if (isTauri) {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const path = await open({ title: "Open workspace", filters: FILTERS, defaultPath: startDir, multiple: false });
+    const path = await open({
+      title: options.title,
+      filters: options.filters,
+      defaultPath: startDir,
+      multiple: false,
+    });
     if (typeof path !== "string") return null;
     return { path, name: basename(path), text: await readText(path) };
   }
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".json";
+    input.accept = options.accept;
     input.onchange = async () => {
-      const f = input.files?.[0];
-      resolve(f ? { path: null, name: f.name, text: await f.text() } : null);
+      const file = input.files?.[0];
+      resolve(
+        file ? { path: null, name: file.name, text: await file.text() } : null,
+      );
     };
     input.oncancel = () => resolve(null);
     input.click();
@@ -65,12 +100,14 @@ export async function pickAndRead(startDir?: string): Promise<OpenedFile | null>
 }
 
 export async function readText(path: string): Promise<string> {
-  const { invoke } = await core();
+  const { invoke } = await loadCoreApi();
   return invoke<string>("read_text", { path });
 }
 
 /** Asks for a path (Tauri) and returns it, or null when cancelled. */
-export async function pickSavePath(defaultPath: string): Promise<string | null> {
+export async function pickSavePath(
+  defaultPath: string,
+): Promise<string | null> {
   if (!isTauri) return defaultPath;
   const { save } = await import("@tauri-apps/plugin-dialog");
   return save({ title: "Save workspace", defaultPath, filters: FILTERS });
@@ -78,66 +115,71 @@ export async function pickSavePath(defaultPath: string): Promise<string | null> 
 
 export async function writeText(path: string, text: string): Promise<void> {
   if (isTauri) {
-    const { invoke } = await core();
+    const { invoke } = await loadCoreApi();
     await invoke("write_text", { path, contents: text });
     return;
   }
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  a.download = basename(path);
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const anchor = document.createElement("a");
+  anchor.href = URL.createObjectURL(
+    new Blob([text], { type: "application/json" }),
+  );
+  anchor.download = basename(path);
+  anchor.click();
+  URL.revokeObjectURL(anchor.href);
 }
 
 /** File passed on the command line (`BitViewer.exe workspace.bitview.json`). */
 export async function initialFile(): Promise<string | null> {
   if (!isTauri) return null;
-  const { invoke } = await core();
+  const { invoke } = await loadCoreApi();
   return invoke<string | null>("initial_file");
 }
 
-export async function setZoom(z: number): Promise<void> {
+export async function setZoom(zoom: number): Promise<void> {
   if (isTauri) {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
-    await getCurrentWebview().setZoom(z);
+    await getCurrentWebview().setZoom(zoom);
   } else {
-    (document.documentElement.style as any).zoom = String(z);
+    (document.documentElement.style as any).zoom = String(zoom);
   }
 }
 
 export async function setTitle(title: string): Promise<void> {
   document.title = title;
-  if (isTauri) await (await win()).setTitle(title);
+  if (isTauri) await (await currentWindow()).setTitle(title);
 }
 
 export async function minimize() {
-  if (isTauri) await (await win()).minimize();
+  if (isTauri) await (await currentWindow()).minimize();
 }
 export async function toggleMaximize() {
-  if (isTauri) await (await win()).toggleMaximize();
+  if (isTauri) await (await currentWindow()).toggleMaximize();
 }
 export async function isMaximized(): Promise<boolean> {
-  return isTauri ? (await win()).isMaximized() : false;
+  return isTauri ? (await currentWindow()).isMaximized() : false;
 }
-export async function onResized(cb: () => void) {
-  if (isTauri) await (await win()).onResized(cb);
+export async function onResized(callback: () => void) {
+  if (isTauri) await (await currentWindow()).onResized(callback);
 }
 /** Close button / Alt+F4. `canClose` decides; returning false keeps the window open.
  *  In the browser preview a page can't wait for a dialog, so `onUnload` runs
  *  instead (the session auto-save keeps the work). */
-export async function guardClose(canClose: () => Promise<boolean>, onUnload: () => void) {
+export async function guardClose(
+  canClose: () => Promise<boolean>,
+  onUnload: () => void,
+) {
   if (!isTauri) {
     window.addEventListener("pagehide", onUnload);
     return;
   }
-  const w = await win();
-  await w.onCloseRequested(async (event) => {
+  const appWindow = await currentWindow();
+  await appWindow.onCloseRequested(async (event) => {
     event.preventDefault();
-    if (await canClose()) await w.destroy();
+    if (await canClose()) await appWindow.destroy();
   });
 }
 export async function closeWindow() {
-  if (isTauri) await (await win()).close();
+  if (isTauri) await (await currentWindow()).close();
 }
 
 export async function copyText(text: string): Promise<void> {
@@ -149,68 +191,100 @@ export async function copyText(text: string): Promise<void> {
 // session / autosave. In the browser they live in localStorage instead.
 export type AppDir = "config" | "data";
 
-export async function readAppFile(dir: AppDir, name: string): Promise<string | null> {
-  if (!isTauri) return localStorage.getItem(`bitviewer.app.${dir}.${name}`);
-  const { invoke } = await core();
-  return invoke<string | null>("read_app_file", { dir, name });
+export async function readAppFile(
+  appDirectory: AppDir,
+  name: string,
+): Promise<string | null> {
+  if (!isTauri)
+    return localStorage.getItem(`bitviewer.app.${appDirectory}.${name}`);
+  const { invoke } = await loadCoreApi();
+  return invoke<string | null>("read_app_file", {
+    directory: appDirectory,
+    name,
+  });
 }
 
-export async function writeAppFile(dir: AppDir, name: string, contents: string): Promise<void> {
+export async function writeAppFile(
+  appDirectory: AppDir,
+  name: string,
+  contents: string,
+): Promise<void> {
   if (!isTauri) {
-    localStorage.setItem(`bitviewer.app.${dir}.${name}`, contents);
+    localStorage.setItem(`bitviewer.app.${appDirectory}.${name}`, contents);
     return;
   }
-  const { invoke } = await core();
-  await invoke("write_app_file", { dir, name, contents });
+  const { invoke } = await loadCoreApi();
+  await invoke("write_app_file", { directory: appDirectory, name, contents });
 }
 
-export async function deleteAppFile(dir: AppDir, name: string): Promise<void> {
+export async function deleteAppFile(
+  appDirectory: AppDir,
+  name: string,
+): Promise<void> {
   if (!isTauri) {
-    localStorage.removeItem(`bitviewer.app.${dir}.${name}`);
+    localStorage.removeItem(`bitviewer.app.${appDirectory}.${name}`);
     return;
   }
-  const { invoke } = await core();
-  await invoke("delete_app_file", { dir, name });
+  const { invoke } = await loadCoreApi();
+  await invoke("delete_app_file", { directory: appDirectory, name });
 }
 
 /** A workspace handed over by a second launch (double-clicking another file). */
-export async function onOpenFile(cb: (path: string) => void) {
+export async function onOpenFile(callback: (path: string) => void) {
   if (!isTauri) return;
   const { listen } = await import("@tauri-apps/api/event");
-  await listen<string>("open-file", (e) => cb(e.payload));
+  await listen<string>("open-file", (event) => callback(event.payload));
 }
 
 // ------------------------------------------------------------------ file drops
 /** Calls `hover(true/false)` while files are dragged over the window and
- *  `drop(file)` with the first dropped file. */
-export async function onFileDrop(hover: (over: boolean) => void, drop: (file: OpenedFile) => void) {
+ *  `drop(file)` with the first dropped file, or `failed` when it can't be read
+ *  (a folder, a file that is too large, no permission…). */
+export async function onFileDrop(
+  hover: (over: boolean) => void,
+  drop: (file: OpenedFile) => void,
+  failed: (name: string, error: unknown) => void,
+) {
   if (isTauri) {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
     await getCurrentWebview().onDragDropEvent(async (event) => {
-      const p = event.payload;
-      if (p.type === "enter" || p.type === "over") hover(true);
-      else if (p.type === "leave") hover(false);
-      else if (p.type === "drop") {
+      const payload = event.payload;
+      if (payload.type === "enter" || payload.type === "over") hover(true);
+      else if (payload.type === "leave") hover(false);
+      else if (payload.type === "drop") {
         hover(false);
-        const path = p.paths[0];
-        if (path) drop({ path, name: basename(path), text: await readText(path) });
+        const path = payload.paths[0];
+        if (!path) return;
+        let text: string;
+        try {
+          text = await readText(path);
+        } catch (error) {
+          failed(basename(path), error);
+          return;
+        }
+        drop({ path, name: basename(path), text });
       }
     });
     return;
   }
-  window.addEventListener("dragover", (e) => {
-    if (e.dataTransfer?.types.includes("Files")) {
-      e.preventDefault();
+  window.addEventListener("dragover", (event) => {
+    if (event.dataTransfer?.types.includes("Files")) {
+      event.preventDefault();
       hover(true);
     }
   });
-  window.addEventListener("dragleave", (e) => {
-    if (!e.relatedTarget) hover(false);
+  window.addEventListener("dragleave", (event) => {
+    if (!event.relatedTarget) hover(false);
   });
-  window.addEventListener("drop", async (e) => {
-    e.preventDefault();
+  window.addEventListener("drop", async (event) => {
+    event.preventDefault();
     hover(false);
-    const f = e.dataTransfer?.files[0];
-    if (f) drop({ path: null, name: f.name, text: await f.text() });
+    const file = event.dataTransfer?.files[0];
+    if (!file) return;
+    try {
+      drop({ path: null, name: file.name, text: await file.text() });
+    } catch (error) {
+      failed(file.name, error);
+    }
   });
 }

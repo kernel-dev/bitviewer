@@ -2,7 +2,7 @@
 // result for a given bit width.
 import { ExprError, evalInt, parseExpr } from "../core/expr";
 import { formatInt, maxValue, ParseError } from "../core/numfmt";
-import { h } from "./kit";
+import { html } from "./kit";
 
 export type Lookup = (name: string) => bigint | undefined;
 
@@ -12,79 +12,102 @@ export interface ExprResult {
 }
 
 /** Evaluates `src` and fits the result into `width` bits. Throws ExprError. */
-export function evaluateFor(src: string, width: number, lookup: Lookup): ExprResult {
-  const raw = evalInt(parseExpr(src), lookup);
+export function evaluateFor(
+  source: string,
+  width: number,
+  lookup: Lookup,
+): ExprResult {
+  const raw = evalInt(parseExpr(source), lookup);
   const mask = maxValue(width);
   const value = raw & mask;
   let note = "";
   if (raw < 0n)
-    note = raw >= -(1n << BigInt(width - 1)) ? "negative: stored as two's complement" : `wrapped to ${width} bits`;
+    note =
+      raw >= -(1n << BigInt(width - 1))
+        ? "negative: stored as two's complement"
+        : `wrapped to ${width} bits`;
   else if (raw > mask) note = `truncated to ${width} bits`;
   return { value, note };
 }
 
 export interface ExprField {
-  el: HTMLElement;
+  element: HTMLElement;
   input: HTMLInputElement;
   /** Current result, or null while the text is empty or invalid. */
   result(): ExprResult | null;
   refresh(): void;
 }
 
-export function exprField(opts: {
+export function exprField(options: {
   width: () => number;
   lookup: Lookup;
   placeholder?: string;
   value?: string;
   onEnter?: () => void;
-  onChange?: (r: ExprResult | null) => void;
+  onChange?: (result: ExprResult | null) => void;
 }): ExprField {
-  const input = h("input", {
+  const input = html("input", {
     class: "field mono expr-input",
-    placeholder: opts.placeholder ?? "e.g. 0x1F << 3 | bit(31)",
-    value: opts.value ?? "",
+    placeholder: options.placeholder ?? "e.g. 0x1F << 3 | bit(31)",
+    value: options.value ?? "",
     spellcheck: false,
     autocomplete: "off",
   });
-  const preview = h("div", { class: "expr-preview mono" });
+  const preview = html("div", { class: "expr-preview mono" });
   let current: ExprResult | null = null;
 
   const refresh = () => {
-    const src = input.value.trim();
+    const source = input.value.trim();
     current = null;
     input.classList.remove("invalid");
-    if (!src) {
-      preview.replaceChildren(h("span", { class: "muted" }, "Result appears here"));
+    if (!source) {
+      preview.replaceChildren(
+        html("span", { class: "muted" }, "Result appears here"),
+      );
     } else {
       try {
-        current = evaluateFor(src, opts.width(), opts.lookup);
-        const w = opts.width();
+        current = evaluateFor(source, options.width(), options.lookup);
+        const width = options.width();
         preview.replaceChildren(
-          h("span", { class: "expr-eq" }, "= "),
-          formatInt(current.value, 16, w, { prefix: true, group: true }),
-          h("span", { class: "muted" }, ` · ${current.value.toString()}`),
-          current.note ? h("span", { class: "expr-note" }, ` · ${current.note}`) : "",
+          html("span", { class: "expr-eq" }, "= "),
+          formatInt(current.value, 16, width, { prefix: true, group: true }),
+          html("span", { class: "muted" }, ` · ${current.value.toString()}`),
+          current.note
+            ? html("span", { class: "expr-note" }, ` · ${current.note}`)
+            : "",
         );
-      } catch (e) {
+      } catch (error) {
         if (
-          !(e instanceof ExprError || e instanceof ParseError || e instanceof RangeError || e instanceof SyntaxError)
+          !(
+            error instanceof ExprError ||
+            error instanceof ParseError ||
+            error instanceof RangeError ||
+            error instanceof SyntaxError
+          )
         ) {
-          throw e;
+          throw error;
         }
         input.classList.add("invalid");
-        preview.replaceChildren(h("span", { class: "expr-error" }, e.message));
+        preview.replaceChildren(
+          html("span", { class: "expr-error" }, error.message),
+        );
       }
     }
-    opts.onChange?.(current);
+    options.onChange?.(current);
   };
 
   input.addEventListener("input", refresh);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && current) {
-      e.preventDefault();
-      opts.onEnter?.();
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && current) {
+      event.preventDefault();
+      options.onEnter?.();
     }
   });
   refresh();
-  return { el: h("div", { class: "expr-field" }, input, preview), input, result: () => current, refresh };
+  return {
+    element: html("div", { class: "expr-field" }, input, preview),
+    input,
+    result: () => current,
+    refresh,
+  };
 }

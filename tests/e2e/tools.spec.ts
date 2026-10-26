@@ -22,11 +22,15 @@ test("expression bar previews and applies", async ({ app, page }) => {
   await app.card().locator(".expr-toggle").click();
   const input = app.card().locator(".expr-bar .expr-input");
   await input.fill("0x1F << 3 | bit(31)");
-  await expect(app.card().locator(".expr-bar .expr-preview")).toContainText("0x8000_00F8");
+  await expect(app.card().locator(".expr-bar .expr-preview")).toContainText(
+    "0x8000_00F8",
+  );
   await input.press("Enter");
   expect(await app.value()).toBe("800000f8");
   await input.fill("1 +");
-  await expect(app.card().locator(".expr-bar .expr-preview")).toContainText("ends too early");
+  await expect(app.card().locator(".expr-bar .expr-preview")).toContainText(
+    "ends too early",
+  );
   await page.keyboard.press("Escape");
   await expect(app.card().locator(".expr-bar")).toHaveCount(0);
 });
@@ -36,19 +40,26 @@ test("float chip is editable", async ({ app }) => {
   await app.card().locator(".stat-input").fill("1.5");
   await app.card().locator(".stat-input").press("Enter");
   expect(await app.value()).toBe("3fc00000");
-  await expect(app.card().locator(".stat-float .stat-detail")).toHaveText("+1.5 × 2^0");
+  await expect(app.card().locator(".stat-float .stat-detail")).toHaveText(
+    "+1.5 × 2^0",
+  );
 });
 
 test("paste bytes little-endian", async ({ app, page }) => {
   await app.run("void window.__app.cards[0].pasteBytes()");
   await page.locator(".bytes-area").fill("78 56 34 12");
   await page.locator(".modal .seg-btn", { hasText: "Little-endian" }).click();
-  await expect(page.locator(".modal .expr-preview")).toContainText("0x1234_5678");
+  await expect(page.locator(".modal .expr-preview")).toContainText(
+    "0x1234_5678",
+  );
   await page.locator(".modal-footer .primary").click();
   expect(await app.value()).toBe("12345678");
 });
 
-test("new value from an expression over other values", async ({ app, page }) => {
+test("new value from an expression over other values", async ({
+  app,
+  page,
+}) => {
   await app.setValue("0x12345678");
   await app.run("window.__app.commands.run('value.fromExpr')");
   await page.keyboard.type("{Value 1} ^ 0xFF");

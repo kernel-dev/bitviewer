@@ -1,76 +1,115 @@
 // The Settings dialog. Every change applies immediately.
 import { Contrast, Moon, SlidersHorizontal, Sun, Volume2 } from "lucide";
-import { S, ZOOM_MAX, ZOOM_MIN } from "../app/settings";
+import { appSettings, ZOOM_MAX, ZOOM_MIN } from "../app/settings";
 import { BASE_NAMES, BASE_ORDER } from "../core/numfmt";
 import { ACCENTS } from "../ui/accent";
-import { button, h, modal, segmented, toggleSwitch } from "../ui/kit";
+import { button, html, modal, segmented, toggleSwitch } from "../ui/kit";
 import { play } from "../ui/sound";
 
 function section(name: string, ...rows: HTMLElement[]): HTMLElement {
-  return h("section", { class: "set-section" }, h("h4", {}, name), h("div", { class: "set-card" }, ...rows));
+  return html(
+    "section",
+    { class: "set-section" },
+    html("h4", {}, name),
+    html("div", { class: "set-card" }, ...rows),
+  );
 }
 
 function row(label: string, control: HTMLElement, hint = ""): HTMLElement {
-  return h(
+  return html(
     "div",
     { class: "set-row" },
-    h("div", {}, h("div", { class: "set-label" }, label), hint ? h("div", { class: "set-hint" }, hint) : null),
+    html(
+      "div",
+      {},
+      html("div", { class: "set-label" }, label),
+      hint ? html("div", { class: "set-hint" }, hint) : null,
+    ),
     control,
   );
 }
 
 /** Range input whose filled part tracks its value. */
-function slider(min: number, max: number, step: number, value: number): HTMLInputElement {
-  const s = h("input", { type: "range", class: "slider", min, max, step, value });
-  const paint = () => s.style.setProperty("--p", `${((+s.value - min) / (max - min)) * 100}%`);
-  s.addEventListener("input", paint);
+function slider(
+  min: number,
+  max: number,
+  step: number,
+  value: number,
+): HTMLInputElement {
+  const input = html("input", {
+    type: "range",
+    class: "slider",
+    min,
+    max,
+    step,
+    value,
+  });
+  const paint = () =>
+    input.style.setProperty(
+      "--p",
+      `${((+input.value - min) / (max - min)) * 100}%`,
+    );
+  input.addEventListener("input", paint);
   paint();
-  return s;
+  return input;
 }
 
 /** Swatches for the accent presets plus a custom colour. */
 function accentPicker(): HTMLElement {
-  const wrap = h("div", { class: "accent-pick", role: "radiogroup", "aria-label": "Accent colour" });
-  const current = () => S.get("accent") || ACCENTS[0].color;
+  const container = html("div", {
+    class: "accent-pick",
+    role: "radiogroup",
+    "aria-label": "Accent colour",
+  });
+  const current = () => appSettings.get("accent") || ACCENTS[0].color;
   const render = () => {
-    const cur = current().toLowerCase();
-    const isPreset = ACCENTS.some((a) => a.color === cur);
-    wrap.replaceChildren(
-      ...ACCENTS.map((a) => {
-        const b = h("button", {
+    const currentLower = current().toLowerCase();
+    const isPreset = ACCENTS.some((accent) => accent.color === currentLower);
+    container.replaceChildren(
+      ...ACCENTS.map((accent) => {
+        const buttonElement = html("button", {
           type: "button",
-          class: `accent-swatch${a.color === cur ? " on" : ""}`,
-          style: `--sw:${a.color}`,
-          tip: a.name,
+          class: `accent-swatch${accent.color === currentLower ? " on" : ""}`,
+          style: `--sw:${accent.color}`,
+          tip: accent.name,
           role: "radio",
-          "aria-checked": a.color === cur ? "true" : "false",
-          "aria-label": a.name,
+          "aria-checked": accent.color === currentLower ? "true" : "false",
+          "aria-label": accent.name,
         });
-        b.addEventListener("click", () => {
-          S.set("accent", a.color === ACCENTS[0].color ? "" : a.color);
+        buttonElement.addEventListener("click", () => {
+          appSettings.set(
+            "accent",
+            accent.color === ACCENTS[0].color ? "" : accent.color,
+          );
           render();
         });
-        return b;
+        return buttonElement;
       }),
       (() => {
-        const input = h("input", {
+        const input = html("input", {
           type: "color",
           class: "accent-custom-input",
-          value: cur,
+          value: currentLower,
           "aria-label": "Custom colour",
         });
-        input.addEventListener("input", () => S.set("accent", input.value.toLowerCase()));
+        input.addEventListener("input", () =>
+          appSettings.set("accent", input.value.toLowerCase()),
+        );
         input.addEventListener("change", render);
-        return h(
+        return html(
           "label",
-          { class: `accent-swatch custom${isPreset ? "" : " on"}`, style: `--sw:${cur}`, tip: "Custom colour…" },
+          {
+            class: `accent-swatch custom${isPreset ? "" : " on"}`,
+            style: `--sw:${currentLower}`,
+            tip: "Custom colour…",
+          },
           input,
         );
       })(),
     );
   };
   render();
-  return wrap;
+  return container;
 }
 
 export function openSettings(): Promise<void> {
@@ -84,24 +123,45 @@ export function openSettings(): Promise<void> {
         [
           { value: "dark" as const, label: "Dark", icon: Moon },
           { value: "light" as const, label: "Light", icon: Sun },
-          { value: "contrast" as const, label: "High contrast", icon: Contrast },
+          {
+            value: "contrast" as const,
+            label: "High contrast",
+            icon: Contrast,
+          },
         ],
-        { value: S.get("theme"), onPick: (v) => S.set("theme", v) },
+        {
+          value: appSettings.get("theme"),
+          onPick: (value) => appSettings.set("theme", value),
+        },
       );
 
-      const zoomVal = h("span", { class: "mono zoom-val" }, `${Math.round(S.get("zoom") * 100)}%`);
-      const zoom = slider(ZOOM_MIN * 100, ZOOM_MAX * 100, 10, Math.round(S.get("zoom") * 100));
+      const zoomVal = html(
+        "span",
+        { class: "mono zoom-val" },
+        `${Math.round(appSettings.get("zoom") * 100)}%`,
+      );
+      const zoom = slider(
+        ZOOM_MIN * 100,
+        ZOOM_MAX * 100,
+        10,
+        Math.round(appSettings.get("zoom") * 100),
+      );
       zoom.addEventListener("input", () => {
         zoomVal.textContent = `${zoom.value}%`;
       });
-      zoom.addEventListener("change", () => S.set("zoom", +zoom.value / 100));
+      zoom.addEventListener("change", () =>
+        appSettings.set("zoom", +zoom.value / 100),
+      );
 
       const order = segmented(
         [
           { value: true, label: "MSB left  7…0" },
           { value: false, label: "LSB left  0…7" },
         ],
-        { value: S.get("msb_left"), onPick: (v) => S.set("msb_left", v) },
+        {
+          value: appSettings.get("msb_left"),
+          onPick: (value) => appSettings.set("msb_left", value),
+        },
       );
       const view = segmented(
         [
@@ -109,59 +169,97 @@ export function openSettings(): Promise<void> {
           { value: "byte" as const, label: "Bytes" },
           { value: "nibble" as const, label: "Nibbles" },
         ],
-        { value: S.get("default_view"), onPick: (v) => S.set("default_view", v) },
+        {
+          value: appSettings.get("default_view"),
+          onPick: (value) => appSettings.set("default_view", value),
+        },
       );
       const base = segmented(
-        BASE_ORDER.map((b) => ({ value: b, label: BASE_NAMES[b] })),
-        { value: S.get("default_base"), onPick: (v) => S.set("default_base", v) },
+        BASE_ORDER.map((base) => ({ value: base, label: BASE_NAMES[base] })),
+        {
+          value: appSettings.get("default_base"),
+          onPick: (base) => appSettings.set("default_base", base),
+        },
       );
 
-      const volVal = h("span", { class: "mono zoom-val" }, `${Math.round(S.get("sound_volume") * 100)}%`);
-      const volume = slider(0, 100, 5, Math.round(S.get("sound_volume") * 100));
+      const volVal = html(
+        "span",
+        { class: "mono zoom-val" },
+        `${Math.round(appSettings.get("sound_volume") * 100)}%`,
+      );
+      const volume = slider(
+        0,
+        100,
+        5,
+        Math.round(appSettings.get("sound_volume") * 100),
+      );
       const syncVolume = () => {
-        volume.disabled = !S.get("sounds");
+        volume.disabled = !appSettings.get("sounds");
       };
       syncVolume();
       volume.addEventListener("input", () => {
         volVal.textContent = `${volume.value}%`;
-        S.set("sound_volume", +volume.value / 100);
+        appSettings.set("sound_volume", +volume.value / 100);
       });
       volume.addEventListener("change", () => play("bitOn"));
-      const sounds = toggleSwitch(S.get("sounds"), (v) => {
-        S.set("sounds", v);
+      const sounds = toggleSwitch(appSettings.get("sounds"), (value) => {
+        appSettings.set("sounds", value);
         syncVolume();
-        if (v) play("bitOn");
+        if (value) play("bitOn");
       });
 
       body.append(
         section(
           "Appearance",
-          row("Theme", theme.el),
-          row("Accent colour", accentPicker(), "Red by default; used for bits that are 1, buttons and highlights"),
+          row("Theme", theme.element),
+          row(
+            "Accent colour",
+            accentPicker(),
+            "Red by default; used for bits that are 1, buttons and highlights",
+          ),
           row(
             "Compact mode",
-            toggleSwitch(S.get("compact"), (v) => S.set("compact", v)),
+            toggleSwitch(appSettings.get("compact"), (value) =>
+              appSettings.set("compact", value),
+            ),
             "Tighter spacing, so more values fit on screen",
           ),
-          row("Zoom", h("div", { class: "zoom-ctl" }, zoom, zoomVal), "Ctrl + mouse wheel anywhere · Ctrl+0 resets"),
+          row(
+            "Zoom",
+            html("div", { class: "zoom-ctl" }, zoom, zoomVal),
+            "Ctrl + mouse wheel anywhere · Ctrl+0 resets",
+          ),
         ),
         section(
           "Bits",
-          row("Bit order in a row", order.el),
-          row("Layout for new values", view.el, "Line puts every bit on one line across the window"),
-          row("Row base for new values", base.el),
+          row("Bit order in a row", order.element),
+          row(
+            "Layout for new values",
+            view.element,
+            "Line puts every bit on one line across the window",
+          ),
+          row("Row base for new values", base.element),
         ),
         section(
           "Sounds",
-          row("Interface sounds", sounds, "Short sounds for flipping bits, selecting, fields, operations and errors"),
+          row(
+            "Interface sounds",
+            sounds,
+            "Short sounds for flipping bits, selecting, fields, operations and errors",
+          ),
           row(
             "Volume",
-            h(
+            html(
               "div",
               { class: "zoom-ctl" },
               volume,
               volVal,
-              button({ icon: Volume2, cls: "ghost sm", tip: "Play a test sound", onClick: () => play("group", true) }),
+              button({
+                icon: Volume2,
+                className: "ghost sm",
+                tip: "Play a test sound",
+                onClick: () => play("group", true),
+              }),
             ),
           ),
         ),
@@ -169,7 +267,9 @@ export function openSettings(): Promise<void> {
           "Updates",
           row(
             "Check for updates at start-up",
-            toggleSwitch(S.get("check_updates"), (v) => S.set("check_updates", v)),
+            toggleSwitch(appSettings.get("check_updates"), (value) =>
+              appSettings.set("check_updates", value),
+            ),
             "Help › Check for updates… works either way",
           ),
         ),
@@ -177,17 +277,23 @@ export function openSettings(): Promise<void> {
           "Readouts",
           row(
             "Per-row readouts",
-            toggleSwitch(S.get("show_readouts"), (v) => S.set("show_readouts", v)),
+            toggleSwitch(appSettings.get("show_readouts"), (value) =>
+              appSettings.set("show_readouts", value),
+            ),
             "hex · dec · oct next to each byte / nibble row",
           ),
           row(
             "Interpretations",
-            toggleSwitch(S.get("show_interp"), (v) => S.set("show_interp", v)),
+            toggleSwitch(appSettings.get("show_interp"), (value) =>
+              appSettings.set("show_interp", value),
+            ),
             "unsigned, signed, set bits and IEEE-754 float",
           ),
         ),
       );
-      return [button({ label: "Done", cls: "primary", onClick: () => close() })];
+      return [
+        button({ label: "Done", className: "primary", onClick: () => close() }),
+      ];
     },
   });
 }

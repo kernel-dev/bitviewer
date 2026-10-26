@@ -11,6 +11,7 @@ export interface Session {
   fileName: string;
   dirty: boolean; // unsaved changes at the time of writing
   values: unknown[] | null; // workspace contents; null = reopen `path` from disk
+  peripherals?: unknown[] | null; // peripheral blocks of those values
   savedAt: number;
 }
 
@@ -18,15 +19,19 @@ export async function loadSession(): Promise<Session | null> {
   try {
     const text = await readAppFile("data", FILE);
     if (!text) return null;
-    const s = JSON.parse(text);
-    if (s?.version !== 1) return null;
+    const parsed = JSON.parse(text);
+    if (parsed?.version !== 1) return null;
     return {
       version: 1,
-      path: typeof s.path === "string" ? s.path : null,
-      fileName: typeof s.fileName === "string" ? s.fileName : "Untitled",
-      dirty: s.dirty === true,
-      values: Array.isArray(s.values) ? s.values : null,
-      savedAt: Number(s.savedAt) || 0,
+      path: typeof parsed.path === "string" ? parsed.path : null,
+      fileName:
+        typeof parsed.fileName === "string" ? parsed.fileName : "Untitled",
+      dirty: parsed.dirty === true,
+      values: Array.isArray(parsed.values) ? parsed.values : null,
+      peripherals: Array.isArray(parsed.peripherals)
+        ? parsed.peripherals
+        : null,
+      savedAt: Number(parsed.savedAt) || 0,
     };
   } catch {
     return null; // a damaged session file just means starting fresh
@@ -47,10 +52,10 @@ export function saveSessionSoon(get: () => Session) {
 }
 
 /** Writes now (on save, open, close). A pending delayed write is replaced. */
-export async function saveSessionNow(s?: Session): Promise<void> {
+export async function saveSessionNow(session?: Session): Promise<void> {
   clearTimeout(timer);
   timer = 0;
-  const data = s ?? latest?.();
+  const data = session ?? latest?.();
   if (data) await writeSession(data);
 }
 
@@ -60,9 +65,9 @@ export async function clearSession(): Promise<void> {
   await deleteAppFile("data", FILE).catch(() => {});
 }
 
-async function writeSession(s: Session) {
+async function writeSession(session: Session) {
   try {
-    await writeAppFile("data", FILE, JSON.stringify(s));
+    await writeAppFile("data", FILE, JSON.stringify(session));
   } catch {
     /* best effort: auto-save must never interrupt work */
   }

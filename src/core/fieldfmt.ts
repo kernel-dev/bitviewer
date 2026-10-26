@@ -5,7 +5,7 @@ import type { Group } from "./model";
 import { maxValue } from "./numfmt";
 
 export interface Formula {
-  f: (x: number) => number;
+  evaluate: (x: number) => number;
   /** [scale, offset] when the formula is linear, so values can be typed back in. */
   linear: [number, number] | null;
 }
@@ -13,32 +13,38 @@ export interface Formula {
 const cache = new Map<string, Formula>();
 
 /** Compiles a formula in `x`. Throws ExprError for bad formulas. */
-export function compileFormula(src: string): Formula {
-  const hit = cache.get(src);
+export function compileFormula(source: string): Formula {
+  const hit = cache.get(source);
   if (hit) return hit;
-  const expr = parseExpr(src);
-  const f = (x: number) =>
-    evalReal(expr, (n) => {
-      if (n === "x") return x;
+  const expression = parseExpr(source);
+  const evaluate = (x: number) =>
+    evalReal(expression, (name) => {
+      if (name === "x") return x;
       return undefined;
     });
-  f(1); // surfaces unknown names now rather than on every redraw
-  const out: Formula = { f, linear: linearity(f, [2, 7, 1000, -3]) };
-  cache.set(src, out);
+  evaluate(1); // surfaces unknown names now rather than on every redraw
+  const out: Formula = {
+    evaluate,
+    linear: linearity(evaluate, [2, 7, 1000, -3]),
+  };
+  cache.set(source, out);
   return out;
 }
 
 /** Short, readable number: integers as-is, others to 6 significant digits. */
-export function formatReal(y: number): string {
-  if (!Number.isFinite(y)) return Number.isNaN(y) ? "NaN" : y > 0 ? "∞" : "−∞";
-  if (Number.isInteger(y) && Math.abs(y) < 1e15) return String(y);
-  return String(Number(y.toPrecision(6)));
+export function formatReal(value: number): string {
+  if (!Number.isFinite(value))
+    return Number.isNaN(value) ? "NaN" : value > 0 ? "∞" : "−∞";
+  if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
+  return String(Number(value.toPrecision(6)));
 }
 
 /** The field's number (`raw` read as signed when the field is signed). */
-export function fieldNumber(g: Group, raw: bigint): bigint {
-  if (!g.signed || g.width < 2) return raw;
-  return (raw >> BigInt(g.width - 1)) & 1n ? raw - (1n << BigInt(g.width)) : raw;
+export function fieldNumber(group: Group, raw: bigint): bigint {
+  if (!group.signed || group.width < 2) return raw;
+  return (raw >> BigInt(group.width - 1)) & 1n
+    ? raw - (1n << BigInt(group.width))
+    : raw;
 }
 
 export interface Decoded {
@@ -48,44 +54,63 @@ export interface Decoded {
 }
 
 /** What a field's raw bits mean, for display next to the raw value. */
-export function decodeField(g: Group, raw: bigint): Decoded {
-  const n = fieldNumber(g, raw);
-  if (!g.formula) {
-    const text = g.signed ? n.toString() : "";
-    return { text: text && g.unit ? `${text} ${g.unit}` : text || (g.unit ? `${n} ${g.unit}` : "") };
+export function decodeField(group: Group, raw: bigint): Decoded {
+  const fieldValue = fieldNumber(group, raw);
+  if (!group.formula) {
+    const text = group.signed ? fieldValue.toString() : "";
+    return {
+      text:
+        text && group.unit
+          ? `${text} ${group.unit}`
+          : text || (group.unit ? `${fieldValue} ${group.unit}` : ""),
+    };
   }
   try {
-    const y = compileFormula(g.formula).f(Number(n));
-    return { text: `${formatReal(y)}${g.unit ? ` ${g.unit}` : ""}` };
-  } catch (e) {
-    if (e instanceof ExprError) return { text: "", error: e.message };
-    throw e;
+    const decoded = compileFormula(group.formula).evaluate(Number(fieldValue));
+    return {
+      text: `${formatReal(decoded)}${group.unit ? ` ${group.unit}` : ""}`,
+    };
+  } catch (error) {
+    // RangeError: a formula that makes a number too big to handle
+    if (error instanceof ExprError || error instanceof RangeError)
+      return { text: "", error: error.message };
+    throw error;
   }
 }
 
 /** Can a real-world value be typed in for this field? */
-export function isInvertible(g: Group): boolean {
-  if (!g.formula) return true;
+export function isInvertible(group: Group): boolean {
+  if (!group.formula) return true;
   try {
-    return compileFormula(g.formula).linear !== null;
+    return compileFormula(group.formula).linear !== null;
   } catch {
     return false;
   }
 }
 
 /** Raw bits for a typed real-world value `y`. Throws ExprError when it can't be represented. */
-export function rawFromNumber(g: Group, y: number): bigint {
-  let x = y;
-  if (g.formula) {
-    const lin = compileFormula(g.formula).linear;
-    if (!lin) throw new ExprError("This formula can't be reversed, so type the raw value instead");
-    x = (y - lin[1]) / lin[0];
+export function rawFromNumber(group: Group, realValue: number): bigint {
+  let rawNumber = realValue;
+  if (group.formula) {
+    const linearFit = compileFormula(group.formula).linear;
+    if (!linearFit)
+      throw new ExprError(
+        "This formula can't be reversed, so type the raw value instead",
+      );
+    rawNumber = (realValue - linearFit[1]) / linearFit[0];
   }
-  if (!Number.isFinite(x)) throw new ExprError("That value can't be represented");
-  const n = BigInt(Math.round(x));
-  const w = BigInt(g.width);
-  const lo = g.signed && g.width > 1 ? -(1n << (w - 1n)) : 0n;
-  const hi = g.signed && g.width > 1 ? (1n << (w - 1n)) - 1n : maxValue(g.width);
-  if (n < lo || n > hi) throw new ExprError(`Out of range for ${g.width} ${g.signed ? "signed " : ""}bits`);
-  return n & maxValue(g.width);
+  if (!Number.isFinite(rawNumber))
+    throw new ExprError("That value can't be represented");
+  const rounded = BigInt(Math.round(rawNumber));
+  const fieldWidth = BigInt(group.width);
+  const lo = group.signed && group.width > 1 ? -(1n << (fieldWidth - 1n)) : 0n;
+  const hi =
+    group.signed && group.width > 1
+      ? (1n << (fieldWidth - 1n)) - 1n
+      : maxValue(group.width);
+  if (rounded < lo || rounded > hi)
+    throw new ExprError(
+      `Out of range for ${group.width} ${group.signed ? "signed " : ""}bits`,
+    );
+  return rounded & maxValue(group.width);
 }

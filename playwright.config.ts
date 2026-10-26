@@ -1,15 +1,16 @@
 import { defineConfig } from "@playwright/test";
 
-// End-to-end tests drive the real UI in the installed Microsoft Edge
-// (no browser download needed) against the Vite dev server.
+// End-to-end tests drive the real UI against the Vite dev server: locally in
+// the installed Microsoft Edge (no browser download needed), in CI in
+// Playwright's Chromium (`npx playwright install chromium`).
 export default defineConfig({
-  testDir: "e2e",
+  testDir: "tests/e2e",
   timeout: 30_000,
   fullyParallel: true,
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:4173",
-    channel: "msedge",
+    channel: process.env.CI ? undefined : "msedge",
     viewport: { width: 1400, height: 900 },
   },
   webServer: {

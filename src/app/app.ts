@@ -8,6 +8,7 @@ import {
   CircleQuestionMark,
   CloudDownload,
   Command,
+  Cpu,
   FileCode2,
   FilePlus,
   FolderClock,
@@ -25,6 +26,7 @@ import {
   Ruler,
   Save,
   SaveAll,
+  ScrollText,
   Search,
   Settings as SettingsIcon,
   SlidersHorizontal,
@@ -42,39 +44,93 @@ import {
 import { ValueCard } from "../card/card";
 import { MAX_WIDTH, MIN_WIDTH, ModelError, ValueModel } from "../core/model";
 import { BASE_NAMES, BASE_ORDER, type Base } from "../core/numfmt";
+import {
+  parseSvd,
+  registerTemplate,
+  type SvdDevice,
+  type SvdRegister,
+} from "../core/svd";
+import {
+  freeName,
+  groupOrder,
+  moveBlock,
+  moveItem,
+  nextOffset,
+  type Peripheral,
+  peripheralsFromJSON,
+  peripheralToJSON,
+} from "../core/workspace";
+import { exportCode } from "../dialogs/export";
 import { showGuide } from "../dialogs/guide";
-import { showAbout, showHelp } from "../dialogs/help";
+import { showAbout, showHelp, VERSION } from "../dialogs/help";
 import { newValueFromExpression } from "../dialogs/newvalue";
 import { openSettings } from "../dialogs/settings";
+import { pickSvdRegisters } from "../dialogs/svd";
 import { pickTemplate } from "../dialogs/templates";
+import { showWhatsNew } from "../dialogs/whatsnew";
 import { pickWidth } from "../dialogs/width";
 import { applyAccent } from "../ui/accent";
-import { ask, button, h, icon, type MenuItem, menusOpen, modalOpen, openMenu, segmented, toast } from "../ui/kit";
+import {
+  ask,
+  button,
+  html,
+  icon,
+  type MenuItem,
+  menusOpen,
+  modalOpen,
+  openMenu,
+  segmented,
+  toast,
+} from "../ui/kit";
 import { logoSvg } from "../ui/logo";
 import { play } from "../ui/sound";
 import { CommandRegistry } from "./commands";
 import { History } from "./history";
 import { openPalette, paletteOpen } from "./palette";
+import {
+  askOffset,
+  editPeripheralDialog,
+  type PeripheralActions,
+  peripheralHeader,
+} from "./peripherals";
 import * as P from "./platform";
 import { SearchBar } from "./search";
-import { loadSession, type Session, saveSessionNow, saveSessionSoon } from "./session";
-import { S, ZOOM_STEP } from "./settings";
+import {
+  loadSession,
+  type Session,
+  saveSessionNow,
+  saveSessionSoon,
+} from "./session";
+import { appSettings, ZOOM_STEP } from "./settings";
 import { startTour, tourRunning } from "./tour";
 import { checkForUpdates } from "./updates";
 
 const FILE_VERSION = 1;
 const UNTITLED = "Untitled";
 
+/** A dropped file that is a CMSIS-SVD description rather than a workspace. */
+const looksLikeSvd = (file: { name: string; text: string }) =>
+  /\.(svd|xml)$/i.test(file.name) || file.text.trimStart().startsWith("<");
+
+/** Inputs, text areas and editable regions: they keep the native right-click menu and their own Esc. */
+const isTextField = (target: EventTarget | null) =>
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  (target instanceof HTMLElement && target.isContentEditable);
+
 export class App {
   readonly commands = new CommandRegistry();
   cards: ValueCard[] = [];
+  /** Peripheral blocks by name; values join one through `model.block`. */
+  private peripherals = new Map<string, Peripheral>();
+  private readonly blockOf = (card: ValueCard) => card.model.block;
   private path: string | null = null;
   private fileName = UNTITLED;
   /** Snapshot of the workspace as last saved/opened; null = never saved. */
   private savedSnapshot: string | null = null;
   private history = new History(
     () => this.snapshot(),
-    (s) => this.restore(s),
+    (text) => this.restore(text),
     () => this.onHistoryChange(),
   );
   private workspace!: HTMLElement;
@@ -95,36 +151,60 @@ export class App {
   async start() {
     this.registerCommands();
     this.applyTheme();
-    await P.setZoom(S.get("zoom"));
+    await P.setZoom(appSettings.get("zoom"));
     this.root.replaceChildren(
       this.buildTitlebar(),
-      h("div", { class: "topbars" }, this.buildToolbar(), this.search.el),
+      html(
+        "div",
+        { class: "topbars" },
+        this.buildToolbar(),
+        this.search.element,
+      ),
       this.buildWorkspace(),
       this.buildStatusbar(),
     );
     this.installInput();
     this.installFileDrop();
-    S.onChange((k) => this.onSetting(k));
+    appSettings.onChange((key) => this.onSetting(key));
     await P.guardClose(
-      () => this.beforeClose(),
+      () => this.prepareToQuit(),
       () => void saveSessionNow(this.sessionData()),
     );
     await P.onResized(() => this.syncMaxButton());
     this.syncMaxButton();
 
-    const initial = await P.initialFile();
-    if (!(initial && (await this.loadPath(initial))) && !(await this.restoreSession())) this.startFresh();
-    if (!S.get("tour_done")) setTimeout(() => this.runTour(), 700);
-    else if (S.get("check_updates")) setTimeout(() => void checkForUpdates(false), 3000);
-    void P.onOpenFile(async (path) => {
+    await P.onOpenFile(async (path) => {
       if (await this.maybeSave()) await this.loadPath(path);
     });
+    const initial = await P.initialFile();
+    if (
+      !(initial && (await this.loadPath(initial))) &&
+      !(await this.restoreSession())
+    )
+      this.startFresh();
+    if (!appSettings.get("tour_done")) {
+      appSettings.set("last_seen_version", VERSION); // nothing is "new" to a first-time user
+      setTimeout(() => this.runTour(), 700);
+    } else setTimeout(() => void this.runStartupChecks(), 700);
+  }
+
+  /** After an update, shows the new version's changes once; then looks for a newer version. */
+  private async runStartupChecks() {
+    if (appSettings.get("last_seen_version") !== VERSION) {
+      appSettings.set("last_seen_version", VERSION);
+      if (!modalOpen()) await showWhatsNew();
+    }
+    if (appSettings.get("check_updates"))
+      setTimeout(
+        () => void checkForUpdates(false, () => this.prepareToQuit()),
+        2300,
+      );
   }
 
   private async runTour() {
     if (modalOpen()) return;
     await startTour();
-    S.set("tour_done", true);
+    appSettings.set("tour_done", true);
   }
 
   get dirty(): boolean {
@@ -133,10 +213,16 @@ export class App {
 
   // ================================================================ commands
   private registerCommands() {
-    const dark = () => S.get("theme") === "dark";
+    this.registerFileCommands();
+    this.registerEditCommands();
+    this.registerViewCommands();
+    this.registerHelpCommands();
     this.registerValueCommands();
+  }
+
+  /** New, open, save, quit. */
+  private registerFileCommands() {
     this.commands.add(
-      // File
       {
         id: "file.new",
         group: "File",
@@ -153,7 +239,14 @@ export class App {
         keys: ["Ctrl+O"],
         run: () => this.openFile(),
       },
-      { id: "file.save", group: "File", label: "Save", icon: Save, keys: ["Ctrl+S"], run: () => this.save() },
+      {
+        id: "file.save",
+        group: "File",
+        label: "Save",
+        icon: Save,
+        keys: ["Ctrl+S"],
+        run: () => this.save(),
+      },
       {
         id: "file.saveAs",
         group: "File",
@@ -162,8 +255,28 @@ export class App {
         keys: ["Ctrl+Shift+S"],
         run: () => this.saveAs(),
       },
-      { id: "file.quit", group: "File", label: "Quit", icon: LogOut, run: () => P.closeWindow() },
-      // Edit
+      {
+        id: "file.importSvd",
+        group: "File",
+        label: "Import CMSIS-SVD…",
+        icon: Cpu,
+        keywords:
+          "svd cmsis register description peripheral arm stm32 nrf import",
+        run: () => this.importSvd(),
+      },
+      {
+        id: "file.quit",
+        group: "File",
+        label: "Quit",
+        icon: LogOut,
+        run: () => P.closeWindow(),
+      },
+    );
+  }
+
+  /** Undo, adding values, selection and find. */
+  private registerEditCommands() {
+    this.commands.add(
       {
         id: "edit.undo",
         group: "Edit",
@@ -215,7 +328,13 @@ export class App {
         keywords: "field register",
         run: () => this.groupSelection(),
       },
-      { id: "sel.clear", group: "Edit", label: "Clear selection", keys: ["Esc"], run: () => this.clearSelections() },
+      {
+        id: "sel.clear",
+        group: "Edit",
+        label: "Clear selection",
+        keys: ["Esc"],
+        run: () => this.clearSelections(),
+      },
       {
         id: "edit.find",
         group: "Edit",
@@ -251,7 +370,13 @@ export class App {
         keywords: "calculate combine and or xor add",
         run: () => this.addFromExpression(),
       },
-      // View
+    );
+  }
+
+  /** Zoom, theme, spacing, sounds and settings. */
+  private registerViewCommands() {
+    const dark = () => appSettings.get("theme") === "dark";
+    this.commands.add(
       {
         id: "view.zoomIn",
         group: "View",
@@ -274,7 +399,7 @@ export class App {
         label: "Reset zoom",
         icon: RotateCcw,
         keys: ["Ctrl+0"],
-        run: () => S.set("zoom", 1),
+        run: () => appSettings.set("zoom", 1),
       },
       {
         id: "view.theme",
@@ -287,16 +412,18 @@ export class App {
       {
         id: "view.compact",
         group: "View",
-        label: () => (S.get("compact") ? "Normal spacing" : "Compact mode"),
-        icon: () => (S.get("compact") ? Maximize : Minimize),
+        label: () =>
+          appSettings.get("compact") ? "Normal spacing" : "Compact mode",
+        icon: () => (appSettings.get("compact") ? Maximize : Minimize),
         keywords: "dense tight spacing",
-        run: () => S.set("compact", !S.get("compact")),
+        run: () => appSettings.set("compact", !appSettings.get("compact")),
       },
       {
         id: "view.sounds",
         group: "View",
-        label: () => (S.get("sounds") ? "Turn sounds off" : "Turn sounds on"),
-        icon: () => (S.get("sounds") ? VolumeX : Volume2),
+        label: () =>
+          appSettings.get("sounds") ? "Turn sounds off" : "Turn sounds on",
+        icon: () => (appSettings.get("sounds") ? VolumeX : Volume2),
         keywords: "audio mute",
         run: () => this.toggleSounds(),
       },
@@ -309,7 +436,12 @@ export class App {
         keywords: "preferences options",
         run: () => openSettings(),
       },
-      // Help
+    );
+  }
+
+  /** Help, the palette itself, and shortcuts to swallow. */
+  private registerHelpCommands() {
+    this.commands.add(
       {
         id: "help.controls",
         group: "Help",
@@ -331,14 +463,31 @@ export class App {
         keywords: "docs documentation manual how to tutorial",
         run: () => showGuide(),
       },
-      { id: "help.about", group: "Help", label: "About Bit Viewer", icon: Info, run: () => showAbout() },
+      {
+        id: "help.about",
+        group: "Help",
+        label: "About Bit Viewer",
+        icon: Info,
+        run: () => showAbout(),
+      },
+      {
+        id: "help.whatsnew",
+        group: "Help",
+        label: "What's new",
+        icon: ScrollText,
+        keywords: "changelog changes release notes version",
+        run: async () => {
+          if (!(await showWhatsNew()))
+            toast("No release notes for this version");
+        },
+      },
       {
         id: "help.updates",
         group: "Help",
         label: "Check for updates…",
         icon: CloudDownload,
         keywords: "upgrade version new",
-        run: () => checkForUpdates(true),
+        run: () => checkForUpdates(true, () => this.prepareToQuit()),
       },
       {
         id: "help.tour",
@@ -363,14 +512,16 @@ export class App {
   /** Palette commands that act on the current value ("Value: …"). */
   private registerValueCommands() {
     const card = () => this.activeCard ?? this.cards[0] ?? null;
-    const named = (verb: string) => () => {
-      const c = card();
-      return c ? `${verb} — ${c.model.name || "value"}` : verb;
+    const named = (label: string) => () => {
+      const activeCard = card();
+      return activeCard
+        ? `${label} — ${activeCard.model.name || "value"}`
+        : label;
     };
     const has = () => card() !== null;
-    const on = (f: (c: ValueCard) => unknown) => () => {
-      const c = card();
-      if (c) void f(c);
+    const runOnActiveCard = (action: (card: ValueCard) => unknown) => () => {
+      const activeCard = card();
+      if (activeCard) void action(activeCard);
     };
     this.commands.add(
       {
@@ -379,7 +530,7 @@ export class App {
         label: named("Collapse / expand"),
         icon: ChevronsUpDown,
         enabled: has,
-        run: on((c) => c.toggleCollapsed()),
+        run: runOnActiveCard((card) => card.toggleCollapsed()),
       },
       {
         id: "card.snapshot",
@@ -387,7 +538,7 @@ export class App {
         label: named("Take snapshot…"),
         icon: Camera,
         enabled: has,
-        run: on((c) => c.takeSnapshot()),
+        run: runOnActiveCard((card) => card.takeSnapshot()),
       },
       {
         id: "card.export",
@@ -396,7 +547,7 @@ export class App {
         icon: FileCode2,
         keywords: "c rust python header",
         enabled: has,
-        run: on((c) => c.exportCode()),
+        run: runOnActiveCard((card) => card.exportCode()),
       },
       {
         id: "card.template",
@@ -404,14 +555,14 @@ export class App {
         label: named("Apply template…"),
         icon: LayoutTemplate,
         enabled: has,
-        run: on((c) => c.applyTemplate()),
+        run: runOnActiveCard((card) => card.applyTemplate()),
       },
       {
         id: "card.saveTemplate",
         group: "Value",
         label: named("Save fields as template…"),
         enabled: has,
-        run: on((c) => c.saveAsTemplate()),
+        run: runOnActiveCard((card) => card.saveAsTemplate()),
       },
       {
         id: "card.expr",
@@ -420,7 +571,7 @@ export class App {
         icon: SquareFunction,
         keywords: "calculate formula",
         enabled: has,
-        run: on((c) => c.toggleExpr()),
+        run: runOnActiveCard((card) => card.toggleExpr()),
       },
       {
         id: "card.bases",
@@ -428,7 +579,7 @@ export class App {
         label: named("Show / hide all bases"),
         keywords: "hex dec oct bin",
         enabled: has,
-        run: on((c) => c.toggleBases()),
+        run: runOnActiveCard((card) => card.toggleBases()),
       },
       {
         id: "card.paste",
@@ -436,7 +587,7 @@ export class App {
         label: named("Paste bytes…"),
         keywords: "endian",
         enabled: has,
-        run: on((c) => c.pasteBytes()),
+        run: runOnActiveCard((card) => card.pasteBytes()),
       },
       {
         id: "card.swap",
@@ -444,28 +595,28 @@ export class App {
         label: named("Swap bytes"),
         keywords: "endian bswap",
         enabled: has,
-        run: on((c) => c.applyOp("bswap")),
+        run: runOnActiveCard((card) => card.applyOp("bswap")),
       },
       {
         id: "card.not",
         group: "Value",
         label: named("Invert bits (NOT)"),
         enabled: has,
-        run: on((c) => c.applyOp("invert")),
+        run: runOnActiveCard((card) => card.applyOp("invert")),
       },
       {
         id: "card.clear",
         group: "Value",
         label: named("Clear to 0"),
         enabled: has,
-        run: on((c) => c.applyOp("clear")),
+        run: runOnActiveCard((card) => card.applyOp("clear")),
       },
       {
         id: "card.duplicate",
         group: "Value",
         label: named("Duplicate"),
         enabled: has,
-        run: on((c) => this.duplicateValue(c)),
+        run: runOnActiveCard((card) => this.duplicateValue(card)),
       },
       {
         id: "card.width",
@@ -473,15 +624,34 @@ export class App {
         label: named("Change width…"),
         icon: Ruler,
         enabled: has,
-        run: on((c) => this.resizeValue(c)),
+        run: runOnActiveCard((card) => this.resizeValue(card)),
       },
-      { id: "card.remove", group: "Value", label: named("Remove"), enabled: has, run: on((c) => this.removeValue(c)) },
+      {
+        id: "card.remove",
+        group: "Value",
+        label: named("Remove"),
+        enabled: has,
+        run: runOnActiveCard((card) => this.removeValue(card)),
+      },
     );
   }
 
   private menus(): [string, (string | MenuItem)[]][] {
     return [
-      ["File", ["file.new", "file.open", this.recentMenu(), "sep", "file.save", "file.saveAs", "sep", "file.quit"]],
+      [
+        "File",
+        [
+          "file.new",
+          "file.open",
+          this.recentMenu(),
+          "file.importSvd",
+          "sep",
+          "file.save",
+          "file.saveAs",
+          "sep",
+          "file.quit",
+        ],
+      ],
       [
         "Edit",
         [
@@ -514,59 +684,106 @@ export class App {
           "app.settings",
         ],
       ],
-      ["Help", ["app.palette", "help.controls", "help.guide", "help.tour", "sep", "help.updates", "help.about"]],
+      [
+        "Help",
+        [
+          "app.palette",
+          "help.controls",
+          "help.guide",
+          "help.whatsnew",
+          "help.tour",
+          "sep",
+          "help.updates",
+          "help.about",
+        ],
+      ],
     ];
   }
 
   // ================================================================ chrome
   private buildTitlebar(): HTMLElement {
-    const menuBar = h("nav", { class: "menubar" });
+    const menuBar = html("nav", { class: "menubar" });
     for (const [name] of this.menus()) {
       // built on each open so dynamic entries (recent files, labels) are current
-      const items = () => this.commands.menu(this.menus().find(([n]) => n === name)?.[1] ?? []);
-      const b = h("button", { type: "button", class: "menubar-item", "data-keep-sel": "" }, name);
-      b.addEventListener("click", () => openMenu(items(), b));
-      b.addEventListener("pointerenter", () => {
+      const items = () =>
+        this.commands.menu(
+          this.menus().find(([menuName]) => menuName === name)?.[1] ?? [],
+        );
+      const buttonElement = html(
+        "button",
+        { type: "button", class: "menubar-item", "data-keep-sel": "" },
+        name,
+      );
+      buttonElement.addEventListener("click", () =>
+        openMenu(items(), buttonElement),
+      );
+      buttonElement.addEventListener("pointerenter", () => {
         // slide between open menus like a native menu bar
-        if (menusOpen() && document.querySelector(".menubar-item.menu-open") && !b.classList.contains("menu-open")) {
-          openMenu(items(), b);
+        if (
+          menusOpen() &&
+          document.querySelector(".menubar-item.menu-open") &&
+          !buttonElement.classList.contains("menu-open")
+        ) {
+          openMenu(items(), buttonElement);
         }
       });
-      menuBar.append(b);
+      menuBar.append(buttonElement);
     }
-    this.titleFile = h("span", { class: "title-file" });
-    this.maxBtn = h("button", { type: "button", class: "win-btn", tip: "Maximize" }, icon(Square, 13));
+    this.titleFile = html("span", { class: "title-file" });
+    this.maxBtn = html(
+      "button",
+      { type: "button", class: "win-btn", tip: "Maximize" },
+      icon(Square, 13),
+    );
     this.maxBtn.addEventListener("click", async () => {
       await P.toggleMaximize();
       this.syncMaxButton();
     });
     const controls = P.isTauri
-      ? h(
+      ? html(
           "div",
           { class: "win-controls" },
-          h(
+          html(
             "button",
-            { type: "button", class: "win-btn", tip: "Minimize", onClick: () => P.minimize() },
+            {
+              type: "button",
+              class: "win-btn",
+              tip: "Minimize",
+              onClick: () => P.minimize(),
+            },
             icon(Minus, 15),
           ),
           this.maxBtn,
-          h(
+          html(
             "button",
-            { type: "button", class: "win-btn close", tip: "Close", onClick: () => P.closeWindow() },
+            {
+              type: "button",
+              class: "win-btn close",
+              tip: "Close",
+              onClick: () => P.closeWindow(),
+            },
             icon(X, 16),
           ),
         )
       : null;
-    const drag = h(
+    const drag = html(
       "div",
       { class: "drag", "data-tauri-drag-region": "" },
-      h("span", { class: "title-text", "data-tauri-drag-region": "" }, "Bit Viewer"),
+      html(
+        "span",
+        { class: "title-text", "data-tauri-drag-region": "" },
+        "Bit Viewer",
+      ),
       this.titleFile,
     );
-    return h(
+    return html(
       "div",
       { class: "titlebar" },
-      h("div", { class: "brand", "data-tauri-drag-region": "" }, logoSvg(20)),
+      html(
+        "div",
+        { class: "brand", "data-tauri-drag-region": "" },
+        logoSvg(20),
+      ),
       menuBar,
       drag,
       controls,
@@ -581,73 +798,83 @@ export class App {
 
   private buildToolbar(): HTMLElement {
     const allRows = segmented(
-      BASE_ORDER.map((b) => ({
-        value: b,
-        label: BASE_NAMES[b],
-        tip: `Switch every row of every value to ${BASE_NAMES[b]}`,
+      BASE_ORDER.map((base) => ({
+        value: base,
+        label: BASE_NAMES[base],
+        tip: `Switch every row of every value to ${BASE_NAMES[base]}`,
       })),
-      { checkable: false, onPick: (b) => this.applyGlobalBase(b) },
+      { checkable: false, onPick: (base) => this.applyGlobalBase(base) },
     );
     this.themeBtn = button({
-      cls: "ghost",
+      className: "ghost",
       tip: "Toggle light / dark theme (Ctrl+T)",
       onClick: () => this.toggleTheme(),
     });
     this.syncThemeButton();
     const run = (id: string) => () => this.commands.run(id);
-    this.undoBtn = button({ icon: Undo2, cls: "ghost", tip: "Undo (Ctrl+Z)", onClick: run("edit.undo") });
-    this.redoBtn = button({ icon: Redo2, cls: "ghost", tip: "Redo (Ctrl+Y)", onClick: run("edit.redo") });
-    return h(
+    this.undoBtn = button({
+      icon: Undo2,
+      className: "ghost",
+      tip: "Undo (Ctrl+Z)",
+      onClick: run("edit.undo"),
+    });
+    this.redoBtn = button({
+      icon: Redo2,
+      className: "ghost",
+      tip: "Redo (Ctrl+Y)",
+      onClick: run("edit.redo"),
+    });
+    return html(
       "div",
       { class: "toolbar" },
       button({
         icon: Plus,
         label: "32-bit",
-        cls: "primary",
+        className: "primary",
         tip: "Add a 32-bit value (Ctrl+1)",
         onClick: run("value.add32"),
       }),
       button({
         icon: Plus,
         label: "64-bit",
-        cls: "primary",
+        className: "primary",
         tip: "Add a 64-bit value (Ctrl+2)",
         onClick: run("value.add64"),
       }),
       button({
         icon: Ruler,
         label: "Custom",
-        cls: "outline",
+        className: "outline",
         tip: `Add a value with any width, ${MIN_WIDTH}–${MAX_WIDTH} bits (Ctrl+3)`,
         onClick: run("value.addCustom"),
       }),
-      h("div", { class: "tb-sep" }),
+      html("div", { class: "tb-sep" }),
       button({
         icon: FolderOpen,
         label: "Open",
-        cls: "ghost",
+        className: "ghost",
         tip: "Open a workspace (Ctrl+O)",
         onClick: run("file.open"),
       }),
       button({
         icon: Save,
         label: "Save",
-        cls: "ghost",
+        className: "ghost",
         tip: "Save the workspace (Ctrl+S)",
         onClick: run("file.save"),
       }),
-      h("div", { class: "tb-sep" }),
+      html("div", { class: "tb-sep" }),
       this.undoBtn,
       this.redoBtn,
-      h("div", { class: "tb-sep" }),
-      h("span", { class: "tb-label" }, "All rows"),
-      allRows.el,
-      h("div", { class: "spacer" }),
+      html("div", { class: "tb-sep" }),
+      html("span", { class: "tb-label" }, "All rows"),
+      allRows.element,
+      html("div", { class: "spacer" }),
       this.themeBtn,
       button({
         icon: SlidersHorizontal,
         label: "Settings",
-        cls: "ghost",
+        className: "ghost",
         tip: "Settings (Ctrl+,)",
         onClick: run("app.settings"),
       }),
@@ -655,66 +882,99 @@ export class App {
   }
 
   private syncThemeButton() {
-    const dark = S.get("theme") === "dark";
-    this.themeBtn.replaceChildren(icon(dark ? Sun : Moon, 16), h("span", {}, dark ? "Light" : "Dark"));
+    const dark = appSettings.get("theme") === "dark";
+    this.themeBtn.replaceChildren(
+      icon(dark ? Sun : Moon, 16),
+      html("span", {}, dark ? "Light" : "Dark"),
+    );
   }
 
   private buildWorkspace(): HTMLElement {
     const run = (id: string) => () => this.commands.run(id);
-    this.empty = h(
+    this.empty = html(
       "div",
       { class: "empty" },
       logoSvg(56),
-      h("h3", {}, "No values yet"),
-      h("p", { class: "muted" }, "Add a value to start inspecting bits."),
-      h(
+      html("h3", {}, "No values yet"),
+      html("p", { class: "muted" }, "Add a value to start inspecting bits."),
+      html(
         "div",
         { class: "empty-actions" },
-        button({ icon: Plus, label: "32-bit value", cls: "primary", onClick: run("value.add32") }),
-        button({ icon: Plus, label: "64-bit value", cls: "outline", onClick: run("value.add64") }),
-        button({ icon: Ruler, label: "Custom width", cls: "outline", onClick: run("value.addCustom") }),
+        button({
+          icon: Plus,
+          label: "32-bit value",
+          className: "primary",
+          onClick: run("value.add32"),
+        }),
+        button({
+          icon: Plus,
+          label: "64-bit value",
+          className: "outline",
+          onClick: run("value.add64"),
+        }),
+        button({
+          icon: Ruler,
+          label: "Custom width",
+          className: "outline",
+          onClick: run("value.addCustom"),
+        }),
       ),
     );
-    this.workspace = h("main", { class: "workspace" }, this.empty);
+    this.workspace = html("main", { class: "workspace" }, this.empty);
     return this.workspace;
   }
 
   private buildStatusbar(): HTMLElement {
-    this.zoomLabel = h("button", {
+    this.zoomLabel = html("button", {
       type: "button",
       class: "zoom-label",
       tip: "Reset zoom (Ctrl+0)",
-      onClick: () => S.set("zoom", 1),
+      onClick: () => appSettings.set("zoom", 1),
     });
     this.updateZoomLabel();
-    return h(
+    return html(
       "footer",
       { class: "statusbar" },
-      h(
+      html(
         "span",
         { class: "status-hint" },
         "Click a bit to flip · drag to select · right-click for row actions · F1 for help",
       ),
-      h("div", { class: "spacer" }),
-      h(
+      html("div", { class: "spacer" }),
+      html(
         "div",
         { class: "zoom" },
-        button({ icon: Minus, cls: "ghost xs", tip: "Zoom out (Ctrl+-)", onClick: () => this.zoomBy(-1), size: 13 }),
+        button({
+          icon: Minus,
+          className: "ghost xs",
+          tip: "Zoom out (Ctrl+-)",
+          onClick: () => this.zoomBy(-1),
+          size: 13,
+        }),
         this.zoomLabel,
-        button({ icon: Plus, cls: "ghost xs", tip: "Zoom in (Ctrl+=)", onClick: () => this.zoomBy(1), size: 13 }),
+        button({
+          icon: Plus,
+          className: "ghost xs",
+          tip: "Zoom in (Ctrl+=)",
+          onClick: () => this.zoomBy(1),
+          size: 13,
+        }),
       ),
     );
   }
 
   private updateZoomLabel() {
-    this.zoomLabel.textContent = `${Math.round(S.get("zoom") * 100)}%`;
+    this.zoomLabel.textContent = `${Math.round(appSettings.get("zoom") * 100)}%`;
   }
 
   // ================================================================ settings
   private applyTheme() {
-    document.documentElement.dataset.theme = S.get("theme");
-    document.body.classList.toggle("compact", S.get("compact"));
-    applyAccent(S.get("accent"), S.get("theme") === "contrast");
+    document.documentElement.dataset.theme = appSettings.get("theme");
+    document.body.classList.toggle("compact", appSettings.get("compact"));
+    applyAccent(
+      appSettings.get("accent"),
+      appSettings.get("theme") === "contrast",
+    );
   }
 
   private onSetting(key: string) {
@@ -722,46 +982,76 @@ export class App {
       this.applyTheme();
       this.syncThemeButton();
     } else if (key === "zoom") {
-      P.setZoom(S.get("zoom"));
+      P.setZoom(appSettings.get("zoom"));
       this.updateZoomLabel();
-    } else if (["msb_left", "show_readouts", "show_interp", "readout_chips"].includes(key)) {
-      for (const c of this.cards) c.rebuild();
+    } else if (
+      ["msb_left", "show_readouts", "show_interp", "readout_chips"].includes(
+        key,
+      )
+    ) {
+      for (const card of this.cards) card.rebuild();
     }
   }
 
   private toggleSounds() {
-    const on = !S.get("sounds");
-    S.set("sounds", on);
-    if (on) play("bitOn");
-    toast(on ? "Sounds on" : "Sounds off");
+    const enabled = !appSettings.get("sounds");
+    appSettings.set("sounds", enabled);
+    if (enabled) play("bitOn");
+    toast(enabled ? "Sounds on" : "Sounds off");
   }
 
   private toggleTheme() {
     // Ctrl+T switches dark ↔ light; high contrast is chosen in Settings
-    S.set("theme", S.get("theme") === "dark" ? "light" : "dark");
+    appSettings.set(
+      "theme",
+      appSettings.get("theme") === "dark" ? "light" : "dark",
+    );
   }
 
   private zoomBy(steps: number) {
-    S.set("zoom", S.get("zoom") + steps * ZOOM_STEP);
+    appSettings.set("zoom", appSettings.get("zoom") + steps * ZOOM_STEP);
   }
 
-  private applyGlobalBase(b: Base) {
-    for (const c of this.cards) c.model.setAllRowBases(b);
-    S.set("default_base", b);
-    toast(`All rows now use ${BASE_NAMES[b]}`);
+  private applyGlobalBase(base: Base) {
+    for (const card of this.cards) card.model.setAllRowBases(base);
+    appSettings.set("default_base", base);
+    toast(`All rows now use ${BASE_NAMES[base]}`);
   }
 
   // ================================================================ undo history
   private snapshot(): string {
-    return JSON.stringify(this.cards.map((c) => c.model.toJSON()));
+    return JSON.stringify(this.workspaceJSON());
+  }
+
+  /** The values and their peripherals, as saved in files, sessions and undo steps. */
+  private workspaceJSON() {
+    return {
+      values: this.cards.map((card) => card.model.toJSON()),
+      peripherals: this.usedPeripherals().map(peripheralToJSON),
+    };
+  }
+
+  /** Peripherals that have registers, in workspace order. */
+  private usedPeripherals(): Peripheral[] {
+    const out: Peripheral[] = [];
+    for (const card of this.cards) {
+      const peripheral = this.peripherals.get(card.model.block);
+      if (peripheral && !out.includes(peripheral)) out.push(peripheral);
+    }
+    return out;
   }
 
   /** Rebuilds the workspace from a snapshot (undo / redo / session restore). */
-  private restore(snap: string) {
+  private restore(snapshotJson: string) {
     const scroll = this.workspace.scrollTop;
-    const models = (JSON.parse(snap) as unknown[]).map((d) => ValueModel.fromJSON(d));
+    const data = JSON.parse(snapshotJson);
+    const models = (data.values as unknown[]).map((serialized) =>
+      ValueModel.fromJSON(serialized),
+    );
     this.clearCards();
-    for (const m of models) this.addValue(m.width, m, undefined, false);
+    this.peripherals = peripheralsFromJSON(data.peripherals);
+    for (const model of models)
+      this.addValue(model.width, model, undefined, false);
     this.workspace.scrollTop = scroll;
   }
 
@@ -794,23 +1084,33 @@ export class App {
       path: this.path,
       fileName: this.fileName,
       dirty: this.dirty,
-      values: this.cards.map((c) => c.model.toJSON()),
+      ...this.workspaceJSON(),
       savedAt: Date.now(),
     };
   }
 
   /** Reopens what was open last time. Returns false when there was nothing to restore. */
   private async restoreSession(): Promise<boolean> {
-    const s = await loadSession();
-    if (!s) return false;
-    if (!s.dirty && s.path && (await this.loadPath(s.path, true))) return true;
-    if (!s.values) return false;
+    const session = await loadSession();
+    if (!session) return false;
+    if (
+      !session.dirty &&
+      session.path &&
+      (await this.loadPath(session.path, true))
+    )
+      return true;
+    if (!session.values) return false;
     try {
-      this.loadValues(s.values, s.path, s.fileName);
+      this.loadValues(
+        session.values,
+        session.path,
+        session.fileName,
+        session.peripherals,
+      );
     } catch {
       return false;
     }
-    if (s.dirty) {
+    if (session.dirty) {
       this.savedSnapshot = null; // contents differ from any file on disk
       this.updateTitle();
       toast("Restored unsaved changes from your last session", "ok");
@@ -818,39 +1118,53 @@ export class App {
     return true;
   }
 
-  /** Window close: ask about unsaved changes, then leave the session tidy. */
-  private async beforeClose(): Promise<boolean> {
+  /** Before the app closes (or restarts to install an update): asks about
+   *  unsaved changes, then leaves the session and settings on disk. */
+  private async prepareToQuit(): Promise<boolean> {
     const dirtyBefore = this.dirty;
     if (!(await this.maybeSave())) return false;
     // "Don't save" means the changes are discarded, so don't bring them back next time
     const discarded = dirtyBefore && this.dirty;
-    await saveSessionNow({ ...this.sessionData(), dirty: false, values: discarded ? null : this.sessionData().values });
-    await S.flush();
+    await saveSessionNow({
+      ...this.sessionData(),
+      dirty: false,
+      values: discarded ? null : this.sessionData().values,
+    });
+    await appSettings.flush();
     return true;
   }
 
   // ================================================================ values
-  addValue(width: number, model?: ValueModel, index?: number, reveal = true): ValueCard {
+  addValue(
+    width: number,
+    model?: ValueModel,
+    index?: number,
+    reveal = true,
+  ): ValueCard {
     if (!model) {
-      const names = new Set(this.cards.map((c) => c.model.name));
-      let n = this.cards.length + 1;
-      while (names.has(`Value ${n}`)) n++;
+      const names = new Set(this.cards.map((card) => card.model.name));
+      let valueNumber = this.cards.length + 1;
+      while (names.has(`Value ${valueNumber}`)) valueNumber++;
       model = new ValueModel({
         width,
-        name: `Value ${n}`,
-        view: S.get("default_view"),
-        defaultRowBase: S.get("default_base"),
+        name: `Value ${valueNumber}`,
+        view: appSettings.get("default_view"),
+        defaultRowBase: appSettings.get("default_base"),
       });
     }
     const card = new ValueCard(model, {
-      remove: (c) => this.removeValue(c),
-      move: (c, d) => this.moveValue(c, d),
-      duplicate: (c) => this.duplicateValue(c),
-      resize: (c) => this.resizeValue(c),
-      lookup: (_c, name) => this.valueByName(name),
-      others: (c) => this.cards.filter((x) => x !== c),
-      dragStart: (c, e) => this.dragCard(c, e),
-      batch: (on) => (on ? this.history.hold() : this.history.release()),
+      remove: (card) => this.removeValue(card),
+      move: (card, direction) => this.moveValue(card, direction),
+      duplicate: (card) => this.duplicateValue(card),
+      resize: (card) => this.resizeValue(card),
+      lookup: (_card, name) => this.valueByName(name),
+      others: (card) => this.cards.filter((otherCard) => otherCard !== card),
+      dragStart: (card, event) => this.dragCard(card, event),
+      batch: (holding) =>
+        holding ? this.history.hold() : this.history.release(),
+      peripheral: (card) => this.peripherals.get(card.model.block),
+      peripheralMenu: (card) => this.peripheralMenu(card),
+      editOffset: (card) => void this.editOffset(card),
     });
     model.subscribe(() => this.history.touch());
     this.cards.splice(index ?? this.cards.length, 0, card);
@@ -859,19 +1173,25 @@ export class App {
     if (reveal) {
       play("add");
       card.root.classList.add("enter");
-      requestAnimationFrame(() => card.root.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+      requestAnimationFrame(() =>
+        card.root.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+      );
     }
     return card;
   }
 
   private async removeValue(card: ValueCard) {
-    const m = card.model;
-    if (m.groups.length || m.compares.size) {
-      const r = await ask("Remove value", `Remove “${m.name}” together with its fields and compare rows?`, [
-        { id: "cancel", label: "Cancel" },
-        { id: "yes", label: "Remove", cls: "danger-btn" },
-      ]);
-      if (r !== "yes") return;
+    const model = card.model;
+    if (model.groups.length || model.compares.size) {
+      const answer = await ask(
+        "Remove value",
+        `Remove “${model.name}” together with its fields and compare rows?`,
+        [
+          { id: "cancel", label: "Cancel" },
+          { id: "yes", label: "Remove", className: "danger-btn" },
+        ],
+      );
+      if (answer !== "yes") return;
     }
     this.drop(card);
     this.relayout();
@@ -886,203 +1206,526 @@ export class App {
   }
 
   /** Drag a card by its handle; a line shows where it will land. */
-  private dragCard(card: ValueCard, e: PointerEvent) {
-    e.preventDefault();
+  private dragCard(card: ValueCard, event: PointerEvent) {
+    event.preventDefault();
     if (this.cards.length < 2) return;
     const from = this.cards.indexOf(card);
     let target = from;
-    let lastY = e.clientY;
-    const line = h("div", { class: "drop-line" });
+    let lastY = event.clientY;
+    const line = html("div", { class: "drop-line" });
     card.root.classList.add("dragging");
     document.body.classList.add("reordering");
 
     const place = () => {
-      let idx = 0;
-      for (const c of this.cards) {
-        const r = c.root.getBoundingClientRect();
-        if (lastY > r.top + r.height / 2) idx++;
+      let index = 0;
+      for (const card of this.cards) {
+        // a collapsed peripheral's registers aren't laid out: use its header
+        const shown = card.root.offsetParent
+          ? card.root
+          : (card.root.closest(".periph") ?? card.root);
+        const rect = shown.getBoundingClientRect();
+        if (lastY > rect.top + rect.height / 2) index++;
       }
-      target = idx;
-      this.workspace.insertBefore(line, this.cards[idx]?.root ?? null);
+      target = index;
+      const before = this.cards[index]?.root;
+      if (before?.parentElement)
+        before.parentElement.insertBefore(line, before);
+      else this.workspace.append(line);
     };
     // keep scrolling while the pointer rests near the top or bottom edge
     const scroller = window.setInterval(() => {
-      const r = this.workspace.getBoundingClientRect();
+      const rect = this.workspace.getBoundingClientRect();
       const edge = 48;
-      const dy = lastY < r.top + edge ? -14 : lastY > r.bottom - edge ? 14 : 0;
-      if (dy) {
-        this.workspace.scrollTop += dy;
+      const scrollStep =
+        lastY < rect.top + edge ? -14 : lastY > rect.bottom - edge ? 14 : 0;
+      if (scrollStep) {
+        this.workspace.scrollTop += scrollStep;
         place();
       }
     }, 16);
-    const move = (ev: PointerEvent) => {
-      lastY = ev.clientY;
+    const onPointerMove = (pointerEvent: PointerEvent) => {
+      lastY = pointerEvent.clientY;
       place();
     };
-    const end = (commit: boolean) => {
+    const finishDrag = (commit: boolean) => {
       window.clearInterval(scroller);
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
       document.removeEventListener("pointercancel", cancel);
-      document.removeEventListener("keydown", esc, true);
+      document.removeEventListener("keydown", onEscape, true);
+      window.removeEventListener("blur", cancel);
       line.remove();
       card.root.classList.remove("dragging");
       document.body.classList.remove("reordering");
-      const to = target > from ? target - 1 : target;
-      if (commit && to !== from) {
-        this.cards.splice(from, 1);
-        this.cards.splice(to, 0, card);
+      const destination = target > from ? target - 1 : target;
+      const reordered = moveItem(this.cards, from, destination, this.blockOf);
+      if (
+        commit &&
+        reordered.some((item, index) => item !== this.cards[index])
+      ) {
+        this.cards = reordered;
         this.relayout();
         this.history.touch();
         play("toggle");
       }
     };
-    const up = () => end(true);
-    const cancel = () => end(false);
-    const esc = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") {
-        ev.stopPropagation();
-        end(false);
+    const onPointerUp = () => finishDrag(true);
+    const cancel = () => finishDrag(false);
+    const onEscape = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === "Escape") {
+        keyEvent.stopPropagation();
+        finishDrag(false);
       }
     };
-    document.addEventListener("pointermove", move);
-    document.addEventListener("pointerup", up);
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
     document.addEventListener("pointercancel", cancel);
-    document.addEventListener("keydown", esc, true);
+    document.addEventListener("keydown", onEscape, true);
+    window.addEventListener("blur", cancel);
     place();
   }
 
   private moveValue(card: ValueCard, delta: number) {
-    const i = this.cards.indexOf(card);
-    const j = i + delta;
-    if (j < 0 || j >= this.cards.length) return;
-    [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+    const index = this.cards.indexOf(card);
+    const newIndex = index + delta;
+    if (newIndex < 0 || newIndex >= this.cards.length) return;
+    this.cards = moveItem(this.cards, index, newIndex, this.blockOf);
     this.relayout();
     this.history.touch();
   }
 
   private async addCustom() {
-    const width = await pickWidth("Add value", S.get("last_width"), "Add value");
+    const width = await pickWidth(
+      "Add value",
+      appSettings.get("last_width"),
+      "Add value",
+    );
     if (width === null) return;
-    S.set("last_width", width);
+    appSettings.set("last_width", width);
     this.addValue(width);
   }
 
   private async addFromTemplate() {
-    const t = await pickTemplate("Add value from template", "Add value");
-    if (!t) return;
-    const card = this.addValue(t.width);
-    card.model.setName(t.name);
-    card.model.applyTemplate(t);
+    const template = await pickTemplate("Add value from template", "Add value");
+    if (!template) return;
+    const card = this.addValue(template.width);
+    card.model.setName(template.name);
+    card.model.applyTemplate(template);
     card.rebuild();
   }
 
   /** A value by name for expressions. Case, spaces and underscores don't matter. */
   private valueByName(name: string): bigint | undefined {
-    const norm = (s: string) =>
-      s
+    const normalize = (text: string) =>
+      text
         .toLowerCase()
         .replace(/[\s_]+/g, " ")
         .trim();
-    const n = norm(name);
-    return this.cards.find((c) => norm(c.model.name) === n)?.model.value;
+    const normalizedName = normalize(name);
+    return this.cards.find(
+      (card) => normalize(card.model.name) === normalizedName,
+    )?.model.value;
   }
 
   private async addFromExpression() {
-    const widest = Math.max(32, ...this.cards.map((c) => c.model.width));
-    const r = await newValueFromExpression(
+    const widest = Math.max(32, ...this.cards.map((card) => card.model.width));
+    const result = await newValueFromExpression(
       (name) => {
-        const n = name.trim().toLowerCase();
+        const normalizedName = name.trim().toLowerCase();
         // "x" has no meaning here (there's no current value yet)
-        return n === "x" ? undefined : this.valueByName(name);
+        return normalizedName === "x" ? undefined : this.valueByName(name);
       },
       Math.min(widest, 512),
     );
-    if (!r) return;
-    const card = this.addValue(r.width);
-    card.model.setValue(r.value);
-    if (r.name) card.model.setName(r.name);
+    if (!result) return;
+    const card = this.addValue(result.width);
+    card.model.setValue(result.value);
+    if (result.name) card.model.setName(result.name);
     card.rebuild();
   }
 
   private async resizeValue(card: ValueCard) {
-    const m = card.model;
-    const width = await pickWidth(`Change width of “${m.name}”`, m.width, "Change width");
-    if (width === null || width === m.width) return;
-    const lost = m.lostOnResize(width);
-    if (lost.groups.length) {
+    const model = card.model;
+    const width = await pickWidth(
+      `Change width of “${model.name}”`,
+      model.width,
+      "Change width",
+    );
+    if (width === null || width === model.width) return;
+    const lostParts = model.lostOnResize(width);
+    if (lostParts.groups.length) {
       // named fields are only ever removed by the user, never by a resize
-      const names = lost.groups.map((g) => `“${g.name}” ${g.label()}`).join(", ");
-      const many = lost.groups.length > 1;
+      const names = lostParts.groups
+        .map((group) => `“${group.name}” ${group.label()}`)
+        .join(", ");
+      const severalFieldsLost = lostParts.groups.length > 1;
       await ask(
         "Fields don't fit",
-        `${names} ${many ? "don't" : "doesn't"} fit in ${width} bits. ` +
-          `Remove ${many ? "those fields" : "that field"} first, or use at least ${m.minWidthForGroups} bits.`,
-        [{ id: "ok", label: "OK", cls: "primary" }],
+        `${names} ${severalFieldsLost ? "don't" : "doesn't"} fit in ${width} bits. ` +
+          `Remove ${severalFieldsLost ? "those fields" : "that field"} first, or use at least ${model.minWidthForGroups} bits.`,
+        [{ id: "ok", label: "OK", className: "primary" }],
         "ok",
       );
       return;
     }
-    if (lost.compares || width < m.width) {
+    if (lostParts.compares || width < model.width) {
       const parts = [`bits above ${width - 1} are cleared`];
-      if (lost.compares)
-        parts.push(`${lost.compares} compare row${lost.compares > 1 ? "s" : ""} no longer fit and will be removed`);
-      const r = await ask("Change width", `Shrinking to ${width} bits: ${parts.join(", and ")}.`, [
-        { id: "cancel", label: "Cancel" },
-        { id: "yes", label: "Change width", cls: "danger-btn" },
-      ]);
-      if (r !== "yes") return;
+      if (lostParts.compares)
+        parts.push(
+          `${lostParts.compares} compare row${lostParts.compares > 1 ? "s" : ""} no longer fit and will be removed`,
+        );
+      const answer = await ask(
+        "Change width",
+        `Shrinking to ${width} bits: ${parts.join(", and ")}.`,
+        [
+          { id: "cancel", label: "Cancel" },
+          { id: "yes", label: "Change width", className: "danger-btn" },
+        ],
+      );
+      if (answer !== "yes") return;
     }
     card.clearSelection();
-    m.setWidth(width);
+    model.setWidth(width);
   }
 
   private duplicateValue(card: ValueCard) {
-    const d = card.model.toJSON();
-    d.name = `${card.model.name} copy`;
-    this.addValue(card.model.width, ValueModel.fromJSON(d), this.cards.indexOf(card) + 1);
+    const serialized = card.model.toJSON();
+    serialized.name = `${card.model.name} copy`;
+    this.addValue(
+      card.model.width,
+      ValueModel.fromJSON(serialized),
+      this.cards.indexOf(card) + 1,
+    );
   }
 
   private relayout() {
-    if (this.activeCard && !this.cards.includes(this.activeCard)) this.activeCard = null;
+    if (this.activeCard && !this.cards.includes(this.activeCard))
+      this.activeCard = null;
+    this.tidyPeripherals();
     const focused = document.activeElement;
-    this.workspace.replaceChildren(...(this.cards.length ? this.cards.map((c) => c.root) : [this.empty]));
-    if (focused instanceof HTMLElement && this.workspace.contains(focused)) focused.focus({ preventScroll: true });
+    const children: HTMLElement[] = [];
+    let body: HTMLElement | null = null;
+    let block = "";
+    for (const card of this.cards) {
+      if (!card.model.block) {
+        children.push(card.root);
+        block = "";
+        continue;
+      }
+      if (card.model.block !== block) {
+        block = card.model.block;
+        const section = this.peripheralSection(block);
+        body = section.querySelector(".periph-body");
+        children.push(section);
+      }
+      body!.append(card.root);
+    }
+    this.workspace.replaceChildren(
+      ...(this.cards.length ? children : [this.empty]),
+    );
+    if (focused instanceof HTMLElement && this.workspace.contains(focused))
+      focused.focus({ preventScroll: true });
     if (this.search.isOpen) this.search.apply();
   }
 
+  // ================================================================ peripherals
+  /** Every value's peripheral exists, unused ones are gone, and each
+   *  peripheral's values are next to each other. */
+  private tidyPeripherals() {
+    for (const card of this.cards) {
+      const block = card.model.block;
+      if (block && !this.peripherals.has(block)) {
+        this.peripherals.set(block, {
+          name: block,
+          base: null,
+          description: "",
+          collapsed: false,
+        });
+        card.rebuild(); // its header shows the peripheral's address
+      }
+    }
+    for (const name of [...this.peripherals.keys()])
+      if (!this.cards.some((card) => card.model.block === name))
+        this.peripherals.delete(name);
+    this.cards = groupOrder(this.cards, this.blockOf);
+  }
+
+  private members(name: string): ValueCard[] {
+    return this.cards.filter((card) => card.model.block === name);
+  }
+
+  /** The block for one peripheral: header plus a body the cards go into. */
+  private peripheralSection(name: string): HTMLElement {
+    const peripheral = this.peripherals.get(name)!;
+    const body = html("div", {
+      class: "periph-body",
+      role: "group",
+      "aria-label": `Registers of ${name}`,
+    });
+    return html(
+      "section",
+      {
+        class: `periph${peripheral.collapsed ? " collapsed" : ""}`,
+        "data-peripheral": name,
+      },
+      peripheralHeader(
+        peripheral,
+        this.members(name).length,
+        this.peripheralActions(name),
+      ),
+      body,
+    );
+  }
+
+  /** Records a change to the peripherals themselves (not their values). */
+  private peripheralsChanged() {
+    this.relayout();
+    this.history.touch();
+  }
+
+  private peripheralActions(name: string): PeripheralActions {
+    const peripheral = () => this.peripherals.get(name)!;
+    return {
+      toggle: () => {
+        peripheral().collapsed = !peripheral().collapsed;
+        play("toggle");
+        this.peripheralsChanged();
+      },
+      edit: () => void this.editPeripheral(name),
+      exportCode: () =>
+        void exportCode({
+          kind: "peripheral",
+          peripheral: peripheral(),
+          models: this.members(name).map((card) => card.model),
+        }),
+      addRegister: () => {
+        const members = this.members(name);
+        const taken = new Set(this.cards.map((card) => card.model.name));
+        let number = members.length + 1;
+        while (taken.has(`${name}.REG${number}`)) number++;
+        const model = new ValueModel({
+          width: 32,
+          name: `${name}.REG${number}`,
+          view: appSettings.get("default_view"),
+          defaultRowBase: appSettings.get("default_base"),
+        });
+        model.setPeripheral(
+          name,
+          nextOffset(members.map((card) => card.model)),
+        );
+        if (peripheral().collapsed) peripheral().collapsed = false;
+        const last = this.cards.indexOf(members[members.length - 1]);
+        this.addValue(32, model, last + 1);
+      },
+      sortByOffset: () => {
+        const members = this.members(name);
+        const sorted = [...members].sort((first, second) => {
+          const [a, b] = [first.model.offset, second.model.offset];
+          if (a === null || b === null)
+            return a === null ? (b === null ? 0 : 1) : -1;
+          return a < b ? -1 : a > b ? 1 : 0;
+        });
+        let next = 0;
+        this.cards = this.cards.map((card) =>
+          card.model.block === name ? sorted[next++] : card,
+        );
+        this.peripheralsChanged();
+      },
+      move: (direction) => {
+        this.cards = moveBlock(this.cards, name, direction, this.blockOf);
+        this.peripheralsChanged();
+      },
+      ungroup: () => {
+        const members = this.members(name);
+        this.history.hold(); // one undo step
+        try {
+          for (const card of members) card.model.setPeripheral("", null);
+        } finally {
+          this.history.release();
+        }
+        this.relayout();
+        toast(`Ungrouped ${name}; Ctrl+Z puts it back`);
+      },
+      remove: async () => {
+        const members = this.members(name);
+        const answer = await ask(
+          "Remove peripheral",
+          `Remove ${name} and its ${members.length} register${members.length === 1 ? "" : "s"}?`,
+          [
+            { id: "cancel", label: "Cancel" },
+            { id: "yes", label: "Remove", className: "danger-btn" },
+          ],
+        );
+        if (answer !== "yes") return;
+        for (const card of members) this.drop(card);
+        this.relayout();
+        this.history.touch();
+        play("remove");
+      },
+    };
+  }
+
+  private async editPeripheral(name: string) {
+    const peripheral = this.peripherals.get(name);
+    if (!peripheral) return;
+    const result = await editPeripheralDialog(
+      `Peripheral “${name}”`,
+      peripheral,
+      (candidate) => candidate !== name && this.peripherals.has(candidate),
+    );
+    if (!result) return;
+    this.history.hold(); // renaming touches every register: one undo step
+    try {
+      this.peripherals.delete(name);
+      this.peripherals.set(result.name, {
+        ...peripheral,
+        name: result.name,
+        base: result.base,
+        description: result.description,
+      });
+      for (const card of this.members(name)) {
+        const model = card.model;
+        // "UART0.CTRL" follows a rename of UART0
+        if (result.name !== name && model.name.startsWith(`${name}.`))
+          model.setName(result.name + model.name.slice(name.length));
+        model.setPeripheral(result.name, model.offset);
+        card.rebuild(); // the address badge depends on the base
+      }
+      this.relayout();
+      this.history.touch();
+    } finally {
+      this.history.release();
+    }
+  }
+
+  /** The "Peripheral" submenu of a value. */
+  private peripheralMenu(card: ValueCard): MenuItem[] {
+    const model = card.model;
+    const hex = (value: bigint) => `0x${value.toString(16).toUpperCase()}`;
+    const items: MenuItem[] = [
+      {
+        label: "New peripheral from this value…",
+        action: () => void this.newPeripheral(card),
+      },
+    ];
+    const others = this.usedPeripherals().filter(
+      (peripheral) => peripheral.name !== model.block,
+    );
+    if (others.length)
+      items.push({
+        label: model.block ? "Move to another peripheral" : "Add to peripheral",
+        submenu: others.map((peripheral) => ({
+          label: peripheral.name,
+          shortcut: peripheral.base === null ? undefined : hex(peripheral.base),
+          action: () => this.moveToPeripheral(card, peripheral.name),
+        })),
+      });
+    if (model.block)
+      items.push(
+        "sep",
+        {
+          label: "Change offset…",
+          action: () => void this.editOffset(card),
+        },
+        {
+          label: `Take out of ${model.block}`,
+          action: () => {
+            model.setPeripheral("", null);
+            this.relayout();
+          },
+        },
+      );
+    return items;
+  }
+
+  private async newPeripheral(card: ValueCard) {
+    const model = card.model;
+    const dot = model.name.indexOf(".");
+    const suggestion = freeName(
+      dot > 0 ? model.name.slice(0, dot) : "PERIPH",
+      (name) => this.peripherals.has(name),
+    );
+    const result = await editPeripheralDialog(
+      "New peripheral",
+      {
+        name: suggestion,
+        base: null,
+        description: "",
+        offset: model.offset ?? 0n,
+      },
+      (name) => this.peripherals.has(name),
+    );
+    if (!result) return;
+    this.peripherals.set(result.name, {
+      name: result.name,
+      base: result.base,
+      description: result.description,
+      collapsed: false,
+    });
+    model.setPeripheral(result.name, result.offset ?? null);
+    this.relayout();
+    play("group");
+  }
+
+  /** Adds a value to another peripheral, after its last register. */
+  private moveToPeripheral(card: ValueCard, name: string) {
+    const members = this.members(name);
+    const offset = nextOffset(members.map((member) => member.model));
+    this.cards.splice(this.cards.indexOf(card), 1);
+    this.cards.splice(
+      this.cards.indexOf(members[members.length - 1]) + 1,
+      0,
+      card,
+    );
+    card.model.setPeripheral(name, offset);
+    this.relayout();
+    toast(`Moved to ${name} at offset 0x${offset.toString(16).toUpperCase()}`);
+  }
+
+  private async editOffset(card: ValueCard) {
+    const model = card.model;
+    if (!model.block) return;
+    const offset = await askOffset(model.name, model.block, model.offset);
+    if (offset === undefined) return;
+    model.setPeripheral(model.block, offset);
+  }
+
   private groupSelection() {
-    const c = this.cards.find((x) => x.sel);
-    if (c) c.createGroupFromSelection();
+    const card = this.cards.find((candidate) => candidate.selection);
+    if (card) card.createGroupFromSelection();
     else toast("Select some bits first (drag across them)");
   }
 
   private clearSelections() {
-    for (const c of this.cards) c.clearSelection();
+    for (const card of this.cards) card.clearSelection();
   }
 
   // ================================================================ files
   private updateTitle() {
-    const mark = this.dirty ? " •" : "";
-    this.titleFile.textContent = `${this.fileName}${mark}`;
-    P.setTitle(`${this.fileName}${mark} — Bit Viewer`);
+    const dirtyMark = this.dirty ? " •" : "";
+    this.titleFile.textContent = `${this.fileName}${dirtyMark}`;
+    P.setTitle(`${this.fileName}${dirtyMark} — Bit Viewer`);
   }
 
   /** Resolves true when it is fine to discard the current workspace. */
   private async maybeSave(): Promise<boolean> {
     this.history.flush();
     if (!this.dirty || !this.cards.length) return true;
-    const r = await ask("Unsaved changes", `Save changes to “${this.fileName}”?`, [
-      { id: "cancel", label: "Cancel" },
-      { id: "discard", label: "Don't save", cls: "outline" },
-      { id: "save", label: "Save", cls: "primary" },
-    ]);
-    if (r === "save") return this.save();
-    return r === "discard";
+    const answer = await ask(
+      "Unsaved changes",
+      `Save changes to “${this.fileName}”?`,
+      [
+        { id: "cancel", label: "Cancel" },
+        { id: "discard", label: "Don't save", className: "outline" },
+        { id: "save", label: "Save", className: "primary" },
+      ],
+    );
+    if (answer === "save") return this.save();
+    return answer === "discard";
   }
 
   private clearCards() {
-    for (const c of [...this.cards]) this.drop(c);
+    for (const card of [...this.cards]) this.drop(card);
     this.relayout();
   }
 
@@ -1103,10 +1746,13 @@ export class App {
   }
 
   private recentMenu(): MenuItem {
-    const files = P.isTauri ? S.get("recent_files") : [];
-    const folder = (p: string) => {
-      const d = p.slice(0, Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/")));
-      return d.length > 38 ? `…${d.slice(-37)}` : d;
+    const files = P.isTauri ? appSettings.get("recent_files") : [];
+    const folder = (path: string) => {
+      const directory = path.slice(
+        0,
+        Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/")),
+      );
+      return directory.length > 38 ? `…${directory.slice(-37)}` : directory;
     };
     return {
       label: "Open recent",
@@ -1114,72 +1760,242 @@ export class App {
       disabled: !files.length,
       submenu: [
         ...files.map(
-          (p): MenuItem => ({ label: P.basename(p), shortcut: folder(p), action: () => this.openRecent(p) }),
+          (path): MenuItem => ({
+            label: P.basename(path),
+            shortcut: folder(path),
+            action: () => this.openRecent(path),
+          }),
         ),
         "sep",
-        { label: "Clear list", action: () => S.set("recent_files", []) },
+        {
+          label: "Clear list",
+          action: () => appSettings.set("recent_files", []),
+        },
       ],
     };
   }
 
   private async openRecent(path: string) {
     if (!(await this.maybeSave())) return;
-    if (!(await this.loadPath(path))) S.removeRecent(path);
+    if (!(await this.loadPath(path))) appSettings.removeRecent(path);
   }
 
   private installFileDrop() {
-    const overlay = h(
+    const overlay = html(
       "div",
       { class: "drop-overlay" },
-      h("div", { class: "drop-card" }, icon(FolderOpen, 28), h("b", {}, "Drop to open the workspace")),
+      html(
+        "div",
+        { class: "drop-card" },
+        icon(FolderOpen, 28),
+        html("b", {}, "Drop to open the workspace"),
+      ),
     );
     document.body.append(overlay);
     void P.onFileDrop(
       (over) => overlay.classList.toggle("show", over),
-      async (f) => {
+      async (openedFile) => {
+        // an SVD adds values to the workspace; anything else replaces it
+        if (looksLikeSvd(openedFile)) return this.importSvd(openedFile);
         if (!(await this.maybeSave())) return;
-        this.loadText(f.text, f.path, f.name);
+        await this.loadText(openedFile.text, openedFile.path, openedFile.name);
       },
+      (name, error) => this.fail("Could not open file", error, name),
     );
   }
 
   private async openFile() {
     if (!(await this.maybeSave())) return;
     try {
-      const f = await P.pickAndRead(S.get("last_dir") || (await P.defaultDir()));
-      if (f) this.loadText(f.text, f.path, f.name);
-    } catch (e) {
-      this.fail("Could not open file", e);
+      const openedFile = await P.pickAndRead(
+        appSettings.get("last_dir") || (await P.defaultDir()),
+      );
+      if (openedFile)
+        await this.loadText(openedFile.text, openedFile.path, openedFile.name);
+    } catch (error) {
+      this.fail("Could not open file", error);
     }
+  }
+
+  /** Reads a CMSIS-SVD file (picked, or `file` when dropped) and adds the
+   *  registers the user chooses as values, or saves them as templates. */
+  private async importSvd(file?: P.OpenedFile) {
+    let opened = file ?? null;
+    if (!opened) {
+      try {
+        opened = await P.pickAndRead(
+          appSettings.get("last_dir") || (await P.defaultDir()),
+          P.SVD_OPEN,
+        );
+      } catch (error) {
+        this.fail("Could not open the SVD file", error);
+        return;
+      }
+    }
+    if (!opened) return;
+    let device: ReturnType<typeof parseSvd>;
+    try {
+      device = parseSvd(opened.text);
+    } catch (error) {
+      this.fail("Could not read the SVD file", error, opened.name);
+      return;
+    }
+    if (opened.path) this.rememberDir(opened.path);
+    const choice = await pickSvdRegisters(device, opened.name);
+    if (!choice) return;
+    if (choice.action === "templates") {
+      const templates = choice.registers.map((register) =>
+        registerTemplate(register, device.name),
+      );
+      const names = new Set(
+        templates.map((template) => template.name.toLowerCase()),
+      );
+      const kept = appSettings
+        .get("templates")
+        .filter((template) => !names.has(template.name.toLowerCase()));
+      const replaced = appSettings.get("templates").length - kept.length;
+      appSettings.set("templates", [...kept, ...templates]);
+      toast(
+        `Saved ${templates.length} template${templates.length === 1 ? "" : "s"}${replaced ? ` (${replaced} replaced)` : ""}`,
+        "ok",
+      );
+      return;
+    }
+    await this.addSvdValues(choice.registers, device);
+  }
+
+  /** Adds SVD registers as values, each in a peripheral block of its own
+   *  peripheral (an existing one with the same name and base is reused). */
+  private async addSvdValues(registers: SvdRegister[], device: SvdDevice) {
+    const deviceName = device.name;
+    if (registers.length > 50) {
+      const answer = await ask(
+        "Add many values?",
+        `This adds ${registers.length} values to the workspace. Large workspaces get slower to scroll and edit.`,
+        [
+          { id: "cancel", label: "Cancel" },
+          {
+            id: "yes",
+            label: `Add ${registers.length} values`,
+            className: "primary",
+          },
+        ],
+      );
+      if (answer !== "yes") return;
+    }
+    let firstCard: ValueCard | null = null;
+    const blocks = new Map<string, string>(); // SVD peripheral → workspace peripheral
+    this.history.hold(); // one undo step for the whole import
+    try {
+      for (const register of registers) {
+        const source = device.peripherals.find(
+          (peripheral) => peripheral.name === register.peripheral,
+        )!;
+        let block = blocks.get(source.name);
+        if (!block) {
+          const existing = this.peripherals.get(source.name);
+          block =
+            existing && existing.base === source.baseAddress
+              ? source.name
+              : freeName(source.name, (name) => this.peripherals.has(name));
+          if (block !== source.name || !existing)
+            this.peripherals.set(block, {
+              name: block,
+              base: source.baseAddress,
+              description: source.description,
+              collapsed: false,
+            });
+          blocks.set(source.name, block);
+        }
+        const model = new ValueModel({
+          width: register.size,
+          value: register.resetValue,
+          name: register.path,
+          view: appSettings.get("default_view"),
+          defaultRowBase: appSettings.get("default_base"),
+        });
+        model.applyTemplate(registerTemplate(register, deviceName));
+        model.setPeripheral(block, register.address - source.baseAddress);
+        model.setDescription(register.description);
+        const members = this.members(block);
+        const index = members.length
+          ? this.cards.indexOf(members[members.length - 1]) + 1
+          : undefined;
+        const card = this.addValue(model.width, model, index, false);
+        firstCard ??= card;
+      }
+    } finally {
+      this.history.release();
+    }
+    play("add");
+    firstCard?.root.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
+    });
+    toast(
+      `Added ${registers.length} value${registers.length === 1 ? "" : "s"} from ${deviceName}`,
+      "ok",
+    );
   }
 
   private async loadPath(path: string, quiet = false): Promise<boolean> {
     try {
-      return this.loadText(await P.readText(path), path, P.basename(path), quiet);
-    } catch (e) {
-      if (!quiet) this.fail("Could not open file", e, path);
+      return await this.loadText(
+        await P.readText(path),
+        path,
+        P.basename(path),
+        quiet,
+      );
+    } catch (error) {
+      if (!quiet) this.fail("Could not open file", error, path);
       return false;
     }
   }
 
-  private loadText(text: string, path: string | null, name: string, quiet = false): boolean {
+  private async loadText(
+    text: string,
+    path: string | null,
+    name: string,
+    quiet = false,
+  ): Promise<boolean> {
     let values: unknown[];
+    let peripherals: unknown;
+    let fileVersion: number;
     try {
       const data = JSON.parse(text);
       if (!data || typeof data !== "object" || data.app !== "bitviewer") {
         throw new ModelError("This is not a Bit Viewer workspace file");
       }
+      fileVersion = Number(data.version ?? 1);
+      if (!Number.isInteger(fileVersion) || fileVersion < 1)
+        throw new ModelError(`Unknown file format version ${data.version}`);
       values = data.values ?? [];
+      if (!Array.isArray(values))
+        throw new ModelError("The file's values aren't a list");
       // validate everything before replacing the workspace
-      for (const d of values) ValueModel.fromJSON(d);
-    } catch (e) {
-      if (!quiet) this.fail("Could not open file", e, name);
+      for (const serialized of values) ValueModel.fromJSON(serialized);
+      peripheralsFromJSON(data.peripherals);
+      peripherals = data.peripherals;
+    } catch (error) {
+      if (!quiet) this.fail("Could not open file", error, name);
       return false;
     }
-    this.loadValues(values, path, name);
+    if (fileVersion > FILE_VERSION && !quiet) {
+      const answer = await ask(
+        "Saved by a newer version",
+        `“${name}” was saved by a newer version of Bit Viewer (file format ${fileVersion}; this version reads format ${FILE_VERSION}). ` +
+          "Anything this version doesn't understand is left out, and is lost if you save over the file. Update Bit Viewer to keep it.",
+        [
+          { id: "cancel", label: "Cancel" },
+          { id: "open", label: "Open anyway", className: "primary" },
+        ],
+      );
+      if (answer !== "open") return false;
+    }
+    this.loadValues(values, path, name, peripherals);
     if (path) {
       this.rememberDir(path);
-      S.addRecent(path);
+      appSettings.addRecent(path);
     }
     void saveSessionNow(this.sessionData());
     if (!quiet) toast(`Opened ${name}`, "ok");
@@ -1187,10 +2003,18 @@ export class App {
   }
 
   /** Replaces the workspace and starts a fresh undo history. */
-  private loadValues(values: unknown[], path: string | null, name: string) {
-    const models = values.map((d) => ValueModel.fromJSON(d));
+  private loadValues(
+    values: unknown[],
+    path: string | null,
+    name: string,
+    peripherals?: unknown,
+  ) {
+    const models = values.map((serialized) => ValueModel.fromJSON(serialized));
+    const blocks = peripheralsFromJSON(peripherals);
     this.clearCards();
-    for (const m of models) this.addValue(m.width, m, undefined, false);
+    this.peripherals = blocks;
+    for (const model of models)
+      this.addValue(model.width, model, undefined, false);
     this.path = path;
     this.fileName = name;
     this.history.reset();
@@ -1204,8 +2028,12 @@ export class App {
   }
 
   private async saveAs(): Promise<boolean> {
-    const dir = S.get("last_dir") || (await P.defaultDir());
-    const start = this.path ?? (dir ? P.joinPath(dir, "workspace.bitview") : "workspace.bitview");
+    const directory = appSettings.get("last_dir") || (await P.defaultDir());
+    const start =
+      this.path ??
+      (directory
+        ? P.joinPath(directory, "workspace.bitview")
+        : "workspace.bitview");
     let path = await P.pickSavePath(start);
     if (!path) return false;
     if (!/\.(bitview|json)$/i.test(path)) path += ".bitview";
@@ -1214,17 +2042,21 @@ export class App {
 
   private async write(path: string): Promise<boolean> {
     this.history.flush();
-    const data = { app: "bitviewer", version: FILE_VERSION, values: this.cards.map((c) => c.model.toJSON()) };
+    const data = {
+      app: "bitviewer",
+      version: FILE_VERSION,
+      ...this.workspaceJSON(),
+    };
     try {
       await P.writeText(path, JSON.stringify(data, null, 2));
-    } catch (e) {
-      this.fail("Could not save", e, path);
+    } catch (error) {
+      this.fail("Could not save", error, path);
       return false;
     }
     this.path = P.isTauri ? path : null;
     this.fileName = P.basename(path);
     this.rememberDir(path);
-    if (P.isTauri) S.addRecent(path);
+    if (P.isTauri) appSettings.addRecent(path);
     this.markSaved();
     void saveSessionNow(this.sessionData());
     toast(`Saved ${this.fileName}`, "ok");
@@ -1232,23 +2064,32 @@ export class App {
   }
 
   private rememberDir(path: string) {
-    const i = Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"));
-    if (i > 0) S.set("last_dir", path.slice(0, i));
+    const separatorIndex = Math.max(
+      path.lastIndexOf("\\"),
+      path.lastIndexOf("/"),
+    );
+    if (separatorIndex > 0)
+      appSettings.set("last_dir", path.slice(0, separatorIndex));
   }
 
-  private fail(title: string, e: unknown, where = "") {
-    const msg = e instanceof Error ? e.message : String(e);
-    ask(title, where ? `${where}\n\n${msg}` : msg, [{ id: "ok", label: "OK", cls: "primary" }], "ok");
+  private fail(title: string, error: unknown, where = "") {
+    const message = error instanceof Error ? error.message : String(error);
+    ask(
+      title,
+      where ? `${where}\n\n${message}` : message,
+      [{ id: "ok", label: "OK", className: "primary" }],
+      "ok",
+    );
   }
 
   // ================================================================ input
   private installInput() {
     window.addEventListener(
       "wheel",
-      (e) => {
-        if (!e.ctrlKey) return;
-        e.preventDefault();
-        this.wheelAcc += -e.deltaY;
+      (event) => {
+        if (!event.ctrlKey) return;
+        event.preventDefault();
+        this.wheelAcc += -event.deltaY;
         while (this.wheelAcc >= 100) {
           this.wheelAcc -= 100;
           this.zoomBy(1);
@@ -1261,9 +2102,11 @@ export class App {
       { passive: false },
     );
 
-    const track = (e: Event) => {
-      const c = this.cards.find((x) => x.root.contains(e.target as Node));
-      if (c) this.activeCard = c;
+    const track = (event: Event) => {
+      const card = this.cards.find((candidate) =>
+        candidate.root.contains(event.target as Node),
+      );
+      if (card) this.activeCard = card;
     };
     document.addEventListener("pointerdown", track, true);
     // Record any pending undo step before the next edit starts, so that a bit
@@ -1273,26 +2116,32 @@ export class App {
     document.addEventListener("pointerdown", () => this.history.flush(), true);
     document.addEventListener("focusin", track);
 
-    document.addEventListener("keydown", (e) => {
+    document.addEventListener("keydown", (event) => {
       if (modalOpen() || menusOpen() || paletteOpen() || tourRunning()) return;
       // Esc inside a field reverts that field instead of clearing the selection
-      if (e.key === "Escape" && document.activeElement instanceof HTMLInputElement) return;
-      this.commands.handleKey(e);
+      if (event.key === "Escape" && isTextField(document.activeElement)) return;
+      this.commands.handleKey(event);
     });
 
     // Clicking anywhere that isn't part of selecting drops the selection.
-    document.addEventListener("pointerdown", (e) => {
-      if (!this.cards.some((c) => c.sel)) return;
-      const t = e.target as Element;
-      if (t.closest(".bit, .row-label, .menu, .backdrop, [data-keep-sel]")) return;
+    document.addEventListener("pointerdown", (event) => {
+      if (!this.cards.some((card) => card.selection)) return;
+      const target = event.target as Element;
+      if (target.closest(".bit, .row-label, .menu, .backdrop, [data-keep-sel]"))
+        return;
       // clicks on a scrollbar land on the scrolling element itself
-      if (t instanceof HTMLElement && (e.offsetX >= t.clientWidth || e.offsetY >= t.clientHeight)) return;
+      if (
+        target instanceof HTMLElement &&
+        (event.offsetX >= target.clientWidth ||
+          event.offsetY >= target.clientHeight)
+      )
+        return;
       this.clearSelections();
     });
 
-    document.addEventListener("contextmenu", (e) => {
+    document.addEventListener("contextmenu", (event) => {
       // keep the native menu for text fields, suppress the browser one elsewhere
-      if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+      if (!isTextField(event.target)) event.preventDefault();
     });
   }
 }

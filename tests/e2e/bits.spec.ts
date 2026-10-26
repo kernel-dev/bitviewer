@@ -1,6 +1,9 @@
 import { expect, test } from "./helpers";
 
-test("click flips a bit, typing sets the value, Esc reverts bad input", async ({ app, page }) => {
+test("click flips a bit, typing sets the value, Esc reverts bad input", async ({
+  app,
+  page,
+}) => {
   await app.bit(0).click();
   expect(await app.value()).toBe("1");
   const field = app.card().locator(".value-edit");
@@ -15,17 +18,24 @@ test("click flips a bit, typing sets the value, Esc reverts bad input", async ({
   expect(await app.value()).toBe("1");
 });
 
-test("drag selects, Ctrl+G names a field, clicking elsewhere keeps named fields", async ({ app, page }) => {
+test("drag selects, Ctrl+G names a field, clicking elsewhere keeps named fields", async ({
+  app,
+  page,
+}) => {
   await app.drag(app.bit(11), app.bit(4));
-  expect(await app.run("JSON.stringify(window.__app.cards[0].sel)")).toBe("[4,11]");
+  expect(await app.run("JSON.stringify(window.__app.cards[0].selection)")).toBe(
+    "[4,11]",
+  );
   await page.keyboard.press("Control+g");
   await page.locator(".modal input").fill("CTRL");
   await page.keyboard.press("Enter");
   await expect(app.card().locator(".field-row")).toHaveCount(1);
   await app.drag(app.bit(3), app.bit(0));
   await app.card().locator(".fields-head").click();
-  expect(await app.run("window.__app.cards[0].sel")).toBeNull();
-  expect(await app.run("window.__app.cards[0].model.groups.map(g => g.name).join()")).toBe("CTRL");
+  expect(await app.run("window.__app.cards[0].selection")).toBeNull();
+  expect(
+    await app.run("window.__app.cards[0].model.groups.map(g => g.name).join()"),
+  ).toBe("CTRL");
 });
 
 test("keyboard moves the cursor and edits bits", async ({ app, page }) => {
@@ -35,14 +45,19 @@ test("keyboard moves the cursor and edits bits", async ({ app, page }) => {
   await page.keyboard.press("Space"); // bit 2
   expect(await app.value()).toBe("5");
   await page.keyboard.press("Shift+ArrowLeft");
-  expect(await app.run("JSON.stringify(window.__app.cards[0].sel)")).toBe("[2,3]");
+  expect(await app.run("JSON.stringify(window.__app.cards[0].selection)")).toBe(
+    "[2,3]",
+  );
   await page.keyboard.press("Home");
   expect(await app.run("window.__app.cards[0].cursor")).toBe(31);
   await page.keyboard.press("1");
   expect(await app.value()).toBe("80000005");
 });
 
-test("Alt+drag paints bits and one Ctrl+Z undoes the stroke", async ({ app, page }) => {
+test("Alt+drag paints bits and one Ctrl+Z undoes the stroke", async ({
+  app,
+  page,
+}) => {
   await app.drag(app.bit(23), app.bit(16), ["Alt"]);
   expect(await app.value()).toBe("ff0000");
   await app.drag(app.bit(20), app.bit(18), ["Alt", "Shift"]);
@@ -58,7 +73,9 @@ test("compare rows remember their value when closed", async ({ app }) => {
   await toggle.click();
   await expect(app.card().locator(".strip.cmp")).toHaveCount(0);
   await toggle.click();
-  expect(await app.run("window.__app.cards[0].model.compareValue(0).toString(16)")).toBe("80000");
+  expect(
+    await app.run("window.__app.cards[0].model.compareValue(0).toString(16)"),
+  ).toBe("80000");
 });
 
 test("widths from 1 to 512 bits, and wrapping lines", async ({ app, page }) => {
@@ -74,15 +91,21 @@ test("widths from 1 to 512 bits, and wrapping lines", async ({ app, page }) => {
   await expect.poll(() => lines.count()).toBeGreaterThan(1);
 });
 
-test("the bottom edge of a bit is clickable, with and without fields", async ({ app }) => {
-  const clickBottom = async (b: number) => {
-    const cell = app.bit(b);
+test("the bottom edge of a bit is clickable, with and without fields", async ({
+  app,
+}) => {
+  const clickBottom = async (bitIndex: number) => {
+    const cell = app.bit(bitIndex);
     const box = (await cell.boundingBox())!;
-    await cell.page().mouse.click(box.x + box.width / 2, box.y + box.height - 3);
+    await cell
+      .page()
+      .mouse.click(box.x + box.width / 2, box.y + box.height - 3);
   };
   await clickBottom(0);
   expect(await app.value()).toBe("1");
-  await app.run("window.__app.cards[0].model.addGroup(8, 15, 'CTRL'); window.__app.cards[0].rebuild()");
+  await app.run(
+    "window.__app.cards[0].model.addGroup(8, 15, 'CTRL'); window.__app.cards[0].rebuild()",
+  );
   await clickBottom(1);
   await clickBottom(9);
   expect(await app.value()).toBe("203");

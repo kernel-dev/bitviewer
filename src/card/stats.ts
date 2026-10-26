@@ -1,12 +1,12 @@
 // The readout chips under a card: unsigned, signed, set bits, floats (editable)
 // and optional extras. Which chips show is a global setting.
 import { Plus } from "lucide";
-import { S } from "../app/settings";
+import { appSettings } from "../app/settings";
 import {
   bcdDecode,
   bytesAsText,
-  clz,
-  ctz,
+  countLeadingZeros,
+  countTrailingZeros,
   decodeFloat,
   encodeFloat,
   FLOAT_NAMES,
@@ -20,48 +20,62 @@ import {
 } from "../core/formats";
 import type { ValueModel } from "../core/model";
 import { ParseError, popcount, toSigned } from "../core/numfmt";
-import { button, h, type MenuItem, openMenu, setTip, toast } from "../ui/kit";
+import {
+  button,
+  html,
+  type MenuItem,
+  openMenu,
+  setTip,
+  toast,
+} from "../ui/kit";
 import { play } from "../ui/sound";
 
 interface ChipDef {
   id: string;
   label: string; // shown in the "+" menu
-  short: (w: number) => string; // shown on the chip
-  tip: (w: number) => string;
-  value: (v: bigint, w: number) => string;
+  short: (width: number) => string; // shown on the chip
+  tip: (width: number) => string;
+  value: (value: bigint, width: number) => string;
 }
 
 export const CHIPS: ChipDef[] = [
   {
     id: "u",
     label: "Unsigned",
-    short: (w) => `u${w}`,
-    tip: (w) => `Unsigned ${w}-bit integer`,
-    value: (v) => v.toString(),
+    short: (width) => `u${width}`,
+    tip: (width) => `Unsigned ${width}-bit integer`,
+    value: (value) => value.toString(),
   },
   {
     id: "s",
     label: "Signed",
-    short: (w) => `s${w}`,
-    tip: (w) => `Signed ${w}-bit integer (two's complement)`,
-    value: (v, w) => toSigned(v, w).toString(),
+    short: (width) => `s${width}`,
+    tip: (width) => `Signed ${width}-bit integer (two's complement)`,
+    value: (value, width) => toSigned(value, width).toString(),
   },
   {
     id: "pop",
     label: "Set bits",
     short: () => "set bits",
     tip: () => "Number of bits set to 1",
-    value: (v) => String(popcount(v)),
+    value: (value) => String(popcount(value)),
   },
-  { id: "float", label: "Floats (16 / 32 / 64-bit)", short: () => "float", tip: () => "", value: () => "" },
+  {
+    id: "float",
+    label: "Floats (16 / 32 / 64-bit)",
+    short: () => "float",
+    tip: () => "",
+    value: () => "",
+  },
   {
     id: "text",
     label: "Text (UTF-8 / ASCII)",
     short: () => "text",
-    tip: () => "The bytes as text, most significant first; · marks non-printable bytes",
-    value: (v, w) => {
-      const t = bytesAsText(v, w);
-      return t ? `“${t}”` : "(empty)";
+    tip: () =>
+      "The bytes as text, most significant first; · marks non-printable bytes",
+    value: (value, width) => {
+      const text = bytesAsText(value, width);
+      return text ? `“${text}”` : "(empty)";
     },
   },
   {
@@ -69,126 +83,157 @@ export const CHIPS: ChipDef[] = [
     label: "BCD",
     short: () => "BCD",
     tip: () => "Binary-coded decimal: each nibble is one decimal digit",
-    value: (v, w) => bcdDecode(v, w) ?? "not BCD",
+    value: (value, width) => bcdDecode(value, width) ?? "not BCD",
   },
   {
     id: "gray",
     label: "Gray code → binary",
     short: () => "gray⁻¹",
     tip: () => "The value read as a Gray code, converted to plain binary",
-    value: (v) => grayToBinary(v).toString(),
+    value: (value) => grayToBinary(value).toString(),
   },
   {
     id: "ones",
     label: "One's complement",
     short: () => "1's comp",
     tip: () => "Signed value in one's complement",
-    value: (v, w) => onesComplement(v, w).toString(),
+    value: (value, width) => onesComplement(value, width).toString(),
   },
   {
     id: "clz",
     label: "Leading zeros",
     short: () => "lead 0s",
     tip: () => "Number of leading zero bits",
-    value: (v, w) => String(clz(v, w)),
+    value: (value, width) => String(countLeadingZeros(value, width)),
   },
   {
     id: "ctz",
     label: "Trailing zeros",
     short: () => "trail 0s",
     tip: () => "Number of trailing zero bits",
-    value: (v, w) => String(ctz(v, w)),
+    value: (value, width) => String(countTrailingZeros(value, width)),
   },
   {
     id: "parity",
     label: "Parity",
     short: () => "parity",
     tip: () => "Even or odd number of set bits",
-    value: (v) => (popcount(v) % 2 ? "odd" : "even"),
+    value: (value) => (popcount(value) % 2 ? "odd" : "even"),
   },
   {
     id: "msb",
     label: "Highest set bit",
     short: () => "top bit",
     tip: () => "Index of the highest bit that is 1",
-    value: (v) => (v === 0n ? "none" : String(v.toString(2).length - 1)),
+    value: (value) =>
+      value === 0n ? "none" : String(value.toString(2).length - 1),
   },
 ];
 
 export class StatsBar {
-  readonly el: HTMLElement;
-  private vals = new Map<string, HTMLElement>();
-  private floats = new Map<FloatKind, { val: HTMLElement; detail: HTMLElement }>();
+  readonly element: HTMLElement;
+  private valueElements = new Map<string, HTMLElement>();
+  private floats = new Map<
+    FloatKind,
+    { valueElement: HTMLElement; detail: HTMLElement }
+  >();
   private editing: FloatKind | null = null;
 
-  constructor(private model: ValueModel) {
-    this.el = h("div", { class: "stats" });
+  /** `write` sets the whole value (the card asks first for protected fields). */
+  constructor(
+    private model: ValueModel,
+    private write: (value: bigint) => Promise<boolean>,
+  ) {
+    this.element = html("div", { class: "stats" });
     this.build();
   }
 
   build() {
-    const w = this.model.width;
-    const on = new Set(S.get("readout_chips"));
-    this.vals.clear();
+    const width = this.model.width;
+    const enabledChips = new Set(appSettings.get("readout_chips"));
+    this.valueElements.clear();
     this.floats.clear();
-    this.el.replaceChildren();
-    for (const c of CHIPS) {
-      if (!on.has(c.id)) continue;
-      if (c.id === "float") {
-        for (const kind of floatKinds(w)) this.el.append(this.floatChip(kind));
+    this.element.replaceChildren();
+    for (const chip of CHIPS) {
+      if (!enabledChips.has(chip.id)) continue;
+      if (chip.id === "float") {
+        for (const kind of floatKinds(width))
+          this.element.append(this.floatChip(kind));
         continue;
       }
-      const val = h("span", { class: "stat-val mono" });
-      this.vals.set(c.id, val);
-      this.el.append(
-        h("div", { class: `stat stat-${c.id}`, tip: c.tip(w) }, h("span", { class: "stat-label" }, c.short(w)), val),
+      const valueElement = html("span", { class: "stat-val mono" });
+      this.valueElements.set(chip.id, valueElement);
+      this.element.append(
+        html(
+          "div",
+          { class: `stat stat-${chip.id}`, tip: chip.tip(width) },
+          html("span", { class: "stat-label" }, chip.short(width)),
+          valueElement,
+        ),
       );
     }
-    const add = button({ icon: Plus, cls: "ghost sm stat-add", tip: "Choose readouts", size: 14 });
-    add.addEventListener("click", () => openMenu(this.chooser(), add));
-    this.el.append(add);
-    this.el.hidden = !S.get("show_interp");
+    const addButton = button({
+      icon: Plus,
+      className: "ghost sm stat-add",
+      tip: "Choose readouts",
+      size: 14,
+    });
+    addButton.addEventListener("click", () =>
+      openMenu(this.chooser(), addButton),
+    );
+    this.element.append(addButton);
+    this.element.hidden = !appSettings.get("show_interp");
     this.update();
   }
 
   private chooser(): MenuItem[] {
-    const on = new Set(S.get("readout_chips"));
-    return CHIPS.map((c) => ({
-      label: c.label,
-      checked: on.has(c.id),
+    const enabledChips = new Set(appSettings.get("readout_chips"));
+    return CHIPS.map((chip) => ({
+      label: chip.label,
+      checked: enabledChips.has(chip.id),
       keepOpen: true,
       action: () => {
-        const now = new Set(S.get("readout_chips"));
-        if (now.has(c.id)) now.delete(c.id);
-        else now.add(c.id);
-        S.set(
+        const now = new Set(appSettings.get("readout_chips"));
+        if (now.has(chip.id)) now.delete(chip.id);
+        else now.add(chip.id);
+        appSettings.set(
           "readout_chips",
-          CHIPS.map((x) => x.id).filter((id) => now.has(id)),
+          CHIPS.map((chip) => chip.id).filter((id) => now.has(id)),
         );
       },
     }));
   }
 
   private floatChip(kind: FloatKind): HTMLElement {
-    const val = h("button", { type: "button", class: "stat-val mono stat-edit", tip: "Click to type a number" });
-    const detail = h("span", { class: "stat-detail mono" });
-    val.addEventListener("click", () => this.editFloat(kind, val));
-    this.floats.set(kind, { val, detail });
-    const chip = h(
+    const valueButton = html("button", {
+      type: "button",
+      class: "stat-val mono stat-edit",
+      tip: "Click to type a number",
+    });
+    const detail = html("span", { class: "stat-detail mono" });
+    valueButton.addEventListener("click", () =>
+      this.editFloat(kind, valueButton),
+    );
+    this.floats.set(kind, { valueElement: valueButton, detail });
+    const chip = html(
       "div",
       { class: "stat stat-float" },
-      h("span", { class: "stat-label" }, FLOAT_NAMES[kind]),
-      val,
+      html("span", { class: "stat-label" }, FLOAT_NAMES[kind]),
+      valueButton,
       detail,
     );
-    setTip(chip, () => `IEEE-754 ${FLOAT_NAMES[kind]}: ${floatBreakdown(decodeFloat(this.model.value, kind))}`);
+    setTip(
+      chip,
+      () =>
+        `IEEE-754 ${FLOAT_NAMES[kind]}: ${floatBreakdown(decodeFloat(this.model.value, kind))}`,
+    );
     return chip;
   }
 
-  private editFloat(kind: FloatKind, val: HTMLElement) {
+  private editFloat(kind: FloatKind, valueElement: HTMLElement) {
     if (this.editing) return;
     this.editing = kind;
-    const input = h("input", {
+    const input = html("input", {
       class: "field mono stat-input",
       value: formatFloatKind(decodeFloat(this.model.value, kind), kind),
       spellcheck: false,
@@ -198,42 +243,44 @@ export class StatsBar {
       this.editing = null;
       if (commit) {
         try {
-          const f = parseFloatText(input.value);
-          this.model.setValue(encodeFloat(f, kind));
-          play("bitOn");
-        } catch (e) {
-          if (!(e instanceof ParseError)) throw e;
+          const parsed = parseFloatText(input.value);
+          void this.write(encodeFloat(parsed, kind)).then((written) => {
+            if (written) play("bitOn");
+          });
+        } catch (error) {
+          if (!(error instanceof ParseError)) throw error;
           play("error");
-          toast(e.message, "error");
+          toast(error.message, "error");
         }
       }
-      input.replaceWith(val);
+      input.replaceWith(valueElement);
       this.update();
     };
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") done(true);
-      else if (e.key === "Escape") {
-        e.stopPropagation();
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") done(true);
+      else if (event.key === "Escape") {
+        event.stopPropagation();
         done(false);
       }
     });
     input.addEventListener("blur", () => done(true));
-    val.replaceWith(input);
+    valueElement.replaceWith(input);
     input.focus();
     input.select();
   }
 
   update() {
-    if (this.el.hidden) return;
-    const { value: v, width: w } = this.model;
-    for (const c of CHIPS) {
-      const el = this.vals.get(c.id);
-      if (el) el.textContent = c.value(v, w);
+    if (this.element.hidden) return;
+    const { value, width } = this.model;
+    for (const chip of CHIPS) {
+      const chipValueElement = this.valueElements.get(chip.id);
+      if (chipValueElement)
+        chipValueElement.textContent = chip.value(value, width);
     }
-    for (const [kind, { val, detail }] of this.floats) {
-      const f = decodeFloat(v, kind);
-      val.textContent = formatFloatKind(f, kind);
-      detail.textContent = floatBreakdown(f);
+    for (const [kind, { valueElement, detail }] of this.floats) {
+      const floatValue = decodeFloat(value, kind);
+      valueElement.textContent = formatFloatKind(floatValue, kind);
+      detail.textContent = floatBreakdown(floatValue);
     }
   }
 }

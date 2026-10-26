@@ -20,62 +20,78 @@ export interface Command {
   hidden?: boolean;
 }
 
-const isTextTarget = (t: EventTarget | null) =>
-  t instanceof HTMLTextAreaElement ||
-  (t instanceof HTMLInputElement && !["checkbox", "radio", "range", "button"].includes(t.type));
+const isTextTarget = (target: EventTarget | null) =>
+  target instanceof HTMLTextAreaElement ||
+  (target instanceof HTMLInputElement &&
+    !["checkbox", "radio", "range", "button"].includes(target.type));
 
 /** Does the shortcut spec ("Ctrl+Shift+S", "F1", "Esc", "Ctrl++") match the event? */
-export function matchKey(spec: string, e: KeyboardEvent): boolean {
+export function matchKey(spec: string, event: KeyboardEvent): boolean {
   const parts = spec.split("+");
   let key = parts.pop() ?? "";
   if (key === "" && spec.endsWith("+")) {
     key = "+";
     parts.pop();
   }
-  const mods = new Set(parts.map((p) => p.toLowerCase()));
-  const ctrl = e.ctrlKey || e.metaKey;
-  if (mods.has("ctrl") !== ctrl || mods.has("alt") !== e.altKey) return false;
-  const k = key.toLowerCase();
+  const modifiers = new Set(parts.map((path) => path.toLowerCase()));
+  const ctrlOrCommand = event.ctrlKey || event.metaKey;
+  if (
+    modifiers.has("ctrl") !== ctrlOrCommand ||
+    modifiers.has("alt") !== event.altKey
+  )
+    return false;
+  const lowerKey = key.toLowerCase();
   // "+" is typed with Shift on most layouts, so don't insist on Shift there
-  if (k !== "+" && mods.has("shift") !== e.shiftKey) return false;
-  if (/^[0-9]$/.test(k)) return e.code === `Digit${k}` || e.code === `Numpad${k}`;
-  if (/^[a-z]$/.test(k)) return e.code === `Key${k.toUpperCase()}`;
-  const aliases: Record<string, string> = { esc: "escape", del: "delete", space: " " };
-  return e.key.toLowerCase() === (aliases[k] ?? k);
+  if (lowerKey !== "+" && modifiers.has("shift") !== event.shiftKey)
+    return false;
+  if (/^[0-9]$/.test(lowerKey))
+    return (
+      event.code === `Digit${lowerKey}` || event.code === `Numpad${lowerKey}`
+    );
+  if (/^[a-z]$/.test(lowerKey))
+    return event.code === `Key${lowerKey.toUpperCase()}`;
+  const aliases: Record<string, string> = {
+    esc: "escape",
+    del: "delete",
+    space: " ",
+  };
+  return event.key.toLowerCase() === (aliases[lowerKey] ?? lowerKey);
 }
 
 export class CommandRegistry {
   private cmds = new Map<string, Command>();
 
   add(...commands: Command[]) {
-    for (const c of commands) this.cmds.set(c.id, c);
+    for (const command of commands) this.cmds.set(command.id, command);
   }
 
   get(id: string): Command {
-    const c = this.cmds.get(id);
-    if (!c) throw new Error(`Unknown command ${id}`);
-    return c;
+    const command = this.cmds.get(id);
+    if (!command) throw new Error(`Unknown command ${id}`);
+    return command;
   }
 
   all(): Command[] {
     return [...this.cmds.values()];
   }
 
-  label(c: Command): string {
-    return typeof c.label === "function" ? c.label() : c.label;
+  label(command: Command): string {
+    return typeof command.label === "function"
+      ? command.label()
+      : command.label;
   }
 
-  icon(c: Command): IconNode | undefined {
-    return typeof c.icon === "function" ? c.icon() : c.icon;
+  icon(command: Command): IconNode | undefined {
+    return typeof command.icon === "function" ? command.icon() : command.icon;
   }
 
-  isEnabled(c: Command): boolean {
-    return !c.enabled || c.enabled();
+  isEnabled(command: Command): boolean {
+    return !command.enabled || command.enabled();
   }
 
   run(id: string) {
-    const c = this.get(id);
-    if (this.isEnabled(c)) c.run();
+    const command = this.get(id);
+    if (this.isEnabled(command)) command.run();
   }
 
   /** Menu entries from command ids; "sep" adds a separator. */
@@ -83,28 +99,28 @@ export class CommandRegistry {
     return ids.map((id): MenuItem => {
       if (id === "sep") return "sep";
       if (typeof id !== "string") return id; // a ready-made entry (e.g. a submenu)
-      const c = this.get(id);
+      const command = this.get(id);
       return {
-        label: this.label(c),
-        icon: this.icon(c),
-        shortcut: c.keys?.[0],
-        disabled: !this.isEnabled(c),
-        action: c.run,
+        label: this.label(command),
+        icon: this.icon(command),
+        shortcut: command.keys?.[0],
+        disabled: !this.isEnabled(command),
+        action: command.run,
       };
     });
   }
 
   /** Runs the command bound to this key press. Returns true when handled. */
-  handleKey(e: KeyboardEvent): boolean {
-    const inText = isTextTarget(e.target);
-    for (const c of this.cmds.values()) {
-      for (const spec of c.keys ?? []) {
-        if (!matchKey(spec, e)) continue;
+  handleKey(event: KeyboardEvent): boolean {
+    const inText = isTextTarget(event.target);
+    for (const command of this.cmds.values()) {
+      for (const spec of command.keys ?? []) {
+        if (!matchKey(spec, event)) continue;
         // plain keys (Delete, Space…) belong to the text field while typing
         const plain = !/(^|\+)(Ctrl|Alt)\+/.test(spec) && !/^F\d+$/.test(spec);
         if (inText && plain) return false;
-        e.preventDefault();
-        if (this.isEnabled(c)) c.run();
+        event.preventDefault();
+        if (this.isEnabled(command)) command.run();
         return true;
       }
     }

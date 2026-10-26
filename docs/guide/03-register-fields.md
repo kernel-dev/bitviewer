@@ -27,9 +27,9 @@ The sliders button on a field opens its details:
 - a description and signed / unsigned,
 - a **formula** with a unit, such as `x * 0.5 - 40` °C (linear formulas can be typed back in),
 - **named values**, such as 0 = Off and 1 = Auto,
-- **access**: read/write, read-only or reserved. Read-only and reserved fields are hatched and ask before their bits change.
+- **access**: read/write, read-only or reserved. Read-only and reserved fields are hatched, and anything that would change their bits asks first: a click, typing a value, an operation, the expression bar, pasting bytes, a named value or restoring a snapshot. **Change it** allows that one change (or, while typing, until you leave the box); **Allow for this field** stops asking until the app restarts. Alt+drag painting skips them.
 
 ## Using fields elsewhere
 
 - In an [expression](02-expressions.md), a field's name is its value.
-- **Export code** (the value's ⋯ menu) generates C macros, a C bitfield struct, Rust or Python for the fields.
+- [Export code](06-generating-code.md) (the value's ⋯ menu) generates C, Rust or Python for the fields.

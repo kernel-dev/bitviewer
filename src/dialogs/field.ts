@@ -5,113 +5,161 @@ import { ExprError } from "../core/expr";
 import { compileFormula, formatReal } from "../core/fieldfmt";
 import type { Access, FieldDetails, Group, NamedValue } from "../core/model";
 import { maxValue } from "../core/numfmt";
-import { button, h, modal, segmented, toggleSwitch } from "../ui/kit";
+import { button, html, modal, segmented, toggleSwitch } from "../ui/kit";
 
 function parseInteger(text: string): bigint {
-  const t = text.trim().replace(/_/g, "");
-  if (!/^-?(0x[0-9a-f]+|0b[01]+|0o[0-7]+|\d+)$/i.test(t)) throw new ExprError(`"${text}" is not a whole number`);
-  return t.startsWith("-") ? -BigInt(t.slice(1)) : BigInt(t);
+  const cleaned = text.trim().replace(/_/g, "");
+  if (!/^-?(0x[0-9a-f]+|0b[01]+|0o[0-7]+|\d+)$/i.test(cleaned))
+    throw new ExprError(`"${text}" is not a whole number`);
+  return cleaned.startsWith("-") ? -BigInt(cleaned.slice(1)) : BigInt(cleaned);
 }
 
-export function editField(g: Group): Promise<Partial<FieldDetails> | null> {
+export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
+  let changed = () => false;
   return modal<Partial<FieldDetails> | null>({
-    title: `Field “${g.name}” ${g.label()}`,
+    title: `Field “${group.name}” ${group.label()}`,
     icon: SlidersVertical,
     wide: true,
     cancelValue: null,
+    hasChanges: () => changed(),
     build: (body, close) => {
-      const d = g.details();
-      const ok = button({ label: "Save", cls: "primary", onClick: () => submit() });
+      const details = group.details();
+      const confirmButton = button({
+        label: "Save",
+        className: "primary",
+        onClick: () => submit(),
+      });
 
-      const desc = h("input", {
+      const descriptionInput = html("input", {
         class: "field",
-        value: d.description,
+        value: details.description,
         placeholder: "What this field does",
         spellcheck: true,
       });
       const access = segmented<Access>(
         [
           { value: "rw", label: "Read / write" },
-          { value: "ro", label: "Read-only", tip: "Clicking its bits asks before changing them" },
-          { value: "reserved", label: "Reserved", tip: "Don't touch: clicking its bits asks before changing them" },
+          {
+            value: "ro",
+            label: "Read-only",
+            tip: "Clicking its bits asks before changing them",
+          },
+          {
+            value: "reserved",
+            label: "Reserved",
+            tip: "Don't touch: clicking its bits asks before changing them",
+          },
         ],
-        { value: d.access, onPick: (v) => (d.access = v) },
+        {
+          value: details.access,
+          onPick: (access) => (details.access = access),
+        },
       );
-      const signed = toggleSwitch(d.signed, (v) => {
-        d.signed = v;
+      const signed = toggleSwitch(details.signed, (value) => {
+        details.signed = value;
         refreshFormula();
       });
 
       // ---- formula
-      const formula = h("input", {
+      const formula = html("input", {
         class: "field mono",
-        value: d.formula,
+        value: details.formula,
         placeholder: "e.g. x * 0.5 - 40   (x is the field's number)",
         spellcheck: false,
       });
-      const unit = h("input", { class: "field unit-input", value: d.unit, placeholder: "°C", spellcheck: false });
-      const formulaInfo = h("div", { class: "expr-preview" });
+      const unit = html("input", {
+        class: "field unit-input",
+        value: details.unit,
+        placeholder: "°C",
+        spellcheck: false,
+      });
+      const formulaInfo = html("div", { class: "expr-preview" });
       let formulaOk = true;
       const refreshFormula = () => {
-        d.formula = formula.value.trim();
+        details.formula = formula.value.trim();
         formula.classList.remove("invalid");
         formulaOk = true;
-        if (!d.formula) {
-          formulaInfo.replaceChildren(h("span", { class: "muted" }, "No formula: the field shows its plain number."));
+        if (!details.formula) {
+          formulaInfo.replaceChildren(
+            html(
+              "span",
+              { class: "muted" },
+              "No formula: the field shows its plain number.",
+            ),
+          );
         } else {
           try {
-            const f = compileFormula(d.formula);
-            const lo = d.signed && g.width > 1 ? -(1n << BigInt(g.width - 1)) : 0n;
-            const hi = d.signed && g.width > 1 ? (1n << BigInt(g.width - 1)) - 1n : maxValue(g.width);
-            const u = unit.value.trim() ? ` ${unit.value.trim()}` : "";
+            const formula = compileFormula(details.formula);
+            const lo =
+              details.signed && group.width > 1
+                ? -(1n << BigInt(group.width - 1))
+                : 0n;
+            const hi =
+              details.signed && group.width > 1
+                ? (1n << BigInt(group.width - 1)) - 1n
+                : maxValue(group.width);
+            const unitSuffix = unit.value.trim() ? ` ${unit.value.trim()}` : "";
             formulaInfo.replaceChildren(
-              h(
+              html(
                 "span",
                 { class: "mono" },
-                `${lo} → ${formatReal(f.f(Number(lo)))}${u}  ·  ${hi} → ${formatReal(f.f(Number(hi)))}${u}`,
+                `${lo} → ${formatReal(formula.evaluate(Number(lo)))}${unitSuffix}  ·  ${hi} → ${formatReal(formula.evaluate(Number(hi)))}${unitSuffix}`,
               ),
-              h(
+              html(
                 "span",
-                { class: f.linear ? "same-text" : "expr-note" },
-                f.linear ? "  ·  linear: values can be typed in" : "  ·  not linear: shown read-only",
+                { class: formula.linear ? "same-text" : "expr-note" },
+                formula.linear
+                  ? "  ·  linear: values can be typed in"
+                  : "  ·  not linear: shown read-only",
               ),
             );
-          } catch (e) {
-            if (!(e instanceof ExprError)) throw e;
+          } catch (error) {
+            if (!(error instanceof ExprError)) throw error;
             formulaOk = false;
             formula.classList.add("invalid");
-            formulaInfo.replaceChildren(h("span", { class: "expr-error" }, e.message));
+            formulaInfo.replaceChildren(
+              html("span", { class: "expr-error" }, error.message),
+            );
           }
         }
-        ok.disabled = !formulaOk;
+        confirmButton.disabled = !formulaOk;
       };
       formula.addEventListener("input", refreshFormula);
       unit.addEventListener("input", refreshFormula);
 
       // ---- named values
-      const rows: { value: HTMLInputElement; label: HTMLInputElement; row: HTMLElement }[] = [];
-      const table = h("div", { class: "named-table" });
-      const addRow = (n?: NamedValue) => {
-        const value = h("input", {
+      const rows: {
+        value: HTMLInputElement;
+        label: HTMLInputElement;
+        row: HTMLElement;
+      }[] = [];
+      const table = html("div", { class: "named-table" });
+      const addRow = (namedValue?: NamedValue) => {
+        const value = html("input", {
           class: "field mono named-value",
-          value: n ? n.value.toString() : "",
+          value: namedValue ? namedValue.value.toString() : "",
           placeholder: "0",
           spellcheck: false,
         });
-        const label = h("input", { class: "field", value: n?.label ?? "", placeholder: "Name", spellcheck: false });
-        const row = h(
+        const label = html("input", {
+          class: "field",
+          value: namedValue?.label ?? "",
+          placeholder: "Name",
+          spellcheck: false,
+        });
+        const row = html(
           "div",
           { class: "named-row" },
           value,
           label,
           button({
             icon: Trash,
-            cls: "ghost danger sm",
+            className: "ghost danger sm",
             tip: "Remove",
             onClick: () => {
               row.remove();
               rows.splice(
-                rows.findIndex((r) => r.row === row),
+                rows.findIndex((rowEntry) => rowEntry.row === row),
                 1,
               );
             },
@@ -121,30 +169,37 @@ export function editField(g: Group): Promise<Partial<FieldDetails> | null> {
         table.append(row);
         return value;
       };
-      for (const n of d.named) addRow(n);
+      for (const namedValue of details.named) addRow(namedValue);
 
       const submit = () => {
         const named: NamedValue[] = [];
-        for (const r of rows) {
-          r.value.classList.remove("invalid");
-          if (!r.value.value.trim() && !r.label.value.trim()) continue;
+        for (const rowEntry of rows) {
+          rowEntry.value.classList.remove("invalid");
+          if (!rowEntry.value.value.trim() && !rowEntry.label.value.trim())
+            continue;
           try {
-            let v = parseInteger(r.value.value);
-            if (v < 0n) v &= maxValue(g.width); // -1 means all ones
-            if (v > maxValue(g.width)) throw new ExprError(`${v} doesn't fit in ${g.width} bits`);
-            named.push({ value: v, label: r.label.value.trim() || `VALUE_${v}` });
-          } catch (e) {
-            if (!(e instanceof ExprError)) throw e;
-            r.value.classList.add("invalid");
-            r.value.focus();
+            let value = parseInteger(rowEntry.value.value);
+            if (value < 0n) value &= maxValue(group.width); // -1 means all ones
+            if (value > maxValue(group.width))
+              throw new ExprError(
+                `${value} doesn't fit in ${group.width} bits`,
+              );
+            named.push({
+              value: value,
+              label: rowEntry.label.value.trim() || `VALUE_${value}`,
+            });
+          } catch (error) {
+            if (!(error instanceof ExprError)) throw error;
+            rowEntry.value.classList.add("invalid");
+            rowEntry.value.focus();
             return;
           }
         }
         if (!formulaOk) return;
         close({
-          description: desc.value.trim(),
-          access: d.access,
-          signed: d.signed,
+          description: descriptionInput.value.trim(),
+          access: details.access,
+          signed: details.signed,
           formula: formula.value.trim(),
           unit: unit.value.trim(),
           named,
@@ -152,48 +207,76 @@ export function editField(g: Group): Promise<Partial<FieldDetails> | null> {
       };
 
       const row = (label: string, control: HTMLElement, hint = "") =>
-        h(
+        html(
           "div",
           { class: "set-row" },
-          h("div", {}, h("div", { class: "set-label" }, label), hint ? h("div", { class: "set-hint" }, hint) : null),
+          html(
+            "div",
+            {},
+            html("div", { class: "set-label" }, label),
+            hint ? html("div", { class: "set-hint" }, hint) : null,
+          ),
           control,
         );
       body.append(
-        h("label", { class: "modal-label" }, "Description"),
-        desc,
-        h(
+        html("label", { class: "modal-label" }, "Description"),
+        descriptionInput,
+        html(
           "section",
           { class: "set-section" },
-          h("h4", {}, "Behaviour"),
-          h(
+          html("h4", {}, "Behaviour"),
+          html(
             "div",
             { class: "set-card" },
-            row("Access", access.el),
-            row("Signed", signed, `Read the field as two's complement (${g.width} bits)`),
+            row("Access", access.element),
+            row(
+              "Signed",
+              signed,
+              `Read the field as two's complement (${group.width} bits)`,
+            ),
           ),
         ),
-        h(
+        html(
           "section",
           { class: "set-section" },
-          h("h4", {}, "Formula & unit"),
-          h("div", { class: "formula-row" }, formula, unit),
+          html("h4", {}, "Formula & unit"),
+          html("div", { class: "formula-row" }, formula, unit),
           formulaInfo,
         ),
-        h(
+        html(
           "section",
           { class: "set-section" },
-          h("h4", {}, "Named values"),
-          h(
+          html("h4", {}, "Named values"),
+          html(
             "p",
             { class: "set-hint" },
             "Give specific numbers a name, e.g. 0 = Off, 1 = Auto. Numbers may be 0x… or 0b….",
           ),
           table,
-          button({ icon: Plus, label: "Add named value", cls: "ghost sm", onClick: () => addRow().focus() }),
+          button({
+            icon: Plus,
+            label: "Add named value",
+            className: "ghost sm",
+            onClick: () => addRow().focus(),
+          }),
         ),
       );
       refreshFormula();
-      return [button({ label: "Cancel", onClick: () => close(null) }), ok];
+      const formState = () =>
+        JSON.stringify([
+          descriptionInput.value,
+          details.access,
+          details.signed,
+          formula.value,
+          unit.value,
+          rows.map((rowEntry) => [rowEntry.value.value, rowEntry.label.value]),
+        ]);
+      const initialState = formState();
+      changed = () => formState() !== initialState;
+      return [
+        button({ label: "Cancel", onClick: () => close(null) }),
+        confirmButton,
+      ];
     },
   });
 }

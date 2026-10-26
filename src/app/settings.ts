@@ -1,6 +1,7 @@
 // Persisted app settings. They live in `settings.json` in the app's config
 // folder (localStorage in the browser). Older versions kept them in the
 // webview's localStorage; those are migrated on first start.
+import type { SavedExportTemplate } from "../core/codegen";
 import type { View } from "../core/model";
 import { BASE_ORDER, type Base } from "../core/numfmt";
 import { type Template, validTemplate } from "../core/templates";
@@ -26,10 +27,13 @@ export interface Settings {
   recent_files: string[]; // most recent first
   readout_chips: string[]; // which readout chips show under each value (stats.ts CHIPS ids)
   templates: Template[]; // the user's own field layout templates
+  export_templates: SavedExportTemplate[]; // the user's own code export templates
+  export_last: string; // id of the export template used last
   compact: boolean; // tighter spacing everywhere
   accent: string; // "#rrggbb", or "" for the theme's red
   tour_done: boolean; // the first-run tour was finished or skipped
   check_updates: boolean; // look for a newer version at start-up
+  last_seen_version: string; // app version whose changes were last shown ("" = never)
 }
 
 const DEFAULTS: Settings = {
@@ -47,48 +51,77 @@ const DEFAULTS: Settings = {
   recent_files: [],
   readout_chips: ["u", "s", "pop", "float"],
   templates: [],
+  export_templates: [],
+  export_last: "c",
   compact: false,
   accent: "",
   tour_done: false,
   check_updates: true,
+  last_seen_version: "",
 };
 
 const FILE = "settings.json";
 const LEGACY_KEY = "bitviewer.settings";
 type Listener = (key: keyof Settings) => void;
 
-export function clampZoom(z: number): number {
-  return Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 100) / 100;
+export function clampZoom(zoom: number): number {
+  return Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom)) * 100) / 100;
+}
+
+function isSavedExport(value: unknown): value is SavedExportTemplate {
+  const candidate = value as Record<string, unknown> | null;
+  return (
+    !!candidate &&
+    typeof candidate === "object" &&
+    typeof candidate.name === "string" &&
+    candidate.name.trim() !== "" &&
+    typeof candidate.extension === "string" &&
+    typeof candidate.source === "string"
+  );
 }
 
 /** Copies valid entries of `raw` over `into`, ignoring unknown or mistyped keys. */
-function merge(into: Settings, raw: unknown) {
+function merge(target: Settings, raw: unknown) {
   if (!raw || typeof raw !== "object") return;
-  const r = raw as Record<string, unknown>;
-  for (const k of Object.keys(DEFAULTS) as (keyof Settings)[]) {
-    const v = r[k];
-    const d = DEFAULTS[k];
-    if (v === undefined) continue;
-    if (k === "templates") {
-      if (Array.isArray(v)) into.templates = v.map(validTemplate).filter((t): t is Template => t !== null);
-    } else if (Array.isArray(d)) {
-      if (Array.isArray(v) && v.every((x) => typeof x === "string")) (into as any)[k] = v;
-    } else if (typeof v === typeof d) (into as any)[k] = v;
+  const record = raw as Record<string, unknown>;
+  for (const key of Object.keys(DEFAULTS) as (keyof Settings)[]) {
+    const value = record[key];
+    const defaultValue = DEFAULTS[key];
+    if (value === undefined) continue;
+    if (key === "templates") {
+      if (Array.isArray(value))
+        target.templates = value
+          .map(validTemplate)
+          .filter((template): template is Template => template !== null);
+    } else if (key === "export_templates") {
+      if (Array.isArray(value))
+        target.export_templates = value.filter(isSavedExport);
+    } else if (Array.isArray(defaultValue)) {
+      if (
+        Array.isArray(value) &&
+        value.every((entry) => typeof entry === "string")
+      )
+        (target as any)[key] = value;
+    } else if (typeof value === typeof defaultValue)
+      (target as any)[key] = value;
   }
 }
 
-function sanitize(v: Settings) {
-  v.zoom = clampZoom(v.zoom);
-  if (!["dark", "light", "contrast"].includes(v.theme)) v.theme = "dark";
-  if (!BASE_ORDER.includes(v.default_base)) v.default_base = 16;
-  if (!["line", "byte", "nibble"].includes(v.default_view)) v.default_view = "line";
-  v.sound_volume = Math.min(1, Math.max(0, v.sound_volume));
-  if (v.accent && !/^#[0-9a-f]{6}$/i.test(v.accent)) v.accent = "";
-  v.recent_files = v.recent_files.slice(0, MAX_RECENT);
+function sanitize(settings: Settings) {
+  settings.zoom = clampZoom(settings.zoom);
+  if (!["dark", "light", "contrast"].includes(settings.theme))
+    settings.theme = "dark";
+  if (!BASE_ORDER.includes(settings.default_base)) settings.default_base = 16;
+  if (!["line", "byte", "nibble"].includes(settings.default_view))
+    settings.default_view = "line";
+  settings.sound_volume = Math.min(1, Math.max(0, settings.sound_volume));
+  if (settings.accent && !/^#[0-9a-f]{6}$/i.test(settings.accent))
+    settings.accent = "";
+  settings.recent_files = settings.recent_files.slice(0, MAX_RECENT);
 }
 
 class Store {
-  private v: Settings = structuredClone(DEFAULTS);
+  private settings: Settings = structuredClone(DEFAULTS);
   private listeners: Listener[] = [];
   private writeTimer = 0;
   private pending: Promise<void> | null = null;
@@ -96,11 +129,14 @@ class Store {
   constructor() {
     // Synchronous best guess so anything reading settings before load() works.
     try {
-      merge(this.v, JSON.parse(localStorage.getItem(LEGACY_KEY) ?? "{}"));
+      merge(
+        this.settings,
+        JSON.parse(localStorage.getItem(LEGACY_KEY) ?? "{}"),
+      );
     } catch {
       /* unreadable storage: keep defaults */
     }
-    sanitize(this.v);
+    sanitize(this.settings);
   }
 
   /** Loads settings.json. Call once before the app starts. */
@@ -108,10 +144,10 @@ class Store {
     try {
       const text = await readAppFile("config", FILE);
       if (text) {
-        const v = structuredClone(DEFAULTS);
-        merge(v, JSON.parse(text));
-        sanitize(v);
-        this.v = v;
+        const loaded = structuredClone(DEFAULTS);
+        merge(loaded, JSON.parse(text));
+        sanitize(loaded);
+        this.settings = loaded;
       } else if (isTauri) {
         await this.write(); // first start with a settings file: migrate localStorage
       }
@@ -120,35 +156,44 @@ class Store {
     }
   }
 
-  get<K extends keyof Settings>(k: K): Settings[K] {
-    return this.v[k];
+  get<K extends keyof Settings>(key: K): Settings[K] {
+    return this.settings[key];
   }
 
-  set<K extends keyof Settings>(k: K, value: Settings[K]): void {
-    if (k === "zoom") value = clampZoom(value as number) as Settings[K];
-    if (this.v[k] === value) return;
-    this.v[k] = value;
+  set<K extends keyof Settings>(key: K, value: Settings[K]): void {
+    if (key === "zoom") value = clampZoom(value as number) as Settings[K];
+    if (this.settings[key] === value) return;
+    this.settings[key] = value;
     this.scheduleWrite();
-    for (const l of [...this.listeners]) l(k);
+    for (const listener of [...this.listeners]) listener(key);
   }
 
-  onChange(l: Listener): () => void {
-    this.listeners.push(l);
+  onChange(listener: Listener): () => void {
+    this.listeners.push(listener);
     return () => {
-      this.listeners = this.listeners.filter((x) => x !== l);
+      this.listeners = this.listeners.filter(
+        (registered) => registered !== listener,
+      );
     };
   }
 
   /** Puts `path` at the top of the recent-files list. */
   addRecent(path: string) {
-    const same = (p: string) => p.toLowerCase() === path.toLowerCase();
-    this.set("recent_files", [path, ...this.v.recent_files.filter((p) => !same(p))].slice(0, MAX_RECENT));
+    const samePath = (candidate: string) =>
+      candidate.toLowerCase() === path.toLowerCase();
+    this.set(
+      "recent_files",
+      [
+        path,
+        ...this.settings.recent_files.filter((path) => !samePath(path)),
+      ].slice(0, MAX_RECENT),
+    );
   }
 
   removeRecent(path: string) {
     this.set(
       "recent_files",
-      this.v.recent_files.filter((p) => p !== path),
+      this.settings.recent_files.filter((recentPath) => recentPath !== path),
     );
   }
 
@@ -171,7 +216,7 @@ class Store {
   }
 
   private async write(): Promise<void> {
-    const text = JSON.stringify(this.v, null, 2);
+    const text = JSON.stringify(this.settings, null, 2);
     this.pending = writeAppFile("config", FILE, text).catch(() => {
       /* disk full / no permission: the setting still applies for this run */
     });
@@ -184,4 +229,4 @@ class Store {
   }
 }
 
-export const S = new Store();
+export const appSettings = new Store();

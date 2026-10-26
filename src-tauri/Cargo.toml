@@ -1,7 +1,7 @@
 [package]
 name = "bitviewer"
-version = "2.1.1"
-description = "Inspect and edit 32/64-bit values bit by bit"
+version = "2.1.2"
+description = "Inspect and edit values of 1 to 512 bits, bit by bit"
 edition = "2021"
 
 [lib]

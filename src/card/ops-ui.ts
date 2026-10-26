@@ -12,9 +12,9 @@ import {
 } from "lucide";
 import type { Op } from "../core/model";
 import { type ExprResult, exprField, type Lookup } from "../ui/exprfield";
-import { button, h, type MenuItem, modal, segmented } from "../ui/kit";
+import { button, html, type MenuItem, modal, segmented } from "../ui/kit";
 
-export type ApplyOp = (op: Op, arg?: bigint) => void;
+export type ApplyOp = (operation: Op, argument?: bigint) => void;
 
 const OP_LABELS: Partial<Record<Op, string>> = {
   shl: "Shift left",
@@ -28,64 +28,99 @@ const OP_LABELS: Partial<Record<Op, string>> = {
 };
 
 /** Asks for a shift/rotate amount or an and/or/xor operand. */
-function askArgument(op: Op, width: number, lookup: Lookup): Promise<{ op: Op; arg: bigint } | null> {
-  const isShift = ["shl", "shr", "asr", "rol", "ror"].includes(op);
-  return modal<{ op: Op; arg: bigint } | null>({
-    title: isShift ? "Shift / rotate by…" : (OP_LABELS[op] ?? "Operation"),
+function askArgument(
+  operation: Op,
+  width: number,
+  lookup: Lookup,
+): Promise<{ operation: Op; argument: bigint } | null> {
+  const isShift = ["shl", "shr", "asr", "rol", "ror"].includes(operation);
+  return modal<{ operation: Op; argument: bigint } | null>({
+    title: isShift
+      ? "Shift / rotate by…"
+      : (OP_LABELS[operation] ?? "Operation"),
     icon: Sigma,
     cancelValue: null,
     build: (body, close) => {
-      let chosen = op;
-      const ok = button({ label: "Apply", cls: "primary", onClick: () => submit() });
+      let chosen = operation;
+      const confirmButton = button({
+        label: "Apply",
+        className: "primary",
+        onClick: () => submit(),
+      });
       const field = exprField({
         width: () => (isShift ? 16 : width),
         lookup,
         placeholder: isShift ? "e.g. 4" : "e.g. 0xFF00 or mask(8) << 4",
         value: isShift ? "1" : "",
         onEnter: () => submit(),
-        onChange: (r) => {
-          ok.disabled = !r;
+        onChange: (result) => {
+          confirmButton.disabled = !result;
         },
       });
       const submit = () => {
-        const r: ExprResult | null = field.result();
-        if (r) close({ op: chosen, arg: r.value });
+        const result: ExprResult | null = field.result();
+        if (result) close({ operation: chosen, argument: result.value });
       };
       if (isShift) {
         const kinds = segmented(
-          (["shl", "shr", "asr", "rol", "ror"] as Op[]).map((o) => ({
-            value: o,
-            label: { shl: "≪ SHL", shr: "≫ SHR", asr: "≫ ASR", rol: "⟲ ROL", ror: "⟳ ROR" }[o as string] ?? o,
-            tip: OP_LABELS[o],
-          })),
-          { value: op, onPick: (o) => (chosen = o) },
+          (["shl", "shr", "asr", "rol", "ror"] as Op[]).map(
+            (shiftOperation) => ({
+              value: shiftOperation,
+              label:
+                {
+                  shl: "≪ SHL",
+                  shr: "≫ SHR",
+                  asr: "≫ ASR",
+                  rol: "⟲ ROL",
+                  ror: "⟳ ROR",
+                }[shiftOperation as string] ?? shiftOperation,
+              tip: OP_LABELS[shiftOperation],
+            }),
+          ),
+          { value: operation, onPick: (picked) => (chosen = picked) },
         );
-        body.append(h("div", { class: "modal-label" }, "Operation"), kinds.el);
+        body.append(
+          html("div", { class: "modal-label" }, "Operation"),
+          kinds.element,
+        );
       }
       body.append(
-        h(
+        html(
           "label",
           { class: "modal-label" },
-          isShift ? "Number of bits" : `Mask (${width} bits) — numbers, expressions, or names of values and fields`,
+          isShift
+            ? "Number of bits"
+            : `Mask (${width} bits) — numbers, expressions, or names of values and fields`,
         ),
-        field.el,
+        field.element,
       );
       field.refresh();
-      return [button({ label: "Cancel", onClick: () => close(null) }), ok];
+      return [
+        button({ label: "Cancel", onClick: () => close(null) }),
+        confirmButton,
+      ];
     },
   });
 }
 
 /** Menu entries for the extra operations. `apply` runs on the value, row or selection. */
-export function moreOpsMenu(apply: ApplyOp, width: number, lookup: Lookup): MenuItem[] {
-  const ask = (op: Op) => async () => {
-    const r = await askArgument(op, width, lookup);
-    if (r) apply(r.op, r.arg);
+export function moreOpsMenu(
+  apply: ApplyOp,
+  width: number,
+  lookup: Lookup,
+): MenuItem[] {
+  const ask = (operation: Op) => async () => {
+    const answer = await askArgument(operation, width, lookup);
+    if (answer) apply(answer.operation, answer.argument);
   };
   return [
     { label: "Rotate left", icon: RotateCcw, action: () => apply("rol") },
     { label: "Rotate right", icon: RotateCw, action: () => apply("ror") },
-    { label: "Arithmetic shift right", icon: ChevronsRight, action: () => apply("asr") },
+    {
+      label: "Arithmetic shift right",
+      icon: ChevronsRight,
+      action: () => apply("asr"),
+    },
     { label: "Shift / rotate by…", icon: ChevronsLeft, action: ask("shl") },
     "sep",
     {
@@ -94,9 +129,17 @@ export function moreOpsMenu(apply: ApplyOp, width: number, lookup: Lookup): Menu
       disabled: width % 8 !== 0 || width < 16,
       action: () => apply("bswap"),
     },
-    { label: "Reverse bits", icon: FlipHorizontal2, action: () => apply("brev") },
+    {
+      label: "Reverse bits",
+      icon: FlipHorizontal2,
+      action: () => apply("brev"),
+    },
     "sep",
-    { label: "Negate (two's complement)", icon: Minus, action: () => apply("neg") },
+    {
+      label: "Negate (two's complement)",
+      icon: Minus,
+      action: () => apply("neg"),
+    },
     { label: "Increment", icon: Plus, action: () => apply("inc") },
     { label: "Decrement", icon: Minus, action: () => apply("dec") },
     "sep",

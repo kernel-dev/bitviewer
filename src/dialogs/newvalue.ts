@@ -2,7 +2,7 @@
 import { SquareFunction } from "lucide";
 import { MAX_WIDTH, MIN_WIDTH } from "../core/model";
 import { exprField, type Lookup } from "../ui/exprfield";
-import { button, h, modal, segmented } from "../ui/kit";
+import { button, html, modal, segmented } from "../ui/kit";
 
 export interface NewValue {
   name: string;
@@ -10,7 +10,10 @@ export interface NewValue {
   value: bigint;
 }
 
-export function newValueFromExpression(lookup: Lookup, defaultWidth: number): Promise<NewValue | null> {
+export function newValueFromExpression(
+  lookup: Lookup,
+  defaultWidth: number,
+): Promise<NewValue | null> {
   return modal<NewValue | null>({
     title: "New value from expression",
     icon: SquareFunction,
@@ -18,18 +21,26 @@ export function newValueFromExpression(lookup: Lookup, defaultWidth: number): Pr
     cancelValue: null,
     build: (body, close) => {
       let width = defaultWidth;
-      const ok = button({ label: "Add value", cls: "primary", onClick: () => submit() });
-      const name = h("input", { class: "field", placeholder: "Name (optional)", spellcheck: false });
+      const confirmButton = button({
+        label: "Add value",
+        className: "primary",
+        onClick: () => submit(),
+      });
+      const name = html("input", {
+        class: "field",
+        placeholder: "Name (optional)",
+        spellcheck: false,
+      });
       const field = exprField({
         width: () => width,
         lookup,
         placeholder: "e.g. {Value 1} ^ {Value 2}   ·   CTRL | bit(31)",
         onEnter: () => submit(),
-        onChange: (r) => {
-          ok.disabled = !r;
+        onChange: (result) => {
+          confirmButton.disabled = !result;
         },
       });
-      const widthIn = h("input", {
+      const widthIn = html("input", {
         class: "field mono width-input",
         type: "number",
         min: MIN_WIDTH,
@@ -37,42 +48,63 @@ export function newValueFromExpression(lookup: Lookup, defaultWidth: number): Pr
         value: String(width),
       });
       const presets = segmented(
-        [8, 16, 32, 64, 128].map((p) => ({ value: p, label: String(p) })),
+        [8, 16, 32, 64, 128].map((bits) => ({
+          value: bits,
+          label: String(bits),
+        })),
         {
           value: width,
-          onPick: (p) => {
-            widthIn.value = String(p);
-            setWidth(p);
+          onPick: (bits) => {
+            widthIn.value = String(bits);
+            setWidth(bits);
           },
-          cls: "sm width-presets",
+          className: "sm width-presets",
         },
       );
-      const setWidth = (w: number) => {
-        if (Number.isInteger(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) {
-          width = w;
+      const setWidth = (newWidth: number) => {
+        if (
+          Number.isInteger(newWidth) &&
+          newWidth >= MIN_WIDTH &&
+          newWidth <= MAX_WIDTH
+        ) {
+          width = newWidth;
           widthIn.classList.remove("invalid");
           field.refresh();
         } else {
           widthIn.classList.add("invalid");
-          ok.disabled = true;
+          confirmButton.disabled = true;
         }
       };
       widthIn.addEventListener("input", () => setWidth(Number(widthIn.value)));
       const submit = () => {
-        const r = field.result();
-        if (r && !widthIn.classList.contains("invalid")) close({ name: name.value.trim(), width, value: r.value });
+        const result = field.result();
+        if (result && !widthIn.classList.contains("invalid"))
+          close({ name: name.value.trim(), width, value: result.value });
       };
       body.append(
-        h("label", { class: "modal-label" }, "Expression — use other values by name; {braces} for names with spaces"),
-        field.el,
-        h("div", { class: "modal-label" }, "Width"),
-        h("div", { class: "width-row" }, widthIn, h("span", { class: "muted" }, "bits"), presets.el),
-        h("div", { class: "modal-label" }, "Name"),
+        html(
+          "label",
+          { class: "modal-label" },
+          "Expression — use other values by name; {braces} for names with spaces",
+        ),
+        field.element,
+        html("div", { class: "modal-label" }, "Width"),
+        html(
+          "div",
+          { class: "width-row" },
+          widthIn,
+          html("span", { class: "muted" }, "bits"),
+          presets.element,
+        ),
+        html("div", { class: "modal-label" }, "Name"),
         name,
       );
       field.refresh();
       requestAnimationFrame(() => field.input.focus());
-      return [button({ label: "Cancel", onClick: () => close(null) }), ok];
+      return [
+        button({ label: "Cancel", onClick: () => close(null) }),
+        confirmButton,
+      ];
     },
   });
 }

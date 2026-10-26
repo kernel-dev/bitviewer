@@ -1,14 +1,23 @@
 // Value model: no DOM, so it can be unit tested headless.
 //
-// Bit numbering is global: bit 0 is the LSB of the whole 32/64-bit value.
+// Bit numbering is global: bit 0 is the LSB of the whole value (1 to 512 bits).
 // A *row* is the whole value ("line" view), a byte or a nibble, identified by
 // its lowest bit index `lo`. Groups are inclusive bit ranges [lo, hi] and may
 // span rows.
 
-import { BASE_ORDER, type Base, isBase, maxValue } from "./numfmt";
+import { type Base, isBase, maxValue } from "./numfmt";
 import type { Template } from "./templates";
 
-export const GROUP_COLORS = ["#f59f00", "#2fb344", "#ae3ec9", "#15aabf", "#4c6ef5", "#82c91e", "#f76707", "#868e96"];
+export const GROUP_COLORS = [
+  "#f59f00",
+  "#2fb344",
+  "#ae3ec9",
+  "#15aabf",
+  "#4c6ef5",
+  "#82c91e",
+  "#f76707",
+  "#868e96",
+];
 export type View = "line" | "byte" | "nibble";
 export const MIN_WIDTH = 1;
 export const MAX_WIDTH = 512;
@@ -34,9 +43,6 @@ export type Op =
   | "or"
   | "xor";
 
-/** Operations that need an argument (amount or operand) from the user. */
-export const ARG_OPS = new Set<Op>(["and", "or", "xor"]);
-
 /** Change kinds passed to listeners:
  *  value       bits of the value or a compare row changed
  *  format      a display base changed
@@ -44,7 +50,13 @@ export const ARG_OPS = new Set<Op>(["and", "or", "xor"]);
  *  group_meta  a group's name / colour / base changed
  *  groups      groups were added or removed
  *  structure   rows changed (view, order, compare rows added/removed) */
-export type ChangeKind = "value" | "format" | "meta" | "group_meta" | "groups" | "structure";
+export type ChangeKind =
+  | "value"
+  | "format"
+  | "meta"
+  | "group_meta"
+  | "groups"
+  | "structure";
 type Listener = (kind: ChangeKind) => void;
 
 export class ModelError extends Error {}
@@ -58,62 +70,73 @@ export interface Snapshot {
 
 /** Applies `op` to a `width`-bit value. `arg` is the shift/rotate amount
  *  (default 1) or the and/or/xor operand. */
-export function applyOp(op: Op, v: bigint, width: number, arg = 1n): bigint {
-  const m = maxValue(width);
-  const w = BigInt(width);
-  v &= m;
+export function applyOp(
+  operation: Op,
+  value: bigint,
+  width: number,
+  argument = 1n,
+): bigint {
+  const mask = maxValue(width);
+  const widthBig = BigInt(width);
+  value &= mask;
   const amount = () => {
-    if (arg < 0n) throw new ModelError("The amount can't be negative");
-    return arg;
+    if (argument < 0n) throw new ModelError("The amount can't be negative");
+    return argument;
   };
-  switch (op) {
+  switch (operation) {
     case "invert":
-      return ~v & m;
+      return ~value & mask;
     case "clear":
       return 0n;
     case "set":
-      return m;
+      return mask;
     case "shl":
-      return amount() >= w ? 0n : (v << arg) & m;
+      return amount() >= widthBig ? 0n : (value << argument) & mask;
     case "shr":
-      return amount() >= w ? 0n : v >> arg;
+      return amount() >= widthBig ? 0n : value >> argument;
     case "asr": {
-      const n = amount() >= w ? w - 1n : arg;
-      const signed = (v >> (w - 1n)) & 1n ? v - (1n << w) : v;
-      return (signed >> n) & m;
+      const shift = amount() >= widthBig ? widthBig - 1n : argument;
+      const signed =
+        (value >> (widthBig - 1n)) & 1n ? value - (1n << widthBig) : value;
+      return (signed >> shift) & mask;
     }
     case "rol":
     case "ror": {
-      const n = amount() % w;
-      if (n === 0n) return v;
-      const left = op === "rol" ? n : w - n;
-      return ((v << left) | (v >> (w - left))) & m;
+      const rotation = amount() % widthBig;
+      if (rotation === 0n) return value;
+      const left = operation === "rol" ? rotation : widthBig - rotation;
+      return ((value << left) | (value >> (widthBig - left))) & mask;
     }
     case "bswap": {
-      if (width % 8) throw new ModelError("Swapping bytes needs a width that is a whole number of bytes");
+      if (width % 8)
+        throw new ModelError(
+          "Swapping bytes needs a width that is a whole number of bytes",
+        );
       let out = 0n;
-      for (let i = 0n; i < w / 8n; i++) out = (out << 8n) | ((v >> (i * 8n)) & 0xffn);
+      for (let i = 0n; i < widthBig / 8n; i++)
+        out = (out << 8n) | ((value >> (i * 8n)) & 0xffn);
       return out;
     }
     case "brev": {
       let out = 0n;
-      for (let i = 0n; i < w; i++) out = (out << 1n) | ((v >> i) & 1n);
+      for (let i = 0n; i < widthBig; i++)
+        out = (out << 1n) | ((value >> i) & 1n);
       return out;
     }
     case "neg":
-      return -v & m;
+      return -value & mask;
     case "inc":
-      return (v + 1n) & m;
+      return (value + 1n) & mask;
     case "dec":
-      return (v - 1n) & m;
+      return (value - 1n) & mask;
     case "and":
-      return v & arg & m;
+      return value & argument & mask;
     case "or":
-      return (v | arg) & m;
+      return (value | argument) & mask;
     case "xor":
-      return (v ^ arg) & m;
+      return (value ^ argument) & mask;
   }
-  throw new ModelError(`Unknown operation ${op}`);
+  throw new ModelError(`Unknown operation ${operation}`);
 }
 
 /** read-write, read-only, or reserved (don't touch). */
@@ -134,15 +157,6 @@ export interface FieldDetails {
   description: string;
   access: Access;
 }
-
-export const DEFAULT_DETAILS: FieldDetails = {
-  signed: false,
-  formula: "",
-  unit: "",
-  named: [],
-  description: "",
-  access: "rw",
-};
 
 export class Group implements FieldDetails {
   signed = false;
@@ -173,14 +187,14 @@ export class Group implements FieldDetails {
   }
   /** The label of a named value, if `raw` has one. */
   nameOf(raw: bigint): string | undefined {
-    return this.named.find((n) => n.value === raw)?.label;
+    return this.named.find((namedValue) => namedValue.value === raw)?.label;
   }
   details(): FieldDetails {
     return {
       signed: this.signed,
       formula: this.formula,
       unit: this.unit,
-      named: this.named.map((n) => ({ ...n })),
+      named: this.named.map((namedValue) => ({ ...namedValue })),
       description: this.description,
       access: this.access,
     };
@@ -197,26 +211,53 @@ export class Group implements FieldDetails {
     if (this.signed) out.signed = true;
     if (this.formula) out.formula = this.formula;
     if (this.unit) out.unit = this.unit;
-    if (this.named.length) out.named = this.named.map((n) => ({ value: n.value.toString(), label: n.label }));
+    if (this.named.length)
+      out.named = this.named.map((namedValue) => ({
+        value: namedValue.value.toString(),
+        label: namedValue.label,
+      }));
     if (this.description) out.description = this.description;
     if (this.access !== "rw") out.access = this.access;
     return out;
   }
 }
 
+/** "#rrggbb" or "#rgb". Colours end up in style attributes, so nothing else is accepted. */
+export function isColor(value: unknown): value is string {
+  return (
+    typeof value === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)
+  );
+}
+
+/** Named values that fit in `width` bits. Negative ones become two's
+ *  complement (-1 = all ones); values that can't fit are dropped. */
+export function fitNamed(named: NamedValue[], width: number): NamedValue[] {
+  const mask = maxValue(width);
+  const out: NamedValue[] = [];
+  for (const namedValue of named) {
+    let value = namedValue.value;
+    if (value < 0n && -value <= 1n << BigInt(width)) value &= mask;
+    if (value >= 0n && value <= mask)
+      out.push({ value, label: namedValue.label });
+  }
+  return out;
+}
+
 /** Reads the optional field details from JSON, ignoring anything malformed. */
-export function detailsFromJSON(d: any): Partial<FieldDetails> {
+export function detailsFromJSON(json: any): Partial<FieldDetails> {
   const out: Partial<FieldDetails> = {};
-  if (d?.signed === true) out.signed = true;
-  if (typeof d?.formula === "string") out.formula = d.formula;
-  if (typeof d?.unit === "string") out.unit = d.unit;
-  if (typeof d?.description === "string") out.description = d.description;
-  if (d?.access === "ro" || d?.access === "reserved") out.access = d.access;
-  if (Array.isArray(d?.named)) {
+  if (json?.signed === true) out.signed = true;
+  if (typeof json?.formula === "string") out.formula = json.formula;
+  if (typeof json?.unit === "string") out.unit = json.unit;
+  if (typeof json?.description === "string") out.description = json.description;
+  if (json?.access === "ro" || json?.access === "reserved")
+    out.access = json.access;
+  if (Array.isArray(json?.named)) {
     out.named = [];
-    for (const n of d.named) {
+    for (const named of json.named) {
       try {
-        if (typeof n?.label === "string") out.named.push({ value: toBig(n.value), label: n.label });
+        if (typeof named?.label === "string")
+          out.named.push({ value: toBig(named.value), label: named.label });
       } catch {
         /* skip a malformed entry */
       }
@@ -225,30 +266,54 @@ export function detailsFromJSON(d: any): Partial<FieldDetails> {
   return out;
 }
 
-function toSignedBits(v: bigint, width: number): bigint {
-  return (v >> BigInt(width - 1)) & 1n ? v - (1n << BigInt(width)) : v;
+/** Copies details onto a field, keeping only named values that fit it. */
+function assignDetails(group: Group, details: Partial<FieldDetails>): void {
+  Object.assign(group, details);
+  group.named = fitNamed(group.named, group.width);
 }
 
-function checkWidth(w: number): void {
-  if (!Number.isInteger(w) || w < MIN_WIDTH || w > MAX_WIDTH) {
-    throw new ModelError(`Width must be a whole number of bits from ${MIN_WIDTH} to ${MAX_WIDTH}`);
+/** A bit position from JSON: a number or a string of digits (anything else is NaN, which is rejected later). */
+function bitPosition(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && /^d+$/.test(value.trim()))
+    return Number(value);
+  return Number.NaN;
+}
+
+function checkPositions(lo: number, hi: number): void {
+  if (!Number.isInteger(lo) || !Number.isInteger(hi))
+    throw new ModelError("Field bit positions must be whole numbers");
+}
+
+function toSignedBits(value: bigint, width: number): bigint {
+  return (value >> BigInt(width - 1)) & 1n
+    ? value - (1n << BigInt(width))
+    : value;
+}
+
+function checkWidth(width: number): void {
+  if (!Number.isInteger(width) || width < MIN_WIDTH || width > MAX_WIDTH) {
+    throw new ModelError(
+      `Width must be a whole number of bits from ${MIN_WIDTH} to ${MAX_WIDTH}`,
+    );
   }
 }
 
-function checkBase(b: unknown): Base {
-  if (!isBase(b)) throw new ModelError(`Unsupported base ${b}`);
-  return b;
+function checkBase(value: unknown): Base {
+  if (!isBase(value)) throw new ModelError(`Unsupported base ${value}`);
+  return value;
 }
 
-function toBig(v: unknown): bigint {
-  if (typeof v === "boolean") throw new ModelError("boolean is not a number");
-  if (typeof v === "bigint") return v;
-  if (typeof v === "number") return BigInt(Math.trunc(v));
-  const s = String(v).trim();
+function toBig(value: unknown): bigint {
+  if (typeof value === "boolean")
+    throw new ModelError("boolean is not a number");
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(Math.trunc(value));
+  const trimmed = String(value).trim();
   try {
-    return BigInt(s); // accepts 0x / 0o / 0b prefixes and decimals
+    return BigInt(trimmed); // accepts 0x / 0o / 0b prefixes and decimals
   } catch {
-    throw new ModelError(`Invalid number ${JSON.stringify(v)}`);
+    throw new ModelError(`Invalid number ${JSON.stringify(value)}`);
   }
 }
 
@@ -262,6 +327,12 @@ export class ValueModel {
   defaultRowBase: Base;
   showBases = false; // optional panel with the value in every base
   collapsed = false; // card shows only its header
+  /** Name of the peripheral this value is a register of ("" = none). */
+  block = "";
+  /** Address offset of the register within its peripheral, in bytes. */
+  offset: bigint | null = null;
+  /** What the register is for (e.g. from an SVD file). */
+  description = "";
   snapshots: Snapshot[] = []; // named copies of the value, oldest first
   rowBases = new Map<number, Base>();
   groups: Group[] = [];
@@ -271,7 +342,7 @@ export class ValueModel {
   private listeners: Listener[] = [];
 
   constructor(
-    opts: {
+    options: {
       width?: number;
       value?: bigint;
       name?: string;
@@ -281,28 +352,28 @@ export class ValueModel {
       defaultRowBase?: Base;
     } = {},
   ) {
-    const width = opts.width ?? 32;
+    const width = options.width ?? 32;
     checkWidth(width);
-    const view = opts.view ?? "byte";
+    const view = options.view ?? "byte";
     if (!VIEWS.includes(view)) throw new ModelError(`Unknown view ${view}`);
     this.width = width;
-    this.value = (opts.value ?? 0n) & maxValue(width);
-    this.name = opts.name ?? "Value";
+    this.value = (options.value ?? 0n) & maxValue(width);
+    this.name = options.name ?? "Value";
     this.view = view;
-    this.msbFirst = opts.msbFirst ?? true;
-    this.fullBase = checkBase(opts.fullBase ?? 16);
-    this.defaultRowBase = checkBase(opts.defaultRowBase ?? 16);
+    this.msbFirst = options.msbFirst ?? true;
+    this.fullBase = checkBase(options.fullBase ?? 16);
+    this.defaultRowBase = checkBase(options.defaultRowBase ?? 16);
   }
 
   // ------------------------------------------------------------ listeners
-  subscribe(cb: Listener): void {
-    this.listeners.push(cb);
+  subscribe(callback: Listener): void {
+    this.listeners.push(callback);
   }
-  unsubscribe(cb: Listener): void {
-    this.listeners = this.listeners.filter((l) => l !== cb);
+  unsubscribe(callback: Listener): void {
+    this.listeners = this.listeners.filter((listener) => listener !== callback);
   }
   private emit(kind: ChangeKind): void {
-    for (const cb of [...this.listeners]) cb(kind);
+    for (const callback of [...this.listeners]) callback(kind);
   }
 
   // ------------------------------------------------------------ geometry
@@ -319,21 +390,27 @@ export class ValueModel {
   }
   /** Row start bits in display order. */
   rowLos(): number[] {
-    const los: number[] = [];
-    for (let lo = 0; lo < this.width; lo += this.rowWidth) los.push(lo);
-    return this.msbFirst ? los.reverse() : los;
+    const rowStarts: number[] = [];
+    for (let lo = 0; lo < this.width; lo += this.rowWidth) rowStarts.push(lo);
+    return this.msbFirst ? rowStarts.reverse() : rowStarts;
   }
   rowTitle(lo: number): string {
     if (this.view === "line") return `Bits ${this.width - 1}…0`;
     return `${this.view === "byte" ? "Byte" : "Nibble"} ${lo / this.rowWidth}`;
   }
   private checkRow(lo: number): void {
-    if (lo % this.rowWidth || lo < 0 || lo >= this.width) {
+    if (
+      !Number.isInteger(lo) ||
+      lo % this.rowWidth ||
+      lo < 0 ||
+      lo >= this.width
+    ) {
       throw new ModelError(`${lo} is not a row start for this view`);
     }
   }
-  private checkBit(i: number): void {
-    if (i < 0 || i >= this.width) throw new ModelError(`Bit ${i} out of range`);
+  private checkBit(bitIndex: number): void {
+    if (bitIndex < 0 || bitIndex >= this.width)
+      throw new ModelError(`Bit ${bitIndex} out of range`);
   }
 
   // ------------------------------------------------------------ meta / bases
@@ -368,68 +445,91 @@ export class ValueModel {
   }
 
   // ------------------------------------------------------------ bits
-  bit(i: number): number {
-    return Number((this.value >> BigInt(i)) & 1n);
+  bit(bitIndex: number): number {
+    return Number((this.value >> BigInt(bitIndex)) & 1n);
   }
-  setValue(v: bigint): void {
-    v &= this.mask;
-    if (v !== this.value) {
-      this.value = v;
+  setValue(value: bigint): void {
+    value &= this.mask;
+    if (value !== this.value) {
+      this.value = value;
       this.emit("value");
     }
   }
-  flipBit(i: number): void {
-    this.checkBit(i);
-    this.setValue(this.value ^ (1n << BigInt(i)));
+  flipBit(bitIndex: number): void {
+    this.checkBit(bitIndex);
+    this.setValue(this.value ^ (1n << BigInt(bitIndex)));
   }
   bitsValue(lo: number, width: number): bigint {
     return (this.value >> BigInt(lo)) & maxValue(width);
   }
-  setBitsValue(lo: number, width: number, v: bigint): void {
-    const m = maxValue(width);
-    const l = BigInt(lo);
-    this.setValue((this.value & ~(m << l)) | ((v & m) << l));
+  /** The whole value with bits lo … lo+width-1 replaced by `value` (nothing is changed). */
+  withBits(lo: number, width: number, value: bigint): bigint {
+    const mask = maxValue(width);
+    const lowBig = BigInt(lo);
+    return (
+      ((this.value & ~(mask << lowBig)) | ((value & mask) << lowBig)) &
+      this.mask
+    );
+  }
+  setBitsValue(lo: number, width: number, value: bigint): void {
+    this.setValue(this.withBits(lo, width, value));
   }
   rowValue(lo: number): bigint {
     return this.bitsValue(lo, this.rowWidthAt(lo));
   }
-  setRowValue(lo: number, v: bigint): void {
+  setRowValue(lo: number, value: bigint): void {
     this.checkRow(lo);
-    this.setBitsValue(lo, this.rowWidthAt(lo), v);
+    this.setBitsValue(lo, this.rowWidthAt(lo), value);
   }
 
   // ------------------------------------------------------------ operations
-  opValue(op: Op, arg?: bigint): void {
-    this.setValue(applyOp(op, this.value, this.width, arg));
+  opValue(operation: Op, argument?: bigint): void {
+    this.setValue(applyOp(operation, this.value, this.width, argument));
   }
-  opRow(lo: number, op: Op, arg?: bigint): void {
-    this.setRowValue(lo, applyOp(op, this.rowValue(lo), this.rowWidthAt(lo), arg));
+  opRow(lo: number, operation: Op, argument?: bigint): void {
+    this.setRowValue(
+      lo,
+      applyOp(operation, this.rowValue(lo), this.rowWidthAt(lo), argument),
+    );
   }
-  opCompare(lo: number, op: Op, arg?: bigint): void {
-    this.setCompare(lo, applyOp(op, this.compareValue(lo), this.rowWidthAt(lo), arg));
+  opCompare(lo: number, operation: Op, argument?: bigint): void {
+    this.setCompare(
+      lo,
+      applyOp(operation, this.compareValue(lo), this.rowWidthAt(lo), argument),
+    );
   }
   /** Applies `op` to the bits lo..hi only (e.g. a selection). */
-  opBits(lo: number, hi: number, op: Op, arg?: bigint): void {
-    const w = hi - lo + 1;
-    this.setBitsValue(lo, w, applyOp(op, this.bitsValue(lo, w), w, arg));
+  opBits(lo: number, hi: number, operation: Op, argument?: bigint): void {
+    const width = hi - lo + 1;
+    this.setBitsValue(
+      lo,
+      width,
+      applyOp(operation, this.bitsValue(lo, width), width, argument),
+    );
   }
 
   // ------------------------------------------------------------ view / order
   setView(view: View): void {
     if (!VIEWS.includes(view)) throw new ModelError(`Unknown view ${view}`);
     if (view === this.view) return;
-    const ow = this.rowWidth;
-    const nw = Math.min(VIEW_WIDTHS[view] ?? this.width, this.width);
-    const compares = this.convertRows(this.compares, ow, nw);
-    const hidden = this.convertRows(this.hiddenCompares, ow, nw);
+    const oldRowWidth = this.rowWidth;
+    const newRowWidth = Math.min(VIEW_WIDTHS[view] ?? this.width, this.width);
+    const compares = this.convertRows(this.compares, oldRowWidth, newRowWidth);
+    const hidden = this.convertRows(
+      this.hiddenCompares,
+      oldRowWidth,
+      newRowWidth,
+    );
     for (const lo of compares.keys()) hidden.delete(lo); // an open row wins
     const bases = new Map<number, Base>();
-    const oldLos = [...this.rowBases.keys()].sort((a, b) => a - b);
-    for (let lo = 0; lo < this.width; lo += nw) {
+    const oldRowStarts = [...this.rowBases.keys()].sort(
+      (first, second) => first - second,
+    );
+    for (let lo = 0; lo < this.width; lo += newRowWidth) {
       // explicit base of the lowest old row overlapping the new row
-      for (const olo of oldLos) {
-        if (olo + ow > lo && olo < lo + nw) {
-          bases.set(lo, this.rowBases.get(olo)!);
+      for (const oldRowStart of oldRowStarts) {
+        if (oldRowStart + oldRowWidth > lo && oldRowStart < lo + newRowWidth) {
+          bases.set(lo, this.rowBases.get(oldRowStart)!);
           break;
         }
       }
@@ -443,25 +543,30 @@ export class ValueModel {
   /** Re-maps compare rows from `ow`-bit rows to `nw`-bit rows. Each old compare
    *  is laid over the parent value; a new row gets a compare if any old compare
    *  covered part of it (the rest of its bits come from the parent). */
-  private convertRows(rows: Map<number, bigint>, ow: number, nw: number): Map<number, bigint> {
+  private convertRows(
+    rows: Map<number, bigint>,
+    oldRowWidth: number,
+    newRowWidth: number,
+  ): Map<number, bigint> {
     let overlay = this.value;
     let covered = 0n;
-    for (const [lo, v] of rows) {
-      const m = (maxValue(ow) << BigInt(lo)) & this.mask;
-      overlay = (overlay & ~m) | ((v << BigInt(lo)) & m);
-      covered |= m;
+    for (const [lo, value] of rows) {
+      const mask = (maxValue(oldRowWidth) << BigInt(lo)) & this.mask;
+      overlay = (overlay & ~mask) | ((value << BigInt(lo)) & mask);
+      covered |= mask;
     }
     const out = new Map<number, bigint>();
-    for (let lo = 0; lo < this.width; lo += nw) {
-      const w = Math.min(nw, this.width - lo);
-      if (covered & (maxValue(w) << BigInt(lo))) out.set(lo, (overlay >> BigInt(lo)) & maxValue(w));
+    for (let lo = 0; lo < this.width; lo += newRowWidth) {
+      const width = Math.min(newRowWidth, this.width - lo);
+      if (covered & (maxValue(width) << BigInt(lo)))
+        out.set(lo, (overlay >> BigInt(lo)) & maxValue(width));
     }
     return out;
   }
 
   /** Smallest width that keeps every named field. */
   get minWidthForGroups(): number {
-    return Math.max(MIN_WIDTH, ...this.groups.map((g) => g.hi + 1));
+    return Math.max(MIN_WIDTH, ...this.groups.map((group) => group.hi + 1));
   }
 
   /** Resize the value. High bits are cut off (or added as 0) and compare rows
@@ -470,34 +575,58 @@ export class ValueModel {
   setWidth(width: number): void {
     checkWidth(width);
     if (width === this.width) return;
-    const cut = this.groups.filter((g) => g.hi >= width);
-    if (cut.length) {
-      throw new ModelError(`Fields ${cut.map((g) => `${g.name} ${g.label()}`).join(", ")} don't fit in ${width} bits`);
+    const groupsBeyondWidth = this.groups.filter((group) => group.hi >= width);
+    if (groupsBeyondWidth.length) {
+      throw new ModelError(
+        `Fields ${groupsBeyondWidth.map((group) => `${group.name} ${group.label()}`).join(", ")} don't fit in ${width} bits`,
+      );
     }
     this.width = width;
     this.value &= this.mask;
-    const rw = this.rowWidth;
+    const rowWidth = this.rowWidth;
     const compares = new Map<number, bigint>();
-    for (const [lo, v] of this.compares) {
-      if (lo < width && lo % rw === 0) compares.set(lo, v & maxValue(this.rowWidthAt(lo)));
+    for (const [lo, value] of this.compares) {
+      if (lo < width && lo % rowWidth === 0)
+        compares.set(lo, value & maxValue(this.rowWidthAt(lo)));
     }
     this.compares = compares;
     const hidden = new Map<number, bigint>();
-    for (const [lo, v] of this.hiddenCompares) {
-      if (lo < width && lo % rw === 0) hidden.set(lo, v & maxValue(this.rowWidthAt(lo)));
+    for (const [lo, value] of this.hiddenCompares) {
+      if (lo < width && lo % rowWidth === 0)
+        hidden.set(lo, value & maxValue(this.rowWidthAt(lo)));
     }
     this.hiddenCompares = hidden;
-    for (const lo of [...this.rowBases.keys()]) if (lo >= width || lo % rw) this.rowBases.delete(lo);
+    for (const lo of [...this.rowBases.keys()])
+      if (lo >= width || lo % rowWidth) this.rowBases.delete(lo);
     this.emit("structure");
   }
 
   /** Fields that block `setWidth(width)`, and how many compare rows it would drop. */
   lostOnResize(width: number): { groups: Group[]; compares: number } {
-    const rw = Math.min(VIEW_WIDTHS[this.view] ?? width, width);
+    const rowWidth = Math.min(VIEW_WIDTHS[this.view] ?? width, width);
     return {
-      groups: this.groups.filter((g) => g.hi >= width),
-      compares: [...this.compares.keys()].filter((lo) => lo >= width || lo % rw).length,
+      groups: this.groups.filter((group) => group.hi >= width),
+      compares: [...this.compares.keys()].filter(
+        (lo) => lo >= width || lo % rowWidth,
+      ).length,
     };
+  }
+
+  /** Puts the value in a peripheral at `offset` ("" takes it out). */
+  setPeripheral(block: string, offset: bigint | null): void {
+    if (offset !== null && offset < 0n)
+      throw new ModelError("The offset can't be negative");
+    if (block === this.block && offset === this.offset) return;
+    this.block = block;
+    this.offset = offset;
+    this.emit("structure");
+  }
+
+  setDescription(description: string): void {
+    if (description !== this.description) {
+      this.description = description;
+      this.emit("structure");
+    }
   }
 
   setCollapsed(collapsed: boolean): void {
@@ -508,17 +637,21 @@ export class ValueModel {
   }
 
   /** Saves the current value under a name. */
-  takeSnapshot(name: string, at = Date.now()): Snapshot {
-    const snap = { name: name.trim() || `Snapshot ${this.snapshots.length + 1}`, value: this.value, at };
-    this.snapshots.push(snap);
+  takeSnapshot(name: string, timestamp = Date.now()): Snapshot {
+    const snapshot = {
+      name: name.trim() || `Snapshot ${this.snapshots.length + 1}`,
+      value: this.value,
+      at: timestamp,
+    };
+    this.snapshots.push(snapshot);
     this.emit("meta");
-    return snap;
+    return snapshot;
   }
 
-  removeSnapshot(snap: Snapshot): void {
-    const i = this.snapshots.indexOf(snap);
-    if (i >= 0) {
-      this.snapshots.splice(i, 1);
+  removeSnapshot(snapshot: Snapshot): void {
+    const index = this.snapshots.indexOf(snapshot);
+    if (index >= 0) {
+      this.snapshots.splice(index, 1);
       this.emit("meta");
     }
   }
@@ -550,30 +683,42 @@ export class ValueModel {
       this.emit("structure");
     }
   }
-  /** Opens a compare row on every row, filled with the bits of `other`
-   *  (e.g. another value, or a snapshot). Bits above this width are dropped. */
   /** Replaces all fields with a template's. Call only with the user's go-ahead:
    *  it removes the current fields. Refuses if a template field doesn't fit. */
-  applyTemplate(t: Template): void {
-    const tooWide = t.fields.filter((f) => f.hi >= this.width);
-    if (tooWide.length) throw new ModelError(`The template needs ${t.width} bits; this value has ${this.width}`);
-    const old = this.groups;
+  applyTemplate(template: Template): void {
+    const tooWide = template.fields.filter((field) => field.hi >= this.width);
+    if (tooWide.length)
+      throw new ModelError(
+        `The template needs ${template.width} bits; this value has ${this.width}`,
+      );
+    const previousGroups = this.groups;
     this.groups = [];
     try {
-      for (const f of t.fields) {
-        const g = this.addGroupQuiet(f.lo, f.hi, f.name, f.color, isBase(f.base) ? f.base : undefined);
-        Object.assign(g, detailsFromJSON(f));
+      for (const field of template.fields) {
+        const group = this.addGroupQuiet(
+          field.lo,
+          field.hi,
+          field.name,
+          field.color,
+          isBase(field.base) ? field.base : undefined,
+        );
+        assignDetails(group, detailsFromJSON(field));
       }
-    } catch (e) {
-      this.groups = old; // all or nothing
-      throw e;
+    } catch (error) {
+      this.groups = previousGroups; // all or nothing
+      throw error;
     }
     this.emit("groups");
   }
 
+  /** Opens a compare row on every row, filled with the bits of `other`
+   *  (e.g. another value, or a snapshot). Bits above this width are dropped. */
   compareWith(other: bigint): void {
     for (const lo of this.rowLos()) {
-      this.compares.set(lo, (other >> BigInt(lo)) & maxValue(this.rowWidthAt(lo)));
+      this.compares.set(
+        lo,
+        (other >> BigInt(lo)) & maxValue(this.rowWidthAt(lo)),
+      );
       this.hiddenCompares.delete(lo);
     }
     this.emit("structure");
@@ -581,22 +726,22 @@ export class ValueModel {
 
   /** Closes a compare row; its value is kept and comes back on reopen. */
   removeCompare(lo: number): void {
-    const v = this.compares.get(lo);
-    if (v === undefined) return;
+    const value = this.compares.get(lo);
+    if (value === undefined) return;
     this.compares.delete(lo);
-    this.hiddenCompares.set(lo, v);
+    this.hiddenCompares.set(lo, value);
     this.emit("structure");
   }
   compareValue(lo: number): bigint {
-    const v = this.compares.get(lo);
-    if (v === undefined) throw new ModelError("No compare row there");
-    return v;
+    const value = this.compares.get(lo);
+    if (value === undefined) throw new ModelError("No compare row there");
+    return value;
   }
-  setCompare(lo: number, v: bigint): void {
+  setCompare(lo: number, value: bigint): void {
     if (!this.compares.has(lo)) throw new ModelError("No compare row there");
-    v &= maxValue(this.rowWidthAt(lo));
-    if (v !== this.compares.get(lo)) {
-      this.compares.set(lo, v);
+    value &= maxValue(this.rowWidthAt(lo));
+    if (value !== this.compares.get(lo)) {
+      this.compares.set(lo, value);
       this.emit("value");
     }
   }
@@ -604,7 +749,8 @@ export class ValueModel {
     return Number((this.compareValue(lo) >> BigInt(bit - lo)) & 1n);
   }
   flipCompareBit(lo: number, bit: number): void {
-    if (bit < lo || bit >= lo + this.rowWidthAt(lo)) throw new ModelError("Bit outside the compare row");
+    if (bit < lo || bit >= lo + this.rowWidthAt(lo))
+      throw new ModelError("Bit outside the compare row");
     this.setCompare(lo, this.compareValue(lo) ^ (1n << BigInt(bit - lo)));
   }
   compareDiff(lo: number): bigint {
@@ -613,104 +759,137 @@ export class ValueModel {
 
   // ------------------------------------------------------------ groups
   groupAt(bit: number): Group | undefined {
-    return this.groups.find((g) => g.lo <= bit && bit <= g.hi);
+    return this.groups.find((group) => group.lo <= bit && bit <= group.hi);
   }
   overlapping(lo: number, hi: number): Group[] {
-    return this.groups.filter((g) => !(g.hi < lo || g.lo > hi));
+    return this.groups.filter((group) => !(group.hi < lo || group.lo > hi));
   }
   suggestGroupName(): string {
-    const names = new Set(this.groups.map((g) => g.name));
-    let n = 1;
-    while (names.has(`FIELD${n}`)) n++;
-    return `FIELD${n}`;
+    const names = new Set(this.groups.map((group) => group.name));
+    let suffix = 1;
+    while (names.has(`FIELD${suffix}`)) suffix++;
+    return `FIELD${suffix}`;
   }
   private nextColor(): string {
-    const used = new Set(this.groups.map((g) => g.color.toLowerCase()));
-    return GROUP_COLORS.find((c) => !used.has(c)) ?? GROUP_COLORS[this.groups.length % GROUP_COLORS.length];
+    const used = new Set(this.groups.map((group) => group.color.toLowerCase()));
+    return (
+      GROUP_COLORS.find((color) => !used.has(color)) ??
+      GROUP_COLORS[this.groups.length % GROUP_COLORS.length]
+    );
   }
-  addGroup(lo: number, hi: number, name?: string, color?: string, base?: Base): Group {
-    const g = this.addGroupQuiet(lo, hi, name, color, base);
+  addGroup(
+    lo: number,
+    hi: number,
+    name?: string,
+    color?: string,
+    base?: Base,
+  ): Group {
+    const group = this.addGroupQuiet(lo, hi, name, color, base);
     this.emit("groups");
-    return g;
+    return group;
   }
   /** addGroup without the change notification (for batch updates). */
-  private addGroupQuiet(lo: number, hi: number, name?: string, color?: string, base?: Base): Group {
+  private addGroupQuiet(
+    lo: number,
+    hi: number,
+    name?: string,
+    color?: string,
+    base?: Base,
+  ): Group {
+    checkPositions(lo, hi);
     [lo, hi] = [Math.min(lo, hi), Math.max(lo, hi)];
-    if (lo < 0 || hi >= this.width) throw new ModelError("Group outside the value");
+    if (lo < 0 || hi >= this.width)
+      throw new ModelError("Group outside the value");
     const clash = this.overlapping(lo, hi);
     if (clash.length) {
-      throw new ModelError("Groups cannot overlap: " + clash.map((g) => `${g.name} ${g.label()}`).join(", "));
+      throw new ModelError(
+        "Groups cannot overlap: " +
+          clash.map((group) => `${group.name} ${group.label()}`).join(", "),
+      );
     }
     const width = hi - lo + 1;
-    const g = new Group(
+    const field = new Group(
       lo,
       hi,
       (name ?? "").trim() || this.suggestGroupName(),
-      color || this.nextColor(),
+      isColor(color) ? color : this.nextColor(),
       base ? checkBase(base) : width <= 3 ? 2 : 16,
     );
-    this.groups.push(g);
-    this.groups.sort((a, b) => b.hi - a.hi);
-    return g;
+    this.groups.push(field);
+    this.groups.sort((first, second) => second.hi - first.hi);
+    return field;
   }
-  removeGroup(g: Group): void {
-    const i = this.groups.indexOf(g);
-    if (i >= 0) {
-      this.groups.splice(i, 1);
+  removeGroup(group: Group): void {
+    const index = this.groups.indexOf(group);
+    if (index >= 0) {
+      this.groups.splice(index, 1);
       this.emit("groups");
     }
   }
   /** Moves a field's edges, e.g. to widen a 4-bit field to 8 bits. Other fields stay put. */
-  resizeGroup(g: Group, lo: number, hi: number): void {
+  resizeGroup(group: Group, lo: number, hi: number): void {
+    checkPositions(lo, hi);
     [lo, hi] = [Math.min(lo, hi), Math.max(lo, hi)];
-    if (lo < 0 || hi >= this.width) throw new ModelError("Group outside the value");
-    const clash = this.overlapping(lo, hi).filter((o) => o !== g);
+    if (lo < 0 || hi >= this.width)
+      throw new ModelError("Group outside the value");
+    const clash = this.overlapping(lo, hi).filter((other) => other !== group);
     if (clash.length) {
-      throw new ModelError("Groups cannot overlap: " + clash.map((o) => `${o.name} ${o.label()}`).join(", "));
+      throw new ModelError(
+        "Groups cannot overlap: " +
+          clash.map((other) => `${other.name} ${other.label()}`).join(", "),
+      );
     }
-    if (lo === g.lo && hi === g.hi) return;
-    g.lo = lo;
-    g.hi = hi;
-    this.groups.sort((a, b) => b.hi - a.hi);
+    if (lo === group.lo && hi === group.hi) return;
+    group.lo = lo;
+    group.hi = hi;
+    this.groups.sort((first, second) => second.hi - first.hi);
     this.emit("groups");
   }
-  updateGroup(g: Group, changes: { name?: string; color?: string; base?: Base }): void {
+  updateGroup(
+    group: Group,
+    changes: { name?: string; color?: string; base?: Base },
+  ): void {
     let changed = false;
-    if (changes.name !== undefined && changes.name !== g.name) {
-      g.name = changes.name;
+    if (changes.name !== undefined && changes.name !== group.name) {
+      group.name = changes.name;
       changed = true;
     }
-    if (changes.color !== undefined && changes.color !== g.color) {
-      g.color = changes.color;
+    if (changes.color !== undefined && changes.color !== group.color) {
+      if (!isColor(changes.color))
+        throw new ModelError(`Not a colour: ${changes.color}`);
+      group.color = changes.color;
       changed = true;
     }
-    if (changes.base !== undefined && checkBase(changes.base) !== g.base) {
-      g.base = changes.base;
+    if (changes.base !== undefined && checkBase(changes.base) !== group.base) {
+      group.base = changes.base;
       changed = true;
     }
     if (changed) this.emit("group_meta");
   }
   /** Replaces a field's details (signedness, formula, named values, …). */
-  setGroupDetails(g: Group, details: Partial<FieldDetails>): void {
-    Object.assign(g, details);
+  setGroupDetails(group: Group, details: Partial<FieldDetails>): void {
+    assignDetails(group, details);
     this.emit("groups"); // the fields panel shows these, so rebuild it
   }
   /** Value of a field as a number: two's complement when the field is signed. */
-  groupNumber(g: Group): bigint {
-    const raw = this.groupValue(g);
-    return g.signed && g.width > 1 ? toSignedBits(raw, g.width) : raw;
+  groupNumber(group: Group): bigint {
+    const raw = this.groupValue(group);
+    return group.signed && group.width > 1
+      ? toSignedBits(raw, group.width)
+      : raw;
   }
-  groupValue(g: Group): bigint {
-    return this.bitsValue(g.lo, g.width);
+  groupValue(group: Group): bigint {
+    return this.bitsValue(group.lo, group.width);
   }
-  setGroupValue(g: Group, v: bigint): void {
-    this.setBitsValue(g.lo, g.width, v);
+  setGroupValue(group: Group, value: bigint): void {
+    this.setBitsValue(group.lo, group.width, value);
   }
 
   // ------------------------------------------------------------ serialization
   toJSON() {
-    const hex = (v: bigint) => "0x" + v.toString(16).toUpperCase();
-    const sorted = <T>(m: Map<number, T>) => [...m.entries()].sort((a, b) => a[0] - b[0]);
+    const hex = (value: bigint) => "0x" + value.toString(16).toUpperCase();
+    const sorted = <T>(map: Map<number, T>) =>
+      [...map.entries()].sort((first, second) => first[0] - second[0]);
     return {
       name: this.name,
       width: this.width,
@@ -721,63 +900,107 @@ export class ValueModel {
       default_row_base: this.defaultRowBase,
       show_bases: this.showBases,
       collapsed: this.collapsed,
-      snapshots: this.snapshots.map((x) => ({ name: x.name, value: hex(x.value), at: x.at })),
-      row_bases: Object.fromEntries(sorted(this.rowBases).map(([k, v]) => [String(k), v])),
-      compares: Object.fromEntries(sorted(this.compares).map(([k, v]) => [String(k), hex(v)])),
-      hidden_compares: Object.fromEntries(sorted(this.hiddenCompares).map(([k, v]) => [String(k), hex(v)])),
-      groups: this.groups.map((g) => g.toJSON()),
+      snapshots: this.snapshots.map((snapshot) => ({
+        name: snapshot.name,
+        value: hex(snapshot.value),
+        at: snapshot.at,
+      })),
+      row_bases: Object.fromEntries(
+        sorted(this.rowBases).map(([rowStart, base]) => [
+          String(rowStart),
+          base,
+        ]),
+      ),
+      compares: Object.fromEntries(
+        sorted(this.compares).map(([rowStart, value]) => [
+          String(rowStart),
+          hex(value),
+        ]),
+      ),
+      hidden_compares: Object.fromEntries(
+        sorted(this.hiddenCompares).map(([rowStart, value]) => [
+          String(rowStart),
+          hex(value),
+        ]),
+      ),
+      groups: this.groups.map((group) => group.toJSON()),
+      // only written when set, so plain values stay as they were
+      ...(this.block ? { block: this.block } : {}),
+      ...(this.offset !== null ? { offset: hex(this.offset) } : {}),
+      ...(this.description ? { description: this.description } : {}),
     };
   }
 
-  static fromJSON(d: any): ValueModel {
-    if (!d || typeof d !== "object") throw new ModelError("Invalid value entry");
-    if (!("width" in d)) throw new ModelError("Invalid value entry: missing width");
-    const m = new ValueModel({
-      width: Number(d.width),
-      value: toBig(d.value ?? 0),
-      name: String(d.name ?? "Value"),
-      view: d.view ?? "byte",
-      msbFirst: Boolean(d.msb_first ?? true),
-      fullBase: checkBase(Number(d.full_base ?? 16)),
-      defaultRowBase: checkBase(Number(d.default_row_base ?? 16)),
+  static fromJSON(json: any): ValueModel {
+    if (!json || typeof json !== "object")
+      throw new ModelError("Invalid value entry");
+    if (!("width" in json))
+      throw new ModelError("Invalid value entry: missing width");
+    const model = new ValueModel({
+      width: Number(json.width),
+      value: toBig(json.value ?? 0),
+      name: String(json.name ?? "Value"),
+      view: json.view ?? "byte",
+      msbFirst: Boolean(json.msb_first ?? true),
+      fullBase: checkBase(Number(json.full_base ?? 16)),
+      defaultRowBase: checkBase(Number(json.default_row_base ?? 16)),
     });
-    m.showBases = d.show_bases === true;
-    m.collapsed = d.collapsed === true;
-    for (const x of Array.isArray(d.snapshots) ? d.snapshots : []) {
+    model.showBases = json.show_bases === true;
+    model.collapsed = json.collapsed === true;
+    if (typeof json.block === "string") model.block = json.block.trim();
+    if (json.offset !== undefined && json.offset !== null) {
+      const offset = toBig(json.offset);
+      if (offset < 0n) throw new ModelError("Invalid register offset");
+      model.offset = offset;
+    }
+    if (typeof json.description === "string")
+      model.description = json.description;
+    for (const snapshotJson of Array.isArray(json.snapshots)
+      ? json.snapshots
+      : []) {
       try {
-        m.snapshots.push({ name: String(x.name ?? "Snapshot"), value: toBig(x.value) & m.mask, at: Number(x.at) || 0 });
+        model.snapshots.push({
+          name: String(snapshotJson.name ?? "Snapshot"),
+          value: toBig(snapshotJson.value) & model.mask,
+          at: Number(snapshotJson.at) || 0,
+        });
       } catch {
         /* skip a malformed snapshot */
       }
     }
-    for (const [k, b] of Object.entries(d.row_bases ?? {})) {
-      const lo = Number(k);
-      m.checkRow(lo);
-      m.rowBases.set(lo, checkBase(Number(b)));
+    for (const [rowStart, base] of Object.entries(json.row_bases ?? {})) {
+      const lo = Number(rowStart);
+      model.checkRow(lo);
+      model.rowBases.set(lo, checkBase(Number(base)));
     }
-    for (const [k, v] of Object.entries(d.compares ?? {})) {
-      const lo = Number(k);
-      m.checkRow(lo);
-      m.compares.set(lo, toBig(v) & maxValue(m.rowWidthAt(lo)));
+    for (const [rowStart, value] of Object.entries(json.compares ?? {})) {
+      const lo = Number(rowStart);
+      model.checkRow(lo);
+      model.compares.set(lo, toBig(value) & maxValue(model.rowWidthAt(lo)));
     }
-    for (const [k, v] of Object.entries(d.hidden_compares ?? {})) {
-      const lo = Number(k);
-      m.checkRow(lo);
-      if (!m.compares.has(lo)) m.hiddenCompares.set(lo, toBig(v) & maxValue(m.rowWidthAt(lo)));
+    for (const [rowStart, value] of Object.entries(
+      json.hidden_compares ?? {},
+    )) {
+      const lo = Number(rowStart);
+      model.checkRow(lo);
+      if (!model.compares.has(lo))
+        model.hiddenCompares.set(
+          lo,
+          toBig(value) & maxValue(model.rowWidthAt(lo)),
+        );
     }
-    for (const gd of d.groups ?? []) {
-      if (gd?.lo === undefined || gd?.hi === undefined) throw new ModelError("Invalid group entry");
-      const g = m.addGroup(
-        Number(gd.lo),
-        Number(gd.hi),
-        String(gd.name ?? ""),
-        gd.color,
-        checkBase(Number(gd.base ?? 16)),
+    for (const groupJson of json.groups ?? []) {
+      if (groupJson?.lo === undefined || groupJson?.hi === undefined)
+        throw new ModelError("Invalid group entry");
+      const group = model.addGroup(
+        bitPosition(groupJson.lo),
+        bitPosition(groupJson.hi),
+        String(groupJson.name ?? ""),
+        groupJson.color,
+        checkBase(Number(groupJson.base ?? 16)),
       );
-      Object.assign(g, detailsFromJSON(gd));
+      assignDetails(group, detailsFromJSON(groupJson));
     }
-    return m;
+    return model;
   }
 }
-
-export { BASE_ORDER };
