@@ -46,6 +46,7 @@ export type ChangeKind =
   | "group_meta"
   | "groups"
   | "structure";
+
 type Listener = (kind: ChangeKind) => void;
 
 /** A named copy of a value at some moment. */
@@ -107,9 +108,11 @@ export class ValueModel {
   subscribe(callback: Listener): void {
     this.listeners.push(callback);
   }
+
   unsubscribe(callback: Listener): void {
     this.listeners = this.listeners.filter((listener) => listener !== callback);
   }
+
   private emit(kind: ChangeKind): void {
     for (const callback of [...this.listeners]) callback(kind);
   }
@@ -118,24 +121,29 @@ export class ValueModel {
   get mask(): bigint {
     return maxValue(this.width);
   }
+
   /** Nominal row width for the view (the top row can be shorter). */
   get rowWidth(): number {
     return rowWidthFor(this.view, this.width);
   }
+
   /** Bits in the row starting at `lo`; only the top row can be partial. */
   rowWidthAt(lo: number): number {
     return Math.min(this.rowWidth, this.width - lo);
   }
+
   /** Row start bits in display order. */
   rowLos(): number[] {
     const rowStarts: number[] = [];
     for (let lo = 0; lo < this.width; lo += this.rowWidth) rowStarts.push(lo);
     return this.msbFirst ? rowStarts.reverse() : rowStarts;
   }
+
   rowTitle(lo: number): string {
     if (this.view === "line") return `Bits ${this.width - 1}…0`;
     return `${this.view === "byte" ? "Byte" : "Nibble"} ${lo / this.rowWidth}`;
   }
+
   /** Throws unless `lo` starts a row in the current view. */
   checkRow(lo: number): void {
     if (
@@ -147,6 +155,7 @@ export class ValueModel {
       throw new ModelError(`${lo} is not a row start for this view`);
     }
   }
+
   private checkBit(bitIndex: number): void {
     if (bitIndex < 0 || bitIndex >= this.width)
       throw new ModelError(`Bit ${bitIndex} out of range`);
@@ -159,6 +168,7 @@ export class ValueModel {
       this.emit("meta");
     }
   }
+
   setFullBase(base: Base): void {
     base = checkBase(base);
     if (base !== this.fullBase) {
@@ -166,17 +176,21 @@ export class ValueModel {
       this.emit("format");
     }
   }
+
   rowBase(lo: number): Base {
     return this.rowBases.get(lo) ?? this.defaultRowBase;
   }
+
   setRowBase(lo: number, base: Base): void {
     this.checkRow(lo);
     base = checkBase(base);
+
     if (this.rowBase(lo) !== base) {
       this.rowBases.set(lo, base);
       this.emit("format");
     }
   }
+
   setAllRowBases(base: Base): void {
     this.defaultRowBase = checkBase(base);
     this.rowBases.clear();
@@ -187,6 +201,7 @@ export class ValueModel {
   bit(bitIndex: number): number {
     return Number((this.value >> BigInt(bitIndex)) & 1n);
   }
+
   setValue(value: bigint): void {
     value &= this.mask;
     if (value !== this.value) {
@@ -194,13 +209,16 @@ export class ValueModel {
       this.emit("value");
     }
   }
+
   flipBit(bitIndex: number): void {
     this.checkBit(bitIndex);
     this.setValue(this.value ^ (1n << BigInt(bitIndex)));
   }
+
   bitsValue(lo: number, width: number): bigint {
     return (this.value >> BigInt(lo)) & maxValue(width);
   }
+
   /** The whole value with bits lo … lo+width-1 replaced by `value` (nothing is changed). */
   withBits(lo: number, width: number, value: bigint): bigint {
     const mask = maxValue(width);
@@ -210,12 +228,15 @@ export class ValueModel {
       this.mask
     );
   }
+
   setBitsValue(lo: number, width: number, value: bigint): void {
     this.setValue(this.withBits(lo, width, value));
   }
+
   rowValue(lo: number): bigint {
     return this.bitsValue(lo, this.rowWidthAt(lo));
   }
+
   setRowValue(lo: number, value: bigint): void {
     this.checkRow(lo);
     this.setBitsValue(lo, this.rowWidthAt(lo), value);
@@ -225,18 +246,21 @@ export class ValueModel {
   opValue(operation: Op, argument?: bigint): void {
     this.setValue(applyOp(operation, this.value, this.width, argument));
   }
+
   opRow(lo: number, operation: Op, argument?: bigint): void {
     this.setRowValue(
       lo,
       applyOp(operation, this.rowValue(lo), this.rowWidthAt(lo), argument),
     );
   }
+
   opCompare(lo: number, operation: Op, argument?: bigint): void {
     this.setCompare(
       lo,
       applyOp(operation, this.compareValue(lo), this.rowWidthAt(lo), argument),
     );
   }
+
   /** Applies `op` to the bits lo..hi only (e.g. a selection). */
   opBits(lo: number, hi: number, operation: Op, argument?: bigint): void {
     const width = hi - lo + 1;
@@ -287,23 +311,30 @@ export class ValueModel {
         `Fields ${groupsBeyondWidth.map((group) => `${group.name} ${group.label()}`).join(", ")} don't fit in ${width} bits`,
       );
     }
+
     this.width = width;
     this.value &= this.mask;
     const rowWidth = this.rowWidth;
     const compares = new Map<number, bigint>();
+
     for (const [lo, value] of this.compares) {
       if (lo < width && lo % rowWidth === 0)
         compares.set(lo, value & maxValue(this.rowWidthAt(lo)));
     }
+
     this.compares = compares;
     const hidden = new Map<number, bigint>();
+
     for (const [lo, value] of this.hiddenCompares) {
       if (lo < width && lo % rowWidth === 0)
         hidden.set(lo, value & maxValue(this.rowWidthAt(lo)));
     }
+
     this.hiddenCompares = hidden;
+
     for (const lo of [...this.rowBases.keys()])
       if (lo >= width || lo % rowWidth) this.rowBases.delete(lo);
+
     this.emit("structure");
   }
 
@@ -322,6 +353,7 @@ export class ValueModel {
   setPeripheral(block: string, offset: bigint | null): void {
     if (offset !== null && offset < 0n)
       throw new ModelError("The offset can't be negative");
+
     if (block === this.block && offset === this.offset) return;
     this.block = block;
     this.offset = offset;
@@ -380,6 +412,7 @@ export class ValueModel {
   hasCompare(lo: number): boolean {
     return this.compares.has(lo);
   }
+
   addCompare(lo: number): void {
     this.checkRow(lo);
     if (!this.compares.has(lo)) {
@@ -400,6 +433,7 @@ export class ValueModel {
       );
       this.hiddenCompares.delete(lo);
     }
+
     this.emit("structure");
   }
 
@@ -411,27 +445,34 @@ export class ValueModel {
     this.hiddenCompares.set(lo, value);
     this.emit("structure");
   }
+
   compareValue(lo: number): bigint {
     const value = this.compares.get(lo);
     if (value === undefined) throw new ModelError("No compare row there");
     return value;
   }
+
   setCompare(lo: number, value: bigint): void {
     if (!this.compares.has(lo)) throw new ModelError("No compare row there");
     value &= maxValue(this.rowWidthAt(lo));
+
     if (value !== this.compares.get(lo)) {
       this.compares.set(lo, value);
       this.emit("value");
     }
   }
+
   compareBit(lo: number, bit: number): number {
     return Number((this.compareValue(lo) >> BigInt(bit - lo)) & 1n);
   }
+
   flipCompareBit(lo: number, bit: number): void {
     if (bit < lo || bit >= lo + this.rowWidthAt(lo))
       throw new ModelError("Bit outside the compare row");
+
     this.setCompare(lo, this.compareValue(lo) ^ (1n << BigInt(bit - lo)));
   }
+
   compareDiff(lo: number): bigint {
     return this.compareValue(lo) ^ this.rowValue(lo);
   }
@@ -440,12 +481,15 @@ export class ValueModel {
   groupAt(bit: number): Group | undefined {
     return this.groups.find((group) => group.lo <= bit && bit <= group.hi);
   }
+
   overlapping(lo: number, hi: number): Group[] {
     return overlappingFields(this.groups, lo, hi);
   }
+
   suggestGroupName(): string {
     return suggestFieldName(this.groups);
   }
+
   addGroup(
     lo: number,
     hi: number,
@@ -457,6 +501,7 @@ export class ValueModel {
     this.emit("groups");
     return group;
   }
+
   /** addGroup without the change notification (for batch updates). */
   private addGroupQuiet(
     lo: number,
@@ -470,6 +515,7 @@ export class ValueModel {
     sortFields(this.groups);
     return group;
   }
+
   removeGroup(group: Group): void {
     const index = this.groups.indexOf(group);
     if (index >= 0) {
@@ -477,6 +523,7 @@ export class ValueModel {
       this.emit("groups");
     }
   }
+
   /** Moves a field's edges, e.g. to widen a 4-bit field to 8 bits. Other fields stay put. */
   resizeGroup(group: Group, lo: number, hi: number): void {
     [lo, hi] = fieldRange(this.groups, this.width, lo, hi, group);
@@ -486,27 +533,34 @@ export class ValueModel {
     sortFields(this.groups);
     this.emit("groups");
   }
+
   updateGroup(
     group: Group,
     changes: { name?: string; color?: string; base?: Base },
   ): void {
     let changed = false;
+
     if (changes.name !== undefined && changes.name !== group.name) {
       group.name = changes.name;
       changed = true;
     }
+
     if (changes.color !== undefined && changes.color !== group.color) {
       if (!isColor(changes.color))
         throw new ModelError(`Not a colour: ${changes.color}`);
+
       group.color = changes.color;
       changed = true;
     }
+
     if (changes.base !== undefined && checkBase(changes.base) !== group.base) {
       group.base = changes.base;
       changed = true;
     }
+
     if (changed) this.emit("group_meta");
   }
+
   /** Replaces a field's details (signedness, formula, named values, …). */
   setGroupDetails(group: Group, details: Partial<FieldDetails>): void {
     assignDetails(group, details);
@@ -521,8 +575,10 @@ export class ValueModel {
       throw new ModelError(
         `The template needs ${template.width} bits; this value has ${this.width}`,
       );
+
     const previousGroups = this.groups;
     this.groups = [];
+
     try {
       for (const field of template.fields) {
         const group = this.addGroupQuiet(
@@ -538,11 +594,14 @@ export class ValueModel {
       this.groups = previousGroups; // all or nothing
       throw error;
     }
+
     this.emit("groups");
   }
+
   groupValue(group: Group): bigint {
     return this.bitsValue(group.lo, group.width);
   }
+
   setGroupValue(group: Group, value: bigint): void {
     this.setBitsValue(group.lo, group.width, value);
   }

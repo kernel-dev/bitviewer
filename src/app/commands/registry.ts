@@ -10,12 +10,16 @@ export interface Command {
   group: CommandGroup;
   label: string | (() => string);
   icon?: IconNode | (() => IconNode);
+
   /** Shortcuts like "Ctrl+Shift+S". The first one is shown in menus. */
   keys?: string[];
+
   /** Extra words the command palette matches on. */
   keywords?: string;
+
   run: () => void;
   enabled?: () => boolean;
+
   /** Hide from the command palette (default: shown). */
   hidden?: boolean;
 }
@@ -33,6 +37,7 @@ export function matchKey(spec: string, event: KeyboardEvent): boolean {
     key = "+";
     parts.pop();
   }
+
   const modifiers = new Set(parts.map((path) => path.toLowerCase()));
   const ctrlOrCommand = event.ctrlKey || event.metaKey;
   if (
@@ -40,16 +45,20 @@ export function matchKey(spec: string, event: KeyboardEvent): boolean {
     modifiers.has("alt") !== event.altKey
   )
     return false;
+
   const lowerKey = key.toLowerCase();
   // "+" is typed with Shift on most layouts, so don't insist on Shift there
   if (lowerKey !== "+" && modifiers.has("shift") !== event.shiftKey)
     return false;
+
   if (/^[0-9]$/.test(lowerKey))
     return (
       event.code === `Digit${lowerKey}` || event.code === `Numpad${lowerKey}`
     );
+
   if (/^[a-z]$/.test(lowerKey))
     return event.code === `Key${lowerKey.toUpperCase()}`;
+
   const aliases: Record<string, string> = {
     esc: "escape",
     del: "delete",
@@ -113,6 +122,7 @@ export class CommandRegistry {
   /** Runs the command bound to this key press. Returns true when handled. */
   handleKey(event: KeyboardEvent): boolean {
     const inText = isTextTarget(event.target);
+
     for (const command of this.cmds.values()) {
       for (const spec of command.keys ?? []) {
         if (!matchKey(spec, event)) continue;
@@ -124,6 +134,7 @@ export class CommandRegistry {
         return true;
       }
     }
+
     return false;
   }
 }

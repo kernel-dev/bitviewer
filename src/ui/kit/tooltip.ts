@@ -2,6 +2,7 @@
 // after a short hover. Bit cells show theirs next to the pointer.
 
 const tooltips = new WeakMap<Element, string | (() => string)>();
+
 export function setTip(
   element: Element,
   tip: string | (() => string) | undefined,
@@ -28,6 +29,7 @@ export function showTip(target: Element, text: string, x?: number, y?: number) {
     tipEl.className = "tooltip";
     tipEl.setAttribute("role", "tooltip");
   }
+
   tipEl.textContent = text;
   tipEl.classList.add("show");
 
@@ -66,6 +68,7 @@ export function installTooltips() {
     if (!target || event.buttons) return;
 
     tipTarget = target;
+
     tipTimer = window.setTimeout(() => {
       const tip = tooltips.get(target);
       const text = typeof tip === "function" ? tip() : tip;
@@ -81,6 +84,7 @@ export function installTooltips() {
     lastX = event.clientX;
     lastY = event.clientY;
   });
+
   document.addEventListener("pointerdown", hideTip, true);
   document.addEventListener("wheel", hideTip, { passive: true });
   document.addEventListener("keydown", hideTip, true);

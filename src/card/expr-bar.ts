@@ -17,10 +17,12 @@ export function expressionBar(options: {
   // created, because the field evaluates (and calls back) right away.
   const label = html("span", { class: "expr-target muted small" });
   let field: ExprField | null = null;
+
   const run = () => {
     const result = field?.result();
     if (result) options.apply(result.value);
   };
+
   const applyBtn = button({
     icon: Check,
     label: "Apply",
@@ -28,6 +30,7 @@ export function expressionBar(options: {
     tip: "Apply (Enter)",
     onClick: run,
   });
+
   field = exprField({
     width: options.width,
     lookup: options.lookup,
@@ -41,13 +44,16 @@ export function expressionBar(options: {
       label.textContent = `→ ${options.target()}`;
     },
   });
+
   const input = field.input;
+
   input.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       event.stopPropagation();
       options.close();
     }
   });
+
   const bar = html(
     "div",
     { class: "expr-bar", "data-keep-sel": "" },

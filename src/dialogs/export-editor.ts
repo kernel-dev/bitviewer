@@ -67,6 +67,7 @@ export function editExportTemplate(
     wide: true,
     cancelValue: null,
     hasChanges: () => currentSource() !== start.source,
+
     build: (body, close) => {
       body.parentElement?.classList.add("guide-modal");
       const source = html("textarea", {
@@ -86,6 +87,7 @@ export function editExportTemplate(
       const render = () => {
         saved = null;
         status.textContent = "";
+
         try {
           const meta = compileTemplate(source.value).meta;
           const scope = meta.scope ?? "register";
@@ -95,12 +97,14 @@ export function editExportTemplate(
                 ? "This exports a peripheral: keep the line @scope peripheral"
                 : "This exports one value: remove the @scope peripheral line, or edit it from a peripheral's Export code",
             );
+
           output.textContent = preview(source.value);
           const name = meta.name?.trim() ?? "";
           if (!name)
             throw new TemplateError(
               "Give it a name with a line such as: @name My template",
             );
+
           if (
             BUILTIN_EXPORTS.some(
               (template) => template.name.toLowerCase() === name.toLowerCase(),
@@ -110,11 +114,13 @@ export function editExportTemplate(
               `“${name}” is a built-in template; change its @name line to save your own`,
             );
           }
+
           if (options.taken.includes(name.toLowerCase())) {
             throw new TemplateError(
               `You already have a template called “${name}”; pick another @name`,
             );
           }
+
           const extension =
             (meta.extension ?? "txt").replace(/^\./, "") || "txt";
           saved = { name, extension, source: source.value };
@@ -127,10 +133,13 @@ export function editExportTemplate(
               ? caught.message
               : `Unexpected error: ${caught instanceof Error ? caught.message : String(caught)}`;
         }
+
         save.disabled = !saved;
         output.classList.toggle("stale", !saved);
       };
+
       source.addEventListener("input", render);
+
       save.addEventListener("click", () => {
         if (saved) close({ saved });
       });
@@ -163,6 +172,7 @@ export function editExportTemplate(
         button({ label: "Cancel", onClick: () => close(null) }),
         save,
       ];
+
       if (options.existing) {
         buttons.unshift(
           button({
@@ -172,6 +182,7 @@ export function editExportTemplate(
           }),
         );
       }
+
       return buttons;
     },
   });

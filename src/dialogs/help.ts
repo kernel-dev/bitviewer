@@ -96,6 +96,7 @@ export function showHelp(
   const withKeys = commands
     .all()
     .filter((command) => command.keys?.length && !command.hidden);
+
   return modal<void>({
     title: "Help",
     icon: CircleQuestionMark,
@@ -122,19 +123,23 @@ export function showHelp(
           ),
         ]),
       );
+
       const guideLink = (page: string) => {
         const anchor = html(
           "a",
           { href: "#", class: "guide-link" },
           "Learn more",
         );
+
         anchor.addEventListener("click", (event) => {
           event.preventDefault();
           close();
           setTimeout(() => openGuide(page), 150);
         });
+
         return anchor;
       };
+
       const render = () => {
         const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
         const hit = (text: string) =>
@@ -164,12 +169,14 @@ export function showHelp(
         );
         // filter shortcut rows in place
         const labels = [...shortcuts.querySelectorAll(".sc-label")];
+
         labels.forEach((label, index) => {
           const show = scRows.includes(withKeys[index]);
           (label as HTMLElement).hidden = !show;
           (label.nextElementSibling as HTMLElement).hidden = !show;
         });
       };
+
       search.addEventListener("input", render);
       body.append(
         html(
@@ -181,6 +188,7 @@ export function showHelp(
         list,
       );
       render();
+
       return [
         button({
           icon: BookOpen,

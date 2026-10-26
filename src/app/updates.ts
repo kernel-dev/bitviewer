@@ -16,9 +16,11 @@ export async function checkForUpdates(
     if (manual) toast("Updates are only available in the desktop app");
     return;
   }
+
   let update: Awaited<
     ReturnType<typeof import("@tauri-apps/plugin-updater").check>
   >;
+
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
     if (manual) toast("Checking for updates…");
@@ -32,13 +34,17 @@ export async function checkForUpdates(
         "ok",
       );
     }
+
     return;
   }
+
   if (!update) {
     if (manual) toast("You're on the latest version", "ok");
     return;
   }
+
   const found = update;
+
   const install = await modal<boolean>({
     title: `Bit Viewer ${found.version} is available`,
     icon: CloudDownload,
@@ -60,9 +66,11 @@ export async function checkForUpdates(
       ];
     },
   });
+
   if (!install || !(await prepare())) return;
   let downloadedBytes = 0;
   let total = 0;
+
   try {
     await found.downloadAndInstall((event) => {
       if (event.event === "Started") total = event.data.contentLength ?? 0;
@@ -74,6 +82,7 @@ export async function checkForUpdates(
           );
       } else if (event.event === "Finished") toast("Installing…");
     });
+
     const { relaunch } = await import("@tauri-apps/plugin-process");
     await relaunch();
   } catch (error) {

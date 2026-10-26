@@ -27,11 +27,13 @@ export const test = base.extend<{ app: AppDriver }>({
         sessionStorage.setItem("e2e-init", "1");
       }
     }, version);
+
     await page.goto("/");
     await expect(page.locator(".card")).toHaveCount(1);
     await use(new AppDriver(page));
   },
 });
+
 export { expect };
 
 export class AppDriver {

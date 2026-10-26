@@ -38,6 +38,7 @@ export function parseSvd(source: string): SvdDevice {
     throw new SvdError(
       `This is not a CMSIS-SVD file (it starts with <${root.name}>, not <device>)`,
     );
+
   return new SvdReader(root).device();
 }
 
@@ -73,6 +74,7 @@ class SvdReader {
       "peripheral",
     );
     const peripherals: SvdPeripheral[] = [];
+
     for (const raw of peripheralElements) {
       const element = merged(
         raw,
@@ -81,6 +83,7 @@ class SvdReader {
       const props = inherit(element, deviceProps);
       const baseAddress =
         parseSvdNumber(childText(element, "baseAddress")) ?? 0n;
+
       for (const copy of expandDim(
         element,
         text(element, "name"),
@@ -99,6 +102,7 @@ class SvdReader {
             props,
             registers,
           );
+
         peripherals.push({
           name: copy.name,
           description: text(element, "description"),
@@ -108,6 +112,7 @@ class SvdReader {
         });
       }
     }
+
     return {
       name: text(root, "name") || "Device",
       description: text(root, "description"),
@@ -128,6 +133,7 @@ class SvdReader {
     const items = container.children.filter(
       (item) => item.name === "register" || item.name === "cluster",
     );
+
     for (const raw of items) {
       const isCluster = raw.name === "cluster";
       const element = merged(
@@ -145,6 +151,7 @@ class SvdReader {
       for (const copy of expandDim(element, baseName, this.warnings)) {
         const address = baseAddress + offset + BigInt(copy.index) * step;
         const path = `${pathPrefix}.${copy.name}`;
+
         if (isCluster) {
           this.readRegisters(
             element,
@@ -156,12 +163,14 @@ class SvdReader {
           );
           continue;
         }
+
         if (ownProps.size < 1 || ownProps.size > MAX_WIDTH) {
           this.warnings.push(
             `${path}: ${ownProps.size} bits is outside 1–${MAX_WIDTH}; skipped`,
           );
           continue;
         }
+
         const registerWarnings: string[] = [];
         const fields = fitFields(
           this.readFields(element, ownProps.access, registerWarnings),
@@ -193,6 +202,7 @@ class SvdReader {
   ): SvdField[] {
     const fieldElements = children(child(register, "fields"), "field");
     const out: SvdField[] = [];
+
     for (const raw of fieldElements) {
       const field = merged(
         raw,
@@ -204,6 +214,7 @@ class SvdReader {
       const bitRange = /^\[(\d+):(\d+)\]$/.exec(
         childText(field, "bitRange") ?? "",
       );
+
       if (bitRange) {
         lsb = Number(bitRange[2]);
         width = Number(bitRange[1]) - lsb + 1;
@@ -214,14 +225,17 @@ class SvdReader {
         lsb = Number(parseSvdNumber(childText(field, "bitOffset")));
         width = Number(parseSvdNumber(childText(field, "bitWidth")) ?? 1n);
       }
+
       if (lsb === null || width === null || !(width >= 1) || !(lsb >= 0)) {
         registerWarnings.push(`${baseName}: no usable bit position`);
         continue;
       }
+
       const step = Number(
         parseSvdNumber(childText(field, "dimIncrement")) ?? 0n,
       );
       const enums = this.readEnums(field);
+
       for (const copy of expandDim(field, baseName, registerWarnings)) {
         const fieldLsb = lsb + copy.index * step;
         out.push({
@@ -234,22 +248,26 @@ class SvdReader {
         });
       }
     }
+
     return out;
   }
 
   private readEnums(field: XmlElement): SvdEnum[] {
     const out: SvdEnum[] = [];
     const seen = new Set<bigint>();
+
     for (const list of children(field, "enumeratedValues")) {
       const resolved = merged(
         list,
         findBase(list.attributes.derivedFrom, [], this.allEnums),
       );
+
       for (const item of children(resolved, "enumeratedValue")) {
         const valueText = childText(item, "value");
         if (valueText === undefined) continue; // isDefault entries have no value
         const values = enumValues(valueText);
         if (!values) continue;
+
         for (const value of values) {
           if (seen.has(value)) continue; // read and write lists often repeat
           seen.add(value);
@@ -261,6 +279,7 @@ class SvdReader {
         }
       }
     }
+
     return out;
   }
 }
@@ -273,6 +292,7 @@ function fitFields(
   warnings: string[],
 ): SvdField[] {
   const kept: SvdField[] = [];
+
   for (const field of fields) {
     if (field.msb >= size) {
       warnings.push(
@@ -280,14 +300,18 @@ function fitFields(
       );
       continue;
     }
+
     const clash = kept.find(
       (other) => !(other.msb < field.lsb || other.lsb > field.msb),
     );
+
     if (clash) {
       warnings.push(`${field.name} overlaps ${clash.name}, so it was left out`);
       continue;
     }
+
     kept.push(field);
   }
+
   return kept;
 }

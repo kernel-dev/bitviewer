@@ -11,6 +11,7 @@ function parseInteger(text: string): bigint {
   const cleaned = text.trim().replace(/_/g, "");
   if (!/^-?(0x[0-9a-f]+|0b[01]+|0o[0-7]+|\d+)$/i.test(cleaned))
     throw new ExprError(`"${text}" is not a whole number`);
+
   return cleaned.startsWith("-") ? -BigInt(cleaned.slice(1)) : BigInt(cleaned);
 }
 
@@ -22,6 +23,7 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
     wide: true,
     cancelValue: null,
     hasChanges: () => changed(),
+
     build: (body, close) => {
       const details = group.details();
       const confirmButton = button({
@@ -55,6 +57,7 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
           onPick: (access) => (details.access = access),
         },
       );
+
       const signed = toggleSwitch(details.signed, (value) => {
         details.signed = value;
         refreshFormula();
@@ -75,10 +78,12 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
       });
       const formulaInfo = html("div", { class: "expr-preview" });
       let formulaOk = true;
+
       const refreshFormula = () => {
         details.formula = formula.value.trim();
         formula.classList.remove("invalid");
         formulaOk = true;
+
         if (!details.formula) {
           formulaInfo.replaceChildren(
             html(
@@ -122,8 +127,10 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
             );
           }
         }
+
         confirmButton.disabled = !formulaOk;
       };
+
       formula.addEventListener("input", refreshFormula);
       unit.addEventListener("input", refreshFormula);
 
@@ -134,6 +141,7 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
         row: HTMLElement;
       }[] = [];
       const table = html("div", { class: "named-table" });
+
       const addRow = (namedValue?: NamedValue) => {
         const value = html("input", {
           class: "field mono named-value",
@@ -147,6 +155,7 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
           placeholder: "Name",
           spellcheck: false,
         });
+
         const row = html(
           "div",
           { class: "named-row" },
@@ -165,25 +174,32 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
             },
           }),
         );
+
         rows.push({ value, label, row });
         table.append(row);
         return value;
       };
+
       for (const namedValue of details.named) addRow(namedValue);
 
       const submit = () => {
         const named: NamedValue[] = [];
+
         for (const rowEntry of rows) {
           rowEntry.value.classList.remove("invalid");
+
           if (!rowEntry.value.value.trim() && !rowEntry.label.value.trim())
             continue;
+
           try {
             let value = parseInteger(rowEntry.value.value);
             if (value < 0n) value &= maxValue(group.width); // -1 means all ones
+
             if (value > maxValue(group.width))
               throw new ExprError(
                 `${value} doesn't fit in ${group.width} bits`,
               );
+
             named.push({
               value: value,
               label: rowEntry.label.value.trim() || `VALUE_${value}`,
@@ -195,6 +211,7 @@ export function editField(group: Group): Promise<Partial<FieldDetails> | null> {
             return;
           }
         }
+
         if (!formulaOk) return;
         close({
           description: descriptionInput.value.trim(),

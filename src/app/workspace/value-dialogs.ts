@@ -34,6 +34,7 @@ export async function addValueFromExpression(workspace: Workspace) {
     32,
     ...workspace.cards.map((card) => card.model.width),
   );
+
   const result = await newValueFromExpression(
     (name) => {
       const normalizedName = name.trim().toLowerCase();
@@ -42,6 +43,7 @@ export async function addValueFromExpression(workspace: Workspace) {
     },
     Math.min(widest, 512),
   );
+
   if (!result) return;
   const card = workspace.addValue(result.width);
   card.model.setValue(result.value);
@@ -74,12 +76,15 @@ export async function resizeValue(card: ValueCard) {
     );
     return;
   }
+
   if (lostParts.compares || width < model.width) {
     const parts = [`bits above ${width - 1} are cleared`];
+
     if (lostParts.compares)
       parts.push(
         `${lostParts.compares} compare row${lostParts.compares > 1 ? "s" : ""} no longer fit and will be removed`,
       );
+
     const answer = await ask(
       "Change width",
       `Shrinking to ${width} bits: ${parts.join(", and ")}.`,
@@ -90,6 +95,7 @@ export async function resizeValue(card: ValueCard) {
     );
     if (answer !== "yes") return;
   }
+
   card.clearSelection();
   model.setWidth(width);
 }

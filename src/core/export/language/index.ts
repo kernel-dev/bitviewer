@@ -30,6 +30,7 @@ import { renderTemplate } from "./render";
 export { compileTemplate } from "./compile";
 export { FILTER_NAMES } from "./filters";
 export { renderTemplate } from "./render";
+
 export {
   type Compiled,
   Num,

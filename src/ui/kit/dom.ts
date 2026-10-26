@@ -5,6 +5,7 @@ import { createElement, type IconNode } from "lucide";
 import { setTip } from "./tooltip";
 
 type Child = Node | string | number | null | undefined | false;
+
 type Props = Record<string, any> & {
   class?: string;
   style?: string;

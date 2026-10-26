@@ -57,6 +57,7 @@ describe("shortcuts", () => {
       metaKey: false,
       ...init,
     }) as KeyboardEvent;
+
   it("matches modifiers exactly", () => {
     expect(
       matchKey("Ctrl+K", key({ key: "k", code: "KeyK", ctrlKey: true })),

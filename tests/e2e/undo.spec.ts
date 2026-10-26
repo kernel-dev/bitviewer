@@ -27,6 +27,7 @@ test("a bit click and typing right after are two undo steps", async ({
     field.value = "ABCD";
     field.dispatchEvent(new Event("input", { bubbles: true }));
   });
+
   expect(await app.value()).toBe("abcd");
   await page.locator(".value-edit").blur();
   await page.keyboard.press("Control+z");

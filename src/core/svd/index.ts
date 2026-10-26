@@ -2,6 +2,7 @@
 
 export { parseSvd } from "./reader";
 export { hexAddress, registerTemplate } from "./template";
+
 export type {
   SvdDevice,
   SvdEnum,
@@ -9,5 +10,6 @@ export type {
   SvdPeripheral,
   SvdRegister,
 } from "./types";
+
 export { SvdError } from "./types";
 export { parseSvdNumber } from "./values";

@@ -27,6 +27,7 @@ export function segmented<T>(
     role: checkable ? "radiogroup" : "group",
   });
   const buttons = new Map<T, HTMLButtonElement>();
+
   const control: Segmented<T> = {
     element,
     value: config.value,
@@ -60,6 +61,7 @@ export function segmented<T>(
       if (checkable) {
         const changed = control.value !== option.value;
         control.set(option.value);
+
         if (changed) {
           play("toggle");
           config.onPick(option.value);

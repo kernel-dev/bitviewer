@@ -22,6 +22,7 @@ import rust from "./templates/rust.tpl?raw";
 import rustPeripheral from "./templates/rust-peripheral.tpl?raw";
 
 export { TemplateError } from "./language";
+
 export { defaultPrefix, type ExportOptions, ident };
 
 /** A template the dialog can offer: a built-in one or one the user wrote. */
@@ -32,6 +33,7 @@ export interface ExportTemplate {
   about: string;
   source: string;
   builtin: boolean;
+
   /** What it exports: one value, or a whole peripheral. */
   scope: TemplateScope;
 }
@@ -79,11 +81,13 @@ export type Lang =
 /** The dialog's view of a template saved in settings. */
 export function customExport(template: SavedExportTemplate): ExportTemplate {
   let meta: TemplateMeta = {};
+
   try {
     meta = compileTemplate(template.source).meta;
   } catch {
     /* a broken template can still be opened and fixed in the editor */
   }
+
   return {
     id: `custom:${template.name.toLowerCase()}`,
     name: template.name,

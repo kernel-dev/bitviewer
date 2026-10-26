@@ -21,8 +21,10 @@ export function parseSvdNumber(text: string | undefined): bigint | null {
       : /^0b/i.test(digits)
         ? BigInt(`0b${digits.slice(2)}`)
         : BigInt(digits.toLowerCase());
+
   if (match[2])
     value <<= BigInt(10 * ("kmgt".indexOf(match[2].toLowerCase()) + 1));
+
   return value;
 }
 
@@ -34,10 +36,12 @@ export function enumValues(text: string): bigint[] | null {
     const value = parseSvdNumber(text);
     return value === null ? null : [value];
   }
+
   const pattern = binary[1].toLowerCase();
   const free = [...pattern].filter((digit) => digit === "x").length;
   if (free > MAX_DONT_CARE) return null;
   const values: bigint[] = [];
+
   for (let combination = 0; combination < 1 << free; combination++) {
     let bit = free;
     const digits = [...pattern].map((digit) =>
@@ -45,6 +49,7 @@ export function enumValues(text: string): bigint[] | null {
     );
     values.push(BigInt(`0b${digits.join("")}`));
   }
+
   return values;
 }
 
@@ -56,6 +61,7 @@ function dimIndices(dim: number, indexText: string | undefined): string[] {
       const first = Number(range[1]);
       return Array.from({ length: dim }, (_, index) => String(first + index));
     }
+
     const letters = /^\s*([A-Z])\s*-\s*([A-Z])\s*$/.exec(indexText);
     if (letters) {
       const first = letters[1].charCodeAt(0);
@@ -63,9 +69,11 @@ function dimIndices(dim: number, indexText: string | undefined): string[] {
         String.fromCharCode(first + index),
       );
     }
+
     const list = indexText.split(",").map((part) => part.trim());
     if (list.length === dim) return list;
   }
+
   return Array.from({ length: dim }, (_, index) => String(index));
 }
 
@@ -77,11 +85,13 @@ export function expandDim(
 ): { name: string; index: number }[] {
   const dim = Number(parseSvdNumber(childText(element, "dim")) ?? 0n);
   if (!dim) return [{ name: name.replace(/\[%s\]|%s/g, ""), index: 0 }];
+
   if (dim > MAX_DIM) {
     warnings.push(
       `${name}: dim ${dim} is more than ${MAX_DIM}; only the first ${MAX_DIM} are read`,
     );
   }
+
   const count = Math.min(dim, MAX_DIM);
   const indices = dimIndices(count, childText(element, "dimIndex"));
   return indices.map((index, position) => ({

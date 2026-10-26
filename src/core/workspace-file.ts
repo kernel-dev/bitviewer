@@ -20,12 +20,15 @@ export function parseWorkspaceFile(text: string): WorkspaceFile {
   const data = JSON.parse(text);
   if (!data || typeof data !== "object" || data.app !== "bitviewer")
     throw new ModelError("This is not a Bit Viewer workspace file");
+
   const version = Number(data.version ?? 1);
   if (!Number.isInteger(version) || version < 1)
     throw new ModelError(`Unknown file format version ${data.version}`);
+
   const values = data.values ?? [];
   if (!Array.isArray(values))
     throw new ModelError("The file's values aren't a list");
+
   for (const serialized of values) valueFromJSON(serialized);
   peripheralsFromJSON(data.peripherals);
   return { version, values, peripherals: data.peripherals };

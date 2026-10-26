@@ -10,9 +10,11 @@ export function score(label: string, extra: string, query: string): number {
   const lowerLabel = label.toLowerCase();
   const haystack = `${lowerLabel} ${extra.toLowerCase()}`;
   let total = 0;
+
   for (const word of lowerQuery.split(/\s+/)) {
     const matchIndex = haystack.indexOf(word);
     if (matchIndex < 0) return -1;
+
     if (lowerLabel.startsWith(word)) total += 30;
     else if (
       new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(
@@ -23,6 +25,7 @@ export function score(label: string, extra: string, query: string): number {
     else if (matchIndex < lowerLabel.length) total += 10;
     else total += 2; // only in keywords / group
   }
+
   return total;
 }
 
@@ -61,11 +64,13 @@ export function openPalette(commands: CommandRegistry) {
     backdrop.remove();
     prevFocus?.focus?.({ preventScroll: true });
   };
+
   const run = (command: Command | undefined) => {
     if (!command || !commands.isEnabled(command)) return;
     close();
     command.run();
   };
+
   const render = () => {
     const queryText = input.value;
     shown = commands
@@ -83,6 +88,7 @@ export function openPalette(commands: CommandRegistry) {
       .sort((first, second) => second.score - first.score)
       .map((ranked) => ranked.command);
     active = Math.min(active, Math.max(0, shown.length - 1));
+
     list.replaceChildren(
       ...(shown.length
         ? shown.map((command, rowIndex) => {
@@ -105,12 +111,14 @@ export function openPalette(commands: CommandRegistry) {
                 ? html("span", { class: "menu-kbd" }, command.keys[0])
                 : null,
             );
+
             row.addEventListener("pointermove", () => {
               if (active !== rowIndex) {
                 active = rowIndex;
                 syncActive();
               }
             });
+
             row.addEventListener("click", () => run(command));
             return row;
           })
@@ -123,6 +131,7 @@ export function openPalette(commands: CommandRegistry) {
           ]),
     );
   };
+
   const syncActive = () => {
     list.querySelectorAll(".palette-item").forEach((element, rowIndex) => {
       element.classList.toggle("active", rowIndex === active);
@@ -131,10 +140,12 @@ export function openPalette(commands: CommandRegistry) {
         rowIndex === active ? "true" : "false",
       );
     });
+
     (
       list.querySelectorAll(".palette-item")[active] as HTMLElement | undefined
     )?.scrollIntoView({ block: "nearest" });
   };
+
   const onKey = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -152,13 +163,16 @@ export function openPalette(commands: CommandRegistry) {
       run(shown[active]);
     }
   };
+
   input.addEventListener("input", () => {
     active = 0;
     render();
   });
+
   backdrop.addEventListener("pointerdown", (event) => {
     if (event.target === backdrop) close();
   });
+
   document.addEventListener("keydown", onKey, true);
   document.body.append(backdrop);
   render();

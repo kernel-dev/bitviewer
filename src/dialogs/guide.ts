@@ -8,6 +8,7 @@ const sources = import.meta.glob<string>("../../docs/guide/*.md", {
   query: "?raw",
   import: "default",
 });
+
 const images = import.meta.glob<string>("../../docs/guide/img/*.png", {
   eager: true,
   query: "?url",
@@ -35,8 +36,10 @@ function inline(source: string, open: (file: string) => void): Child[] {
   const out: Child[] = [];
   const pattern = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
   let last = 0;
+
   for (let match = pattern.exec(source); match; match = pattern.exec(source)) {
     if (match.index > last) out.push(source.slice(last, match.index));
+
     if (match[1] !== undefined) out.push(html("code", {}, match[1]));
     else if (match[2] !== undefined) out.push(html("strong", {}, match[2]));
     else if (/^https?:\/\//.test(match[4])) {
@@ -47,14 +50,18 @@ function inline(source: string, open: (file: string) => void): Child[] {
     } else {
       const file = match[4];
       const anchor = html("a", { href: "#", class: "guide-link" }, match[3]);
+
       anchor.addEventListener("click", (event) => {
         event.preventDefault();
         open(file);
       });
+
       out.push(anchor);
     }
+
     last = match.index + match[0].length;
   }
+
   if (last < source.length) out.push(source.slice(last));
   return out;
 }
@@ -79,8 +86,10 @@ export function renderMarkdown(
       i++;
     } else if (line.startsWith("```")) {
       const code: string[] = [];
+
       for (i++; i < lines.length && !lines[i].startsWith("```"); i++)
         code.push(lines[i]);
+
       i++; // the closing fence
       out.push(html("pre", { class: "guide-code mono" }, code.join("\n")));
     } else if (/^#{1,3} /.test(line)) {
@@ -105,12 +114,15 @@ export function renderMarkdown(
             html("figcaption", {}, match[1]),
           ),
         );
+
       i++;
     } else if (/^\|/.test(line)) {
       const rows: string[][] = [];
+
       for (; i < lines.length && /^\|/.test(lines[i]); i++) {
         if (!/^\|[\s|:-]+\|$/.test(lines[i])) rows.push(cells(lines[i]));
       }
+
       const [headerRow, ...body] = rows;
       out.push(
         html(
@@ -145,14 +157,17 @@ export function renderMarkdown(
     } else if (/^(- |\d+\. )/.test(line)) {
       const ordered = /^\d/.test(line);
       const items: HTMLElement[] = [];
+
       for (; i < lines.length && /^(- |\d+\. )/.test(lines[i]); i++) {
         items.push(
           html("li", {}, ...inline(lines[i].replace(/^(- |\d+\. )/, ""), open)),
         );
       }
+
       out.push(html(ordered ? "ol" : "ul", {}, ...items));
     } else {
       const paragraphLines: string[] = [];
+
       for (
         ;
         i < lines.length &&
@@ -161,9 +176,11 @@ export function renderMarkdown(
         i++
       )
         paragraphLines.push(lines[i]);
+
       out.push(html("p", {}, ...inline(paragraphLines.join(" "), open)));
     }
   }
+
   return out;
 }
 
@@ -178,6 +195,7 @@ export function showGuide(file?: string): Promise<void> {
       body.parentElement?.classList.add("guide-modal");
       const navigation = html("nav", { class: "guide-nav" });
       const page = html("article", { class: "guide-page" });
+
       const show = (file: string) => {
         const selected =
           GUIDE_PAGES.find((page) => page.file === file) ?? GUIDE_PAGES[0];
@@ -196,6 +214,7 @@ export function showGuide(file?: string): Promise<void> {
         page.replaceChildren(...renderMarkdown(selected.text, show));
         page.scrollTop = 0;
       };
+
       show(file ?? GUIDE_PAGES[0].file);
       body.append(html("div", { class: "guide" }, navigation, page));
       return [

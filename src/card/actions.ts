@@ -86,6 +86,7 @@ export async function createGroupFromSelection(card: ValueCard) {
     );
     return;
   }
+
   const suggestion = card.model.suggestGroupName();
   const name = await prompt(
     "New register field",
@@ -94,6 +95,7 @@ export async function createGroupFromSelection(card: ValueCard) {
     Tag,
   );
   if (name === null) return;
+
   try {
     card.model.addGroup(lo, hi, name.trim() || suggestion);
     play("group");
@@ -101,12 +103,14 @@ export async function createGroupFromSelection(card: ValueCard) {
     if (error instanceof ModelError) toast(error.message, "error");
     return;
   }
+
   card.clearSelection();
 }
 
 /** Widens or narrows a field so it covers exactly the selected bits. */
 export function resizeGroupToSelection(card: ValueCard, group: Group) {
   if (!card.selection) return;
+
   try {
     card.model.resizeGroup(group, card.selection[0], card.selection[1]);
     play("group");
@@ -116,6 +120,7 @@ export function resizeGroupToSelection(card: ValueCard, group: Group) {
     toast(error.message, "error");
     return;
   }
+
   card.clearSelection();
 }
 
@@ -126,6 +131,7 @@ export async function renameGroup(card: ValueCard, group: Group) {
     group.name,
     PencilLine,
   );
+
   if (name?.trim()) {
     card.model.updateGroup(group, { name: name.trim() });
     card.rebuildWhenShown();
@@ -166,6 +172,7 @@ export async function applyTemplate(card: ValueCard) {
     );
     if (answer !== "yes") return;
   }
+
   if (model.groups.length) {
     // replacing named fields is only ever done with the user's explicit go-ahead
     const answer = await ask(
@@ -179,15 +186,18 @@ export async function applyTemplate(card: ValueCard) {
     );
     if (answer !== "yes") return;
   }
+
   try {
     // one undo step for the widening and the new fields
     card.events.batch(true);
+
     try {
       if (widen) model.setWidth(template.width);
       model.applyTemplate(template);
     } finally {
       card.events.batch(false);
     }
+
     play("group");
   } catch (error) {
     if (!(error instanceof ModelError)) throw error;
@@ -202,6 +212,7 @@ export async function saveAsTemplate(card: ValueCard) {
     toast("Create some fields first", "error");
     return;
   }
+
   const name = await prompt(
     "Save fields as template",
     "Template name",
@@ -214,6 +225,7 @@ export async function saveAsTemplate(card: ValueCard) {
     .find(
       (template) => template.name.toLowerCase() === name.trim().toLowerCase(),
     );
+
   if (existing) {
     const answer = await ask(
       "Replace template?",
@@ -225,6 +237,7 @@ export async function saveAsTemplate(card: ValueCard) {
     );
     if (answer !== "yes") return;
   }
+
   saveTemplate({
     name: name.trim(),
     width: model.width,

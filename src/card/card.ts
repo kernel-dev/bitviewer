@@ -54,18 +54,25 @@ export interface CardEvents {
   move(card: ValueCard, delta: number): void;
   duplicate(card: ValueCard): void;
   resize(card: ValueCard): void;
+
   /** Value of another card by name, for expressions. */
   lookup(card: ValueCard, name: string): bigint | undefined;
+
   /** The other cards in the workspace. */
   others(card: ValueCard): ValueCard[];
+
   /** The drag handle was pressed: start reordering. */
   dragStart(card: ValueCard, event: PointerEvent): void;
+
   /** Group the following changes into one undo step (true) / end the group (false). */
   batch(holding: boolean): void;
+
   /** The peripheral the value is a register of, if any. */
   peripheral(card: ValueCard): Peripheral | undefined;
+
   /** Entries for the card's "Peripheral" submenu. */
   peripheralMenu(card: ValueCard): MenuItem[];
+
   /** Asks for a new offset within the peripheral. */
   editOffset(card: ValueCard): void;
 }
@@ -140,6 +147,7 @@ export class ValueCard implements StripHost {
     const normalizedName = name.trim().toLowerCase();
     if (["x", "this", "value", "v"].includes(normalizedName))
       return model.value;
+
     const group = model.groups.find(
       (field) => field.name.toLowerCase() === normalizedName,
     );
@@ -169,6 +177,7 @@ export class ValueCard implements StripHost {
   async applyOp(operation: Op, argument?: bigint) {
     const model = this.model;
     let next: bigint;
+
     try {
       if (this.selection) {
         const [lo, hi] = this.selection;
@@ -185,6 +194,7 @@ export class ValueCard implements StripHost {
       toast(error.message, "error");
       return;
     }
+
     if (await this.commit(next)) play("op");
   }
 
@@ -207,6 +217,7 @@ export class ValueCard implements StripHost {
       this.refresh();
       return false;
     }
+
     this.model.setValue(next);
     return true;
   }
@@ -266,6 +277,7 @@ export class ValueCard implements StripHost {
       this.root.contains(document.activeElement);
 
     this.root.classList.toggle("collapsed", model.collapsed);
+
     if (model.collapsed) {
       // only the header line; the toolbar's buttons are still created because
       // selection code updates them
@@ -273,8 +285,10 @@ export class ValueCard implements StripHost {
       const header = this.header.build();
       this.toolbar.build();
       this.root.replaceChildren(header);
+
       if (focusedName)
         (this.root.querySelector(".name-edit") as HTMLElement).focus();
+
       this.refresh();
       return;
     }
@@ -291,8 +305,10 @@ export class ValueCard implements StripHost {
         this.buildStats(),
       ].filter((element): element is HTMLElement => element !== null),
     );
+
     if (focusedName)
       (this.root.querySelector(".name-edit") as HTMLElement).focus();
+
     this.refresh();
   }
 
@@ -320,14 +336,17 @@ export class ValueCard implements StripHost {
       onText: (text) => {
         this.exprText = text;
       },
+
       apply: async (value) => {
         const next = this.selection
           ? this.model.withBits(this.selection[0], this.opWidth, value)
           : value;
         if (await this.commit(next)) play("op");
       },
+
       close: () => this.toggleExpr(false),
     });
+
     this.exprRefresh = bar.refresh;
     return bar.element;
   }

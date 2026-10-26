@@ -33,15 +33,18 @@ import { Workspace } from "./workspace/workspace";
 
 export class App {
   readonly commands = new CommandRegistry();
+
   readonly history = new History(
     () => this.workspace.snapshot(),
     (text) => this.workspace.restore(text),
     () => this.onHistoryChange(),
   );
+
   readonly search = new SearchBar(
     () => this.workspace.cards,
     () => this.workspace.buildNearView(),
   );
+
   readonly workspace = new Workspace(this);
   readonly peripherals = new PeripheralController(this);
   readonly document = new WorkspaceDocument(this);
@@ -87,12 +90,14 @@ export class App {
     await P.onOpenFile(async (path) => {
       if (await this.document.maybeSave()) await this.document.loadPath(path);
     });
+
     const initial = await P.initialFile();
     if (
       !(initial && (await this.document.loadPath(initial))) &&
       !(await this.document.restoreSession())
     )
       this.document.startFresh();
+
     if (!appSettings.get("tour_done")) {
       appSettings.set("last_seen_version", VERSION); // nothing is "new" to a first-time user
       setTimeout(() => this.runTour(), 700);
@@ -105,6 +110,7 @@ export class App {
       appSettings.set("last_seen_version", VERSION);
       if (!modalOpen()) await showWhatsNew();
     }
+
     if (appSettings.get("check_updates"))
       setTimeout(
         () => void checkForUpdates(false, () => this.document.prepareToQuit()),

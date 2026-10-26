@@ -73,6 +73,7 @@ export const CHIPS: ChipDef[] = [
     short: () => "text",
     tip: () =>
       "The bytes as text, most significant first; · marks non-printable bytes",
+
     value: (value, width) => {
       const text = bytesAsText(value, width);
       return text ? `“${text}”` : "(empty)";
@@ -133,10 +134,12 @@ export const CHIPS: ChipDef[] = [
 export class StatsBar {
   readonly element: HTMLElement;
   private valueElements = new Map<string, HTMLElement>();
+
   private floats = new Map<
     FloatKind,
     { valueElement: HTMLElement; detail: HTMLElement }
   >();
+
   private editing: FloatKind | null = null;
 
   /** `write` sets the whole value (the card asks first for protected fields). */
@@ -154,13 +157,17 @@ export class StatsBar {
     this.valueElements.clear();
     this.floats.clear();
     this.element.replaceChildren();
+
     for (const chip of CHIPS) {
       if (!enabledChips.has(chip.id)) continue;
+
       if (chip.id === "float") {
         for (const kind of floatKinds(width))
           this.element.append(this.floatChip(kind));
+
         continue;
       }
+
       const valueElement = html("span", { class: "stat-val mono" });
       this.valueElements.set(chip.id, valueElement);
       this.element.append(
@@ -172,6 +179,7 @@ export class StatsBar {
         ),
       );
     }
+
     const addButton = button({
       icon: Plus,
       className: "ghost sm stat-add",
@@ -196,6 +204,7 @@ export class StatsBar {
         const now = new Set(appSettings.get("readout_chips"));
         if (now.has(chip.id)) now.delete(chip.id);
         else now.add(chip.id);
+
         appSettings.set(
           "readout_chips",
           CHIPS.map((chip) => chip.id).filter((id) => now.has(id)),
@@ -238,9 +247,11 @@ export class StatsBar {
       value: formatFloatKind(decodeFloat(this.model.value, kind), kind),
       spellcheck: false,
     });
+
     const done = (commit: boolean) => {
       if (this.editing !== kind) return;
       this.editing = null;
+
       if (commit) {
         try {
           const parsed = parseFloatText(input.value);
@@ -253,9 +264,11 @@ export class StatsBar {
           toast(error.message, "error");
         }
       }
+
       input.replaceWith(valueElement);
       this.update();
     };
+
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") done(true);
       else if (event.key === "Escape") {
@@ -263,6 +276,7 @@ export class StatsBar {
         done(false);
       }
     });
+
     input.addEventListener("blur", () => done(true));
     valueElement.replaceWith(input);
     input.focus();
@@ -272,11 +286,13 @@ export class StatsBar {
   update() {
     if (this.element.hidden) return;
     const { value, width } = this.model;
+
     for (const chip of CHIPS) {
       const chipValueElement = this.valueElements.get(chip.id);
       if (chipValueElement)
         chipValueElement.textContent = chip.value(value, width);
     }
+
     for (const [kind, { valueElement, detail }] of this.floats) {
       const floatValue = decodeFloat(value, kind);
       valueElement.textContent = formatFloatKind(floatValue, kind);

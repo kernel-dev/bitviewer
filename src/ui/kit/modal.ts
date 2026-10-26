@@ -8,7 +8,9 @@ import { hideTip } from "./tooltip";
 
 /** Open dialogs, bottom first. Only the top one reacts to keys. */
 const modalStack: HTMLElement[] = [];
+
 let modalCount = 0;
+
 export function modalOpen(): boolean {
   return modalStack.length > 0;
 }
@@ -66,6 +68,7 @@ export function modal<T>(options: {
     modalStack.push(box);
 
     let done = false;
+
     const close = (result: T) => {
       if (done) return;
       done = true;
@@ -79,8 +82,10 @@ export function modal<T>(options: {
 
     /** Esc, the X or a click outside: asks first when a form has edits. */
     let asking = false;
+
     const dismiss = async () => {
       if (done || asking) return;
+
       if (options.hasChanges?.()) {
         asking = true;
         const answer = await ask(
@@ -95,6 +100,7 @@ export function modal<T>(options: {
         asking = false;
         if (answer !== "discard") return;
       }
+
       close(options.cancelValue);
     };
 
@@ -128,6 +134,7 @@ export function modal<T>(options: {
     };
 
     document.addEventListener("keydown", onKey, true);
+
     backdrop.addEventListener("pointerdown", (event) => {
       if (event.target === backdrop) void dismiss();
     });
@@ -186,9 +193,11 @@ export function prompt(
     cancelValue: null,
     build(body, close) {
       const input = html("input", { class: "field", value, spellcheck: false });
+
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") close(input.value);
       });
+
       body.append(html("label", { class: "modal-label" }, label), input);
       return [
         button({ label: "Cancel", onClick: () => close(null) }),

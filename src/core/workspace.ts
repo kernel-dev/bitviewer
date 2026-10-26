@@ -8,8 +8,10 @@ import { ModelError } from "./model";
 
 export interface Peripheral {
   name: string;
+
   /** Base address, or null when unknown (offsets still work). */
   base: bigint | null;
+
   description: string;
   collapsed: boolean;
 }
@@ -32,16 +34,20 @@ export function peripheralToJSON(peripheral: Peripheral) {
 export function peripheralFromJSON(json: any): Peripheral {
   if (!json || typeof json.name !== "string" || !json.name.trim())
     throw new ModelError("Invalid peripheral entry: it needs a name");
+
   let base: bigint | null = null;
+
   if (json.base !== null && json.base !== undefined) {
     try {
       base = BigInt(String(json.base).trim());
     } catch {
       throw new ModelError(`Invalid base address for ${json.name}`);
     }
+
     if (base < 0n)
       throw new ModelError(`Invalid base address for ${json.name}`);
   }
+
   return {
     name: json.name.trim(),
     base,
@@ -54,12 +60,15 @@ export function peripheralFromJSON(json: any): Peripheral {
 export function peripheralsFromJSON(json: unknown): Map<string, Peripheral> {
   const out = new Map<string, Peripheral>();
   if (json === undefined || json === null) return out;
+
   if (!Array.isArray(json))
     throw new ModelError("The file's peripherals aren't a list");
+
   for (const entry of json) {
     const peripheral = peripheralFromJSON(entry);
     out.set(peripheral.name, peripheral);
   }
+
   return out;
 }
 
@@ -72,11 +81,13 @@ export function nextOffset(
   align = 4n,
 ): bigint {
   let end = 0n;
+
   for (const register of registers) {
     if (register.offset === null) continue;
     const registerEnd = register.offset + BigInt(byteSize(register.width));
     if (registerEnd > end) end = registerEnd;
   }
+
   return ((end + align - 1n) / align) * align;
 }
 
@@ -95,6 +106,7 @@ export function addressOf(
 export function groupOrder<T>(items: T[], blockOf: BlockOf<T>): T[] {
   const out: T[] = [];
   const placed = new Set<string>();
+
   for (const item of items) {
     const block = blockOf(item);
     if (!block) out.push(item);
@@ -103,18 +115,21 @@ export function groupOrder<T>(items: T[], blockOf: BlockOf<T>): T[] {
       out.push(...items.filter((other) => blockOf(other) === block));
     }
   }
+
   return out;
 }
 
 /** Top-level units of the workspace: a loose value, or a whole peripheral. */
 function units<T>(items: T[], blockOf: BlockOf<T>): T[][] {
   const out: T[][] = [];
+
   for (const item of items) {
     const block = blockOf(item);
     const last = out[out.length - 1];
     if (block && last && blockOf(last[0]) === block) last.push(item);
     else out.push([item]);
   }
+
   return out;
 }
 
@@ -135,6 +150,7 @@ export function moveItem<T>(
   const siblings = block
     ? rest.flatMap((other, index) => (blockOf(other) === block ? [index] : []))
     : [];
+
   if (siblings.length) {
     destination = Math.max(
       siblings[0],
@@ -157,6 +173,7 @@ export function moveItem<T>(
           destination++;
     }
   }
+
   rest.splice(destination, 0, item);
   return rest;
 }
@@ -182,5 +199,6 @@ export function freeName(name: string, taken: (name: string) => boolean) {
   let candidate = name;
   for (let suffix = 2; taken(candidate); suffix++)
     candidate = `${name} (${suffix})`;
+
   return candidate;
 }

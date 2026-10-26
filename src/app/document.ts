@@ -38,6 +38,7 @@ export function rememberDir(path: string) {
     path.lastIndexOf("\\"),
     path.lastIndexOf("/"),
   );
+
   if (separatorIndex > 0)
     appSettings.set("last_dir", path.slice(0, separatorIndex));
 }
@@ -107,6 +108,7 @@ export class WorkspaceDocument {
       const openedFile = await P.pickAndRead(
         appSettings.get("last_dir") || (await P.defaultDir()),
       );
+
       if (openedFile)
         await this.loadText(openedFile.text, openedFile.path, openedFile.name);
     } catch (error) {
@@ -117,6 +119,7 @@ export class WorkspaceDocument {
   /** File › Open recent. */
   recentMenu(): MenuItem {
     const files = P.isTauri ? appSettings.get("recent_files") : [];
+
     const folder = (path: string) => {
       const directory = path.slice(
         0,
@@ -124,6 +127,7 @@ export class WorkspaceDocument {
       );
       return directory.length > 38 ? `…${directory.slice(-37)}` : directory;
     };
+
     return {
       label: "Open recent",
       icon: FolderClock,
@@ -163,6 +167,7 @@ export class WorkspaceDocument {
       ),
     );
     document.body.append(overlay);
+
     void P.onFileDrop(
       (over) => overlay.classList.toggle("show", over),
       async (openedFile) => {
@@ -198,12 +203,14 @@ export class WorkspaceDocument {
     quiet = false,
   ): Promise<boolean> {
     let file: ReturnType<typeof parseWorkspaceFile>;
+
     try {
       file = parseWorkspaceFile(text);
     } catch (error) {
       if (!quiet) showError("Could not open file", error, name);
       return false;
     }
+
     if (file.version > FILE_VERSION && !quiet) {
       const answer = await ask(
         "Saved by a newer version",
@@ -216,11 +223,14 @@ export class WorkspaceDocument {
       );
       if (answer !== "open") return false;
     }
+
     this.loadValues(file.values, path, name, file.peripherals);
+
     if (path) {
       rememberDir(path);
       appSettings.addRecent(path);
     }
+
     void saveSessionNow(this.sessionData());
     if (!quiet) toast(`Opened ${name}`, "ok");
     return true;
@@ -262,12 +272,14 @@ export class WorkspaceDocument {
 
   private async write(path: string): Promise<boolean> {
     this.app.history.flush();
+
     try {
       await P.writeText(path, workspaceFileText(this.app.workspace.toJSON()));
     } catch (error) {
       showError("Could not save", error, path);
       return false;
     }
+
     this.path = P.isTauri ? path : null;
     this.fileName = P.basename(path);
     rememberDir(path);
@@ -295,13 +307,16 @@ export class WorkspaceDocument {
   async restoreSession(): Promise<boolean> {
     const session = await loadSession();
     if (!session) return false;
+
     if (
       !session.dirty &&
       session.path &&
       (await this.loadPath(session.path, true))
     )
       return true;
+
     if (!session.values) return false;
+
     try {
       this.loadValues(
         session.values,
@@ -312,11 +327,13 @@ export class WorkspaceDocument {
     } catch {
       return false;
     }
+
     if (session.dirty) {
       this.savedSnapshot = null; // contents differ from any file on disk
       this.updateTitle();
       toast("Restored unsaved changes from your last session", "ok");
     }
+
     return true;
   }
 

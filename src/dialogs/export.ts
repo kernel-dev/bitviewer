@@ -82,6 +82,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
         },
         html("span", { class: "muted" }, "Register width"),
       );
+
       const widthSeg = segmented<number>(
         [
           { value: 32, label: "32-bit" },
@@ -95,7 +96,9 @@ export function exportCode(target: ExportTarget): Promise<void> {
           },
         },
       );
+
       widthOpt.append(widthSeg.element);
+
       const valueOpt = html(
         "label",
         { class: "export-opt" },
@@ -105,6 +108,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
         }),
         html("span", { class: "muted" }, "Current value"),
       );
+
       const accessorsOpt = html(
         "label",
         {
@@ -139,6 +143,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
         valueOpt.hidden = !/\binclude_value\b/.test(current.source);
         accessorsOpt.hidden = !/\baccessors\b/.test(current.source);
         help.textContent = current.about;
+
         try {
           preview.textContent = renderSource(current.source);
           error.textContent = "";
@@ -156,6 +161,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
         const list = templatesFor(scope);
         if (!list.some((template) => template.id === current.id))
           current = first();
+
         const seg = segmented(
           list.map((template) => ({
             value: template.id,
@@ -172,6 +178,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
             },
           },
         );
+
         picker.replaceChildren(
           seg.element,
           button({
@@ -224,6 +231,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
           scope,
         });
         if (!result) return;
+
         if ("deleted" in result) {
           appSettings.set("export_templates", others);
           current = first();
@@ -232,12 +240,14 @@ export function exportCode(target: ExportTarget): Promise<void> {
           current = customExport(result.saved);
           toast(`Saved template “${result.saved.name}”`, "ok");
         }
+
         appSettings.set("export_last", current.id);
         buildPicker();
         render();
       };
 
       prefix.addEventListener("input", render);
+
       const copy = () =>
         copyText(preview.textContent ?? "").then(
           () => {
@@ -246,6 +256,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
           },
           () => toast("Could not access the clipboard", "error"),
         );
+
       const save = async () => {
         const name = `${(prefix.value || "reg").toLowerCase()}.${current.extension}`;
         const directory = appSettings.get("last_dir");
@@ -253,6 +264,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
           directory ? joinPath(directory, name) : name,
         );
         if (!path) return;
+
         try {
           await writeText(path, preview.textContent ?? "");
           toast(`Saved ${basename(path)}`, "ok");
@@ -286,6 +298,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
         error,
         preview,
       );
+
       if (target.kind === "register" && !target.model.groups.length) {
         preview.before(
           html(
@@ -295,6 +308,7 @@ export function exportCode(target: ExportTarget): Promise<void> {
           ),
         );
       }
+
       buildPicker();
       render();
       return [

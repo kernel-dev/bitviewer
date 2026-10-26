@@ -25,6 +25,7 @@ export function defaultPrefix(model: ValueModel): string {
 export function fieldIds(fields: Group[]): Map<Group, string> {
   const used = new Set<string>();
   const ids = new Map<Group, string>();
+
   for (const group of fields) {
     const base = ident(group.name, "FIELD");
     let id = base;
@@ -32,5 +33,6 @@ export function fieldIds(fields: Group[]): Map<Group, string> {
     used.add(id);
     ids.set(group, id);
   }
+
   return ids;
 }

@@ -46,6 +46,7 @@ export interface TemplateMeta {
   name?: string;
   extension?: string;
   about?: string;
+
   /** "register": one value; "peripheral": a block of registers. */
   scope?: TemplateScope;
 }
@@ -58,6 +59,7 @@ export type Ex =
   | { kind: "filter"; input: Ex; name: string; argumentExpressions: Ex[] };
 
 export type Part = string | { expression: Ex };
+
 export type Node =
   | { kind: "text"; line: number; parts: Part[] }
   | {

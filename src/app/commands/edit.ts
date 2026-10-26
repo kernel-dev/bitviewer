@@ -31,6 +31,7 @@ export function editCommands(app: App): Command[] {
       icon: Undo2,
       keys: ["Ctrl+Z"],
       enabled: () => history.canUndo,
+
       run: () => {
         if (history.undo()) play("op");
       },
@@ -42,6 +43,7 @@ export function editCommands(app: App): Command[] {
       icon: Redo2,
       keys: ["Ctrl+Y", "Ctrl+Shift+Z"],
       enabled: () => history.canRedo,
+
       run: () => {
         if (history.redo()) play("op");
       },

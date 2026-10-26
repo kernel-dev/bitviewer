@@ -1,5 +1,6 @@
 // The app mark: a 4×4 grid of bits, same as the app icon.
 const ACTIVE_CELLS = [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1];
+
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 function rect(attributes: Record<string, string | number>): SVGRectElement {

@@ -35,18 +35,22 @@ export async function importSvd(app: App, file?: P.OpenedFile) {
       return;
     }
   }
+
   if (!opened) return;
   let device: SvdDevice;
+
   try {
     device = parseSvd(opened.text);
   } catch (error) {
     showError("Could not read the SVD file", error, opened.name);
     return;
   }
+
   if (opened.path) rememberDir(opened.path);
   const choice = await pickSvdRegisters(device, opened.name);
   console.log(device);
   if (!choice) return;
+
   if (choice.action === "templates") saveAsTemplates(choice.registers, device);
   else await addSvdValues(app, choice.registers, device);
 }
@@ -79,6 +83,7 @@ async function addSvdValues(
 ) {
   const workspace = app.workspace;
   const deviceName = device.name;
+
   if (registers.length > 50) {
     const answer = await ask(
       "Add many values?",
@@ -94,13 +99,16 @@ async function addSvdValues(
     );
     if (answer !== "yes") return;
   }
+
   const blocks = new Map<string, string>(); // SVD peripheral → workspace peripheral
   app.history.hold(); // one undo step for the whole import
   let firstCard: ValueCard | null;
+
   try {
     // one layout for the whole import
     firstCard = workspace.batch(() => {
       let first: ValueCard | null = null;
+
       for (const register of registers) {
         const source = device.peripherals.find(
           (peripheral) => peripheral.name === register.peripheral,
@@ -114,6 +122,7 @@ async function addSvdValues(
               : freeName(source.name, (name) =>
                   workspace.peripherals.has(name),
                 );
+
           if (block !== source.name || !existing)
             workspace.peripherals.set(block, {
               name: block,
@@ -121,8 +130,10 @@ async function addSvdValues(
               description: source.description,
               collapsed: false,
             });
+
           blocks.set(source.name, block);
         }
+
         const model = new ValueModel({
           width: register.size,
           value: register.resetValue,
@@ -140,14 +151,18 @@ async function addSvdValues(
         const card = workspace.addValue(model.width, model, index, false);
         first ??= card;
       }
+
       return first;
     });
   } finally {
     app.history.release();
   }
+
   play("add");
+
   if (firstCard)
     bringIntoView(firstCard.root, "start", () => workspace.buildNearView());
+
   toast(
     `Added ${registers.length} value${registers.length === 1 ? "" : "s"} from ${deviceName}`,
     "ok",

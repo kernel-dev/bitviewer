@@ -4,6 +4,7 @@
 
 export { type Segmented, segmented, toggleSwitch } from "./controls";
 export { append, button, html, icon } from "./dom";
+
 export {
   closeMenus,
   installMenus,
@@ -11,6 +12,7 @@ export {
   menusOpen,
   openMenu,
 } from "./menu";
+
 export { ask, modal, modalOpen, prompt } from "./modal";
 export { NumberInput } from "./number-input";
 export { toast } from "./toast";

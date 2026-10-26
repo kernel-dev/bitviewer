@@ -60,6 +60,7 @@ export class RowsView {
     });
     rows.addEventListener("keydown", (event) => onBitKey(card, event));
     this.element = rows;
+
     for (const lo of model.rowLos()) {
       if (card.line) {
         rows.append(this.buildLineRow(lo));
@@ -69,6 +70,7 @@ export class RowsView {
         if (model.hasCompare(lo)) rows.append(this.buildCompareRow(lo));
       }
     }
+
     return rows;
   }
 
@@ -76,6 +78,7 @@ export class RowsView {
   destroy() {
     for (const strip of [...this.strips.values(), ...this.cmpStrips.values()])
       strip.destroy();
+
     this.strips.clear();
     this.cmpStrips.clear();
     this.rowBases.clear();
@@ -95,6 +98,7 @@ export class RowsView {
   update() {
     const card = this.card;
     const model = this.model;
+
     for (const [lo, strip] of this.strips) {
       const base = card.line ? model.fullBase : model.rowBase(lo);
       const value = model.rowValue(lo);
@@ -108,6 +112,7 @@ export class RowsView {
           model.rowWidthAt(lo),
         );
       }
+
       strip.update();
       const compareStrip = this.cmpStrips.get(lo);
       if (compareStrip) {
@@ -116,6 +121,7 @@ export class RowsView {
         this.cmpEdits.get(lo)!.setValue(model.compareValue(lo));
         const diff = model.compareDiff(lo);
         const readoutElement = this.cmpReadouts.get(lo)!;
+
         if (diff) {
           const differingBits = popcount(diff);
           readoutElement.replaceChildren(
@@ -130,6 +136,7 @@ export class RowsView {
           readoutElement.replaceChildren(
             html("span", { class: "same-text" }, "identical"),
           );
+
         compareStrip.update();
       }
     }
@@ -329,8 +336,10 @@ function readoutText(value: bigint, width: number): string {
     value.toString(),
     formatInt(value, 8, width, { prefix: true }),
   ];
+
   if (width === 8 && value >= 0x20n && value < 0x7fn)
     parts.push(`'${String.fromCharCode(Number(value))}'`);
+
   return parts.join(" · ");
 }
 
@@ -342,6 +351,7 @@ export function bitTip(
   compare: boolean,
 ): string {
   const lines: string[] = [];
+
   if (compare) {
     const compareBit = model.compareBit(lo, bit);
     const parentBit = model.bit(bit);
@@ -350,6 +360,7 @@ export function bitTip(
         (compareBit === parentBit ? "" : `   ≠ parent ${parentBit}`),
     );
   } else lines.push(`Bit ${bit} = ${model.bit(bit)}`);
+
   const group = model.groupAt(bit);
   if (group) {
     const raw = model.groupValue(group);
@@ -359,12 +370,15 @@ export function bitTip(
     lines.push(
       `${group.name} ${group.label()} = ${formatInt(raw, group.base, group.width, { prefix: true })}${extra ? `  (${extra})` : ""}`,
     );
+
     if (group.access !== "rw")
       lines.push(
         group.access === "ro" ? "🔒 read-only field" : "🔒 reserved field",
       );
+
     if (group.description) lines.push(group.description);
   }
+
   if (!compare) lines.push("Click: flip · Drag: select · Shift+click: extend");
   return lines.join("\n");
 }

@@ -49,6 +49,7 @@ export class BitSelection {
           ? this.range[1]
           : this.range[0]
         : current;
+
     this.set(this.anchor, next);
   }
 

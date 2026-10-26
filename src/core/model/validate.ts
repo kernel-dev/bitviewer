@@ -24,9 +24,11 @@ export function checkBase(value: unknown): Base {
 export function toBig(value: unknown): bigint {
   if (typeof value === "boolean")
     throw new ModelError("boolean is not a number");
+
   if (typeof value === "bigint") return value;
   if (typeof value === "number") return BigInt(Math.trunc(value));
   const trimmed = String(value).trim();
+
   try {
     return BigInt(trimmed); // accepts 0x / 0o / 0b prefixes and decimals
   } catch {
@@ -37,8 +39,10 @@ export function toBig(value: unknown): bigint {
 /** A bit position from JSON: a number or a string of digits (anything else is NaN, which is rejected later). */
 export function bitPosition(value: unknown): number {
   if (typeof value === "number") return value;
+
   if (typeof value === "string" && /^\d+$/.test(value.trim()))
     return Number(value);
+
   return Number.NaN;
 }
 

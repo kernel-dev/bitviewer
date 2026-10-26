@@ -166,6 +166,7 @@ describe("peripheral export", () => {
       model.setPeripheral("UART0", offset);
       return model;
     };
+
     const ctrl = make("UART0.CTRL", 32, 0x0n);
     ctrl.setDescription("Control register");
     ctrl.addGroup(0, 0, "EN");
@@ -186,6 +187,7 @@ describe("peripheral export", () => {
       ],
     };
   };
+
   const source = (id: string) =>
     BUILTIN_EXPORTS.find((template) => template.id === id)!.source;
 

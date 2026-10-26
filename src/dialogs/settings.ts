@@ -62,9 +62,11 @@ function accentPicker(): HTMLElement {
     "aria-label": "Accent colour",
   });
   const current = () => appSettings.get("accent") || ACCENTS[0].color;
+
   const render = () => {
     const currentLower = current().toLowerCase();
     const isPreset = ACCENTS.some((accent) => accent.color === currentLower);
+
     container.replaceChildren(
       ...ACCENTS.map((accent) => {
         const buttonElement = html("button", {
@@ -76,6 +78,7 @@ function accentPicker(): HTMLElement {
           "aria-checked": accent.color === currentLower ? "true" : "false",
           "aria-label": accent.name,
         });
+
         buttonElement.addEventListener("click", () => {
           appSettings.set(
             "accent",
@@ -83,6 +86,7 @@ function accentPicker(): HTMLElement {
           );
           render();
         });
+
         return buttonElement;
       }),
       (() => {
@@ -108,6 +112,7 @@ function accentPicker(): HTMLElement {
       })(),
     );
   };
+
   render();
   return container;
 }
@@ -146,9 +151,11 @@ export function openSettings(): Promise<void> {
         10,
         Math.round(appSettings.get("zoom") * 100),
       );
+
       zoom.addEventListener("input", () => {
         zoomVal.textContent = `${zoom.value}%`;
       });
+
       zoom.addEventListener("change", () =>
         appSettings.set("zoom", +zoom.value / 100),
       );
@@ -193,15 +200,20 @@ export function openSettings(): Promise<void> {
         5,
         Math.round(appSettings.get("sound_volume") * 100),
       );
+
       const syncVolume = () => {
         volume.disabled = !appSettings.get("sounds");
       };
+
       syncVolume();
+
       volume.addEventListener("input", () => {
         volVal.textContent = `${volume.value}%`;
         appSettings.set("sound_volume", +volume.value / 100);
       });
+
       volume.addEventListener("change", () => play("bitOn"));
+
       const sounds = toggleSwitch(appSettings.get("sounds"), (value) => {
         appSettings.set("sounds", value);
         syncVolume();

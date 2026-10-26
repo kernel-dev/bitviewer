@@ -170,6 +170,7 @@ function snapshotMenu(card: ValueCard): MenuItem[] {
     },
   ];
   if (model.snapshots.length) items.push("sep");
+
   for (const snap of [...model.snapshots].reverse()) {
     items.push({
       label: `${snap.name}  ·  ${formatInt(snap.value & model.mask, 16, model.width, { prefix: true, group: true })}`,
@@ -204,6 +205,7 @@ function snapshotMenu(card: ValueCard): MenuItem[] {
       ],
     });
   }
+
   return items;
 }
 
@@ -218,6 +220,7 @@ export function rowMenu(
   const model = card.model;
   const rowWidth = model.rowWidthAt(lo);
   const items: MenuItem[] = [];
+
   if (!compare) {
     items.push({
       label: "Group selection",
@@ -230,6 +233,7 @@ export function rowMenu(
     if (group) items.push(...groupMenuItems(card, group));
     items.push("sep");
   }
+
   const rowOp = async (operation: Op, argument?: bigint) => {
     try {
       if (compare) {
@@ -237,6 +241,7 @@ export function rowMenu(
         play("op");
         return;
       }
+
       const next = model.withBits(
         lo,
         rowWidth,
@@ -249,8 +254,10 @@ export function rowMenu(
       toast(error.message, "error");
     }
   };
+
   for (const [operation, text] of ROW_OPS)
     items.push({ label: text, action: () => rowOp(operation) });
+
   items.push({
     label: "More operations",
     icon: ChevronDown,
@@ -335,6 +342,7 @@ function compareMenuItems(
     danger: true,
     action: () => removed(() => model.removeCompare(lo)),
   };
+
   if (compare) {
     return [
       {
@@ -353,6 +361,7 @@ function compareMenuItems(
       remove,
     ];
   }
+
   if (model.hasCompare(lo)) return [remove];
   return [
     {

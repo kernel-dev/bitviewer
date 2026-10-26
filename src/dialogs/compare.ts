@@ -41,20 +41,24 @@ export function pickCompareValue(options: {
         className: "primary",
         onClick: () => submit(),
       });
+
       const field = exprField({
         width: () => options.width,
         lookup: options.lookup,
         value: hexOf(options.value, options.width),
         placeholder: "e.g. 0xFF00   ·   x ^ 0b1000   ·   {Value 2}",
         onEnter: () => submit(),
+
         onChange: (result) => {
           confirmButton.disabled = !result;
         },
       });
+
       const submit = () => {
         const result = field.result();
         if (result) close(result.value);
       };
+
       body.append(
         html(
           "label",
@@ -63,14 +67,17 @@ export function pickCompareValue(options: {
         ),
         field.element,
       );
+
       if (options.candidates.length)
         body.append(
           candidatePicker(options.candidates, field, (value) => close(value)),
         );
+
       requestAnimationFrame(() => {
         field.input.focus();
         field.input.select();
       });
+
       return [
         button({ label: "Cancel", onClick: () => close(null) }),
         confirmButton,
@@ -92,10 +99,12 @@ function candidatePicker(
     spellcheck: false,
   });
   const list = html("div", { class: "compare-list", role: "listbox" });
+
   const fill = (candidate: CompareCandidate) => {
     field.input.value = hexOf(candidate.value, candidate.width);
     field.refresh();
   };
+
   const render = () => {
     const query = filter.value.trim().toLowerCase();
     const matching = query
@@ -103,6 +112,7 @@ function candidatePicker(
           candidate.name.toLowerCase().includes(query),
         )
       : candidates;
+
     const items = matching.slice(0, MAX_LISTED).map((candidate) => {
       const item = html(
         "button",
@@ -114,17 +124,21 @@ function candidatePicker(
           `${candidate.width}-bit · ${formatInt(candidate.value, 16, candidate.width, { prefix: true, group: true })}`,
         ),
       );
+
       item.addEventListener("click", () => {
         fill(candidate);
         for (const other of list.children)
           other.classList.toggle("on", other === item);
       });
+
       item.addEventListener("dblclick", () => {
         const result = field.result();
         if (result) compare(result.value);
       });
+
       return item;
     });
+
     const note = !matching.length
       ? "No values match"
       : matching.length > MAX_LISTED
@@ -135,13 +149,16 @@ function candidatePicker(
       ...(note ? [html("p", { class: "muted small compare-more" }, note)] : []),
     );
   };
+
   filter.addEventListener("input", render);
+
   filter.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       list.querySelector<HTMLElement>(".compare-item")?.click();
     }
   });
+
   const details = html(
     "details",
     { class: "compare-pick" },
@@ -153,11 +170,13 @@ function candidatePicker(
     filter,
     list,
   );
+
   // the list is only built when opened
   details.addEventListener("toggle", () => {
     if (!details.open) return;
     render();
     filter.focus();
   });
+
   return details;
 }

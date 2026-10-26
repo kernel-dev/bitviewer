@@ -29,6 +29,7 @@ export function renderTemplate(
   const lookup = (name: string, line: number): unknown => {
     for (let i = scopes.length - 1; i >= 0; i--)
       if (scopes[i].has(name)) return scopes[i].get(name);
+
     if (Object.hasOwn(context, name)) return context[name];
     throw new TemplateError(`Unknown name "${name}"`, line);
   };
@@ -44,15 +45,18 @@ export function renderTemplate(
       key === "length"
     )
       return record.length;
+
     if (record && typeof record === "object" && !Array.isArray(record)) {
       if (Object.hasOwn(record, key))
         return (record as Record<string, unknown>)[key];
+
       const keys = Object.keys(record).join(", ");
       throw new TemplateError(
         `"${path}" has no "${key}" (it has: ${keys})`,
         line,
       );
     }
+
     throw new TemplateError(`"${path}" has no "${key}"`, line);
   };
 
@@ -60,8 +64,10 @@ export function renderTemplate(
     switch (expression.kind) {
       case "lit":
         return expression.value;
+
       case "path": {
         let value = lookup(expression.path[0], line);
+
         for (let i = 1; i < expression.path.length; i++)
           value = readProperty(
             value,
@@ -69,12 +75,15 @@ export function renderTemplate(
             line,
             expression.path.slice(0, i).join("."),
           );
+
         return value;
       }
+
       case "not":
         return !truthy(evaluate(expression.operand, line));
       case "neg":
         return -Number(unwrap(evaluate(expression.operand, line)));
+
       case "filter": {
         const filter = FILTERS[expression.name];
         if (!filter)
@@ -82,6 +91,7 @@ export function renderTemplate(
             `Unknown filter "${expression.name}" (try ${FILTER_NAMES.join(", ")})`,
             line,
           );
+
         return filter(
           evaluate(expression.input, line),
           expression.argumentExpressions.map((argument) =>
@@ -90,30 +100,38 @@ export function renderTemplate(
           line,
         );
       }
+
       case "bin": {
         if (expression.operator === "and") {
           const left = evaluate(expression.left, line);
           return truthy(left) ? evaluate(expression.right, line) : left;
         }
+
         if (expression.operator === "or") {
           const left = evaluate(expression.left, line);
           return truthy(left) ? left : evaluate(expression.right, line);
         }
+
         const leftValue = evaluate(expression.left, line);
         const rightValue = evaluate(expression.right, line);
+
         switch (expression.operator) {
           case "==":
             return sameValue(leftValue, rightValue);
           case "!=":
             return !sameValue(leftValue, rightValue);
+
           case "+": {
             if (isNumeric(leftValue) && isNumeric(rightValue))
               return Number(unwrap(leftValue)) + Number(unwrap(rightValue));
+
             const text = valueToText(leftValue) + valueToText(rightValue);
             if (text.length > MAX_OUTPUT)
               throw new TemplateError("The text is too long", line);
+
             return text;
           }
+
           case "-":
             return Number(unwrap(leftValue)) - Number(unwrap(rightValue));
           default:
@@ -131,12 +149,15 @@ export function renderTemplate(
       } catch (error) {
         if (error instanceof TemplateError && !error.line)
           throw new TemplateError(error.reason, node.line);
+
         if (error instanceof RangeError)
           throw new TemplateError("The output is too large", node.line);
+
         throw error;
       }
     }
   };
+
   const runNode = (node: Node) => {
     if (node.kind === "text") {
       const rendered = node.parts
@@ -147,8 +168,10 @@ export function renderTemplate(
         )
         .join("");
       size += rendered.length + 1;
+
       if (size > MAX_OUTPUT)
         throw new TemplateError("The output is too large", node.line);
+
       out.push(rendered.trimEnd());
     } else if (node.kind === "set") {
       const value = evaluate(node.expression, node.line);
@@ -168,10 +191,13 @@ export function renderTemplate(
       const list = evaluate(node.list, node.line);
       if (!Array.isArray(list))
         throw new TemplateError("@for needs a list to loop over", node.line);
+
       if (!list.length) run(node.orelse);
+
       list.forEach((item, index) => {
         if (++loops > MAX_LOOP)
           throw new TemplateError("Too many loop iterations", node.line);
+
         scopes.push(
           new Map<string, unknown>([
             [node.variable, item],
@@ -191,6 +217,7 @@ export function renderTemplate(
       });
     }
   };
+
   run(compiled.body);
   return `${out.join("\n").trimEnd()}\n`;
 }

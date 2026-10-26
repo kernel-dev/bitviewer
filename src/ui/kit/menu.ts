@@ -78,6 +78,7 @@ export function openMenu(
 
     if (item.submenu) {
       const submenu = item.submenu;
+
       const openSub = () => {
         const rowRect = row.getBoundingClientRect();
         const menuRect = menu.getBoundingClientRect();
@@ -99,6 +100,7 @@ export function openMenu(
       row.addEventListener("click", () => {
         if (item.keepOpen) {
           item.action?.();
+
           if (item.checked !== undefined) {
             item.checked = !item.checked;
             row.firstElementChild?.replaceWith(
@@ -107,8 +109,10 @@ export function openMenu(
                 : html("span", { class: "menu-ico-pad" }),
             );
           }
+
           return;
         }
+
         closeMenus();
         item.action?.();
       });
@@ -147,6 +151,7 @@ export function openMenu(
         anchor.flipX === undefined ? -1 : anchor.flipX - menuWidth;
       x = flipped >= 6 ? flipped : innerWidth - menuWidth - 6;
     }
+
     if (y + menuHeight > innerHeight - 6)
       y = Math.max(6, innerHeight - menuHeight - 6);
   }

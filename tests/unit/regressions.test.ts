@@ -55,6 +55,7 @@ describe("workspace files", () => {
           groups: [{ lo, hi: 3, name: "A" }],
         }),
       ).toThrow(ModelError);
+
     expect(() => valueFromJSON({ width: 8, row_bases: { abc: 2 } })).toThrow(
       ModelError,
     );
@@ -140,6 +141,7 @@ describe("code export", () => {
     });
     return model;
   };
+
   const options = { prefix: "CTRL", includeValue: true };
 
   it("escapes Rust keywords", () => {
@@ -194,6 +196,7 @@ describe("export templates", () => {
   it("stops text that doubles in a loop", () => {
     const source =
       '@set s = "ab"\n@for item in items\n@set s = s + s\n@end\n${s.length}';
+
     try {
       renderSource(source, { items: Array.from({ length: 40 }, () => 0) });
       expect.unreachable();

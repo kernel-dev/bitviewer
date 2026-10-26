@@ -100,9 +100,11 @@ export class CardHeader {
       },
       icon(GripVertical, 16),
     );
+
     grip.addEventListener("pointerdown", (event) => {
       if (event.button === 0) card.events.dragStart(card, event);
     });
+
     const collapse = button({
       icon: model.collapsed ? ChevronRight : ChevronDown,
       className: "ghost sm collapse-btn",

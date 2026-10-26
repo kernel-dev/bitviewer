@@ -62,6 +62,7 @@ const DEFAULTS: Settings = {
 
 const FILE = "settings.json";
 const LEGACY_KEY = "bitviewer.settings";
+
 type Listener = (key: keyof Settings) => void;
 
 export function clampZoom(zoom: number): number {
@@ -84,10 +85,12 @@ function isSavedExport(value: unknown): value is SavedExportTemplate {
 function merge(target: Settings, raw: unknown) {
   if (!raw || typeof raw !== "object") return;
   const record = raw as Record<string, unknown>;
+
   for (const key of Object.keys(DEFAULTS) as (keyof Settings)[]) {
     const value = record[key];
     const defaultValue = DEFAULTS[key];
     if (value === undefined) continue;
+
     if (key === "templates") {
       if (Array.isArray(value))
         target.templates = value
@@ -109,14 +112,20 @@ function merge(target: Settings, raw: unknown) {
 
 function sanitize(settings: Settings) {
   settings.zoom = clampZoom(settings.zoom);
+
   if (!["dark", "light", "contrast"].includes(settings.theme))
     settings.theme = "dark";
+
   if (!BASE_ORDER.includes(settings.default_base)) settings.default_base = 16;
+
   if (!["line", "byte", "nibble"].includes(settings.default_view))
     settings.default_view = "line";
+
   settings.sound_volume = Math.min(1, Math.max(0, settings.sound_volume));
+
   if (settings.accent && !/^#[0-9a-f]{6}$/i.test(settings.accent))
     settings.accent = "";
+
   settings.recent_files = settings.recent_files.slice(0, MAX_RECENT);
 }
 
@@ -136,6 +145,7 @@ class Store {
     } catch {
       /* unreadable storage: keep defaults */
     }
+
     sanitize(this.settings);
   }
 
@@ -204,6 +214,7 @@ class Store {
       this.writeTimer = 0;
       await this.write();
     }
+
     await this.pending;
   }
 
@@ -217,14 +228,17 @@ class Store {
 
   private async write(): Promise<void> {
     const text = JSON.stringify(this.settings, null, 2);
+
     this.pending = writeAppFile("config", FILE, text).catch(() => {
       /* disk full / no permission: the setting still applies for this run */
     });
+
     try {
       localStorage.setItem(LEGACY_KEY, text); // keeps the browser preview in sync too
     } catch {
       /* ignore */
     }
+
     await this.pending;
   }
 }

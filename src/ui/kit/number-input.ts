@@ -45,6 +45,7 @@ export class NumberInput {
 
     this.element.addEventListener("input", () => this.onEdited());
     this.element.addEventListener("blur", () => this.render());
+
     this.element.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -82,6 +83,7 @@ export class NumberInput {
 
   private onEdited() {
     let value: bigint;
+
     try {
       value = parseValue(
         this.element.value,
@@ -92,6 +94,7 @@ export class NumberInput {
     } catch (error) {
       if (error instanceof ParseError)
         this.mark(error.incomplete ? null : error.message);
+
       return;
     }
 

@@ -16,6 +16,7 @@ export interface XmlElement {
   name: string;
   attributes: Record<string, string>;
   children: XmlElement[];
+
   /** The element's own text (not its children's), entities decoded. */
   text: string;
 }
@@ -36,13 +37,17 @@ function decodeEntities(text: string, lineOf: () => number): string {
         entity[1] === "x" || entity[1] === "X"
           ? Number.parseInt(entity.slice(2), 16)
           : Number.parseInt(entity.slice(1), 10);
+
       if (!(code >= 0 && code <= 0x10ffff))
         throw new XmlError(`Bad character reference ${whole}`, lineOf());
+
       return String.fromCodePoint(code);
     }
+
     const named = NAMED_ENTITIES[entity];
     if (named === undefined)
       throw new XmlError(`Unknown entity ${whole}`, lineOf());
+
     return named;
   });
 }
@@ -55,6 +60,7 @@ export function parseXml(source: string): XmlElement {
   let cursor = 0;
   // line numbers are only worked out when an error needs one
   const lineOf = (at = cursor) => source.slice(0, at).split("\n").length;
+
   const fail = (reason: string, at = cursor): never => {
     throw new XmlError(reason, lineOf(at));
   };
@@ -74,8 +80,10 @@ export function parseXml(source: string): XmlElement {
       addText(decodeEntities(source.slice(cursor), lineOf));
       break;
     }
+
     if (open > cursor)
       addText(decodeEntities(source.slice(cursor, open), () => lineOf(open)));
+
     cursor = open;
 
     if (source.startsWith("<!--", cursor)) {
@@ -101,6 +109,7 @@ export function parseXml(source: string): XmlElement {
         else if (character === "]") depth--;
         else if (character === ">" && depth <= 0) break;
       }
+
       if (scan >= source.length) fail("A <! … > declaration is never closed");
       cursor = scan + 1;
     } else if (source[cursor + 1] === "/") {
@@ -111,6 +120,7 @@ export function parseXml(source: string): XmlElement {
       const end = source.indexOf(">", NAME.lastIndex);
       if (end < 0 || source.slice(NAME.lastIndex, end).trim())
         fail(`Bad closing tag </${name}`);
+
       const element = stack.pop();
       if (!element) fail(`</${name}> without an opening tag`);
       if (element!.name !== name) fail(`</${name}> closes <${element!.name}>`);
@@ -127,6 +137,7 @@ export function parseXml(source: string): XmlElement {
         text: "",
       };
       let scan = NAME.lastIndex;
+
       for (;;) {
         ATTRIBUTE.lastIndex = scan;
         const attribute = ATTRIBUTE.exec(source);
@@ -137,6 +148,7 @@ export function parseXml(source: string): XmlElement {
         );
         scan = ATTRIBUTE.lastIndex;
       }
+
       while (/\s/.test(source[scan] ?? "")) scan++;
       const selfClosing = source.startsWith("/>", scan);
       if (!selfClosing && source[scan] !== ">")
@@ -144,19 +156,23 @@ export function parseXml(source: string): XmlElement {
           `Unexpected "${source[scan] ?? "end of file"}" in <${element.name}>`,
           scan,
         );
+
       cursor = scan + (selfClosing ? 2 : 1);
 
       if (stack.length) stack[stack.length - 1].children.push(element);
       else if (root) fail("A second root element");
       else root = element;
+
       if (!selfClosing) {
         stack.push(element);
         textParts.push([]);
       }
     }
   }
+
   if (stack.length)
     fail(`<${stack[stack.length - 1].name}> is never closed`, source.length);
+
   if (!root) fail("No elements found", 0);
   return root!;
 }

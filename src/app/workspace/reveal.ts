@@ -13,11 +13,14 @@ export function bringIntoView(
   const rect = element.getBoundingClientRect();
   const far =
     rect.bottom < -window.innerHeight || rect.top > 2 * window.innerHeight;
+
   if (!far) {
     element.scrollIntoView({ block, behavior: "smooth" });
     return;
   }
+
   let top = Number.NaN;
+
   for (let attempt = 0; attempt < 4; attempt++) {
     element.scrollIntoView({ block, behavior: "instant" });
     settle();

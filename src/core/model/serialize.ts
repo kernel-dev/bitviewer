@@ -57,8 +57,10 @@ export function valueToJSON(model: ValueModel) {
 export function valueFromJSON(json: any): ValueModel {
   if (!json || typeof json !== "object")
     throw new ModelError("Invalid value entry");
+
   if (!("width" in json))
     throw new ModelError("Invalid value entry: missing width");
+
   const model = new ValueModel({
     width: Number(json.width),
     value: toBig(json.value ?? 0),
@@ -71,13 +73,16 @@ export function valueFromJSON(json: any): ValueModel {
   model.showBases = json.show_bases === true;
   model.collapsed = json.collapsed === true;
   if (typeof json.block === "string") model.block = json.block.trim();
+
   if (json.offset !== undefined && json.offset !== null) {
     const offset = toBig(json.offset);
     if (offset < 0n) throw new ModelError("Invalid register offset");
     model.offset = offset;
   }
+
   if (typeof json.description === "string")
     model.description = json.description;
+
   for (const snapshotJson of Array.isArray(json.snapshots)
     ? json.snapshots
     : []) {
@@ -91,28 +96,34 @@ export function valueFromJSON(json: any): ValueModel {
       /* skip a malformed snapshot */
     }
   }
+
   for (const [rowStart, base] of Object.entries(json.row_bases ?? {})) {
     const lo = Number(rowStart);
     model.checkRow(lo);
     model.rowBases.set(lo, checkBase(Number(base)));
   }
+
   for (const [rowStart, value] of Object.entries(json.compares ?? {})) {
     const lo = Number(rowStart);
     model.checkRow(lo);
     model.compares.set(lo, toBig(value) & maxValue(model.rowWidthAt(lo)));
   }
+
   for (const [rowStart, value] of Object.entries(json.hidden_compares ?? {})) {
     const lo = Number(rowStart);
     model.checkRow(lo);
+
     if (!model.compares.has(lo))
       model.hiddenCompares.set(
         lo,
         toBig(value) & maxValue(model.rowWidthAt(lo)),
       );
   }
+
   for (const groupJson of json.groups ?? []) {
     if (groupJson?.lo === undefined || groupJson?.hi === undefined)
       throw new ModelError("Invalid group entry");
+
     const group = model.addGroup(
       bitPosition(groupJson.lo),
       bitPosition(groupJson.hi),
@@ -122,5 +133,6 @@ export function valueFromJSON(json: any): ValueModel {
     );
     assignDetails(group, detailsFromJSON(groupJson));
   }
+
   return model;
 }

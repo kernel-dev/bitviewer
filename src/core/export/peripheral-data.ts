@@ -53,6 +53,7 @@ export function peripheralContext(
     model.name.startsWith(`${peripheral.name}.`)
       ? model.name.slice(peripheral.name.length + 1)
       : model.name;
+
   const registers = sorted.map((model) => {
     let base = ident(ownName(model), "REG");
     if (RESERVED_REGISTER_NAMES.has(base)) base = `${base}_REG`;
@@ -87,6 +88,7 @@ export function peripheralContext(
   const layout: Record<string, unknown>[] = [];
   let cursor = 0n;
   let gaps = 0;
+
   for (const register of registers) {
     if (!register.has_offset) continue;
     const offset = (register.offset as Num).big;
@@ -94,6 +96,7 @@ export function peripheralContext(
       layout.push({ ...register, member: false, gap: false, overlap: true });
       continue;
     }
+
     if (offset > cursor) {
       layout.push({
         gap: true,
@@ -106,6 +109,7 @@ export function peripheralContext(
         declaration: `RESERVED${gaps - 1}[${Number(offset - cursor)}]`,
       });
     }
+
     layout.push({
       ...register,
       member: true,
@@ -115,6 +119,7 @@ export function peripheralContext(
     });
     cursor = offset + BigInt(register.member_bytes);
   }
+
   const base = peripheral.base;
   return {
     name: peripheral.name,

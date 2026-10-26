@@ -56,16 +56,19 @@ export function tourRunning(): boolean {
 export function startTour(): Promise<void> {
   if (running) return Promise.resolve();
   running = true;
+
   const steps = STEPS.filter((step) => {
     const element = document.querySelector(step.target);
     return element && (element as HTMLElement).offsetParent !== null;
   });
+
   return new Promise((resolve) => {
     if (!steps.length) {
       running = false;
       resolve();
       return;
     }
+
     let stepIndex = 0;
     const ringElement = html("div", { class: "tour-ring" });
     const title = html("h3", {});
@@ -131,6 +134,7 @@ export function startTour(): Promise<void> {
       popover.style.top = `${below ? rect.bottom + 14 : Math.max(12, rect.top - popHeight - 14)}px`;
       next.focus();
     };
+
     const finish = () => {
       running = false;
       document.removeEventListener("keydown", onKey, true);
@@ -138,11 +142,13 @@ export function startTour(): Promise<void> {
       layer.remove();
       resolve();
     };
+
     const goBy = (delta: number) => {
       stepIndex += delta;
       if (stepIndex >= steps.length) finish();
       else place();
     };
+
     const onKey = (event: KeyboardEvent) => {
       event.stopPropagation();
       if (event.key === "Escape") finish();
@@ -151,6 +157,7 @@ export function startTour(): Promise<void> {
         goBy(1);
       } else if (event.key === "ArrowLeft" && stepIndex > 0) goBy(-1);
     };
+
     back.addEventListener("click", () => goBy(-1));
     next.addEventListener("click", () => goBy(1));
     skip.addEventListener("click", finish);

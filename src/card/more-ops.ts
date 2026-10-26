@@ -47,20 +47,24 @@ function askArgument(
         className: "primary",
         onClick: () => submit(),
       });
+
       const field = exprField({
         width: () => (isShift ? 16 : width),
         lookup,
         placeholder: isShift ? "e.g. 4" : "e.g. 0xFF00 or mask(8) << 4",
         value: isShift ? "1" : "",
         onEnter: () => submit(),
+
         onChange: (result) => {
           confirmButton.disabled = !result;
         },
       });
+
       const submit = () => {
         const result: ExprResult | null = field.result();
         if (result) close({ operation: chosen, argument: result.value });
       };
+
       if (isShift) {
         const kinds = segmented(
           (["shl", "shr", "asr", "rol", "ror"] as Op[]).map(
@@ -84,6 +88,7 @@ function askArgument(
           kinds.element,
         );
       }
+
       body.append(
         html(
           "label",
@@ -113,6 +118,7 @@ export function moreOpsMenu(
     const answer = await askArgument(operation, width, lookup);
     if (answer) apply(answer.operation, answer.argument);
   };
+
   return [
     { label: "Rotate left", icon: RotateCcw, action: () => apply("rol") },
     { label: "Rotate right", icon: RotateCw, action: () => apply("ror") },

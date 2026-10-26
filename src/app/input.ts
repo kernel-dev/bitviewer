@@ -18,16 +18,19 @@ export function installInput(app: App) {
   const workspace = app.workspace;
 
   let wheelAcc = 0;
+
   window.addEventListener(
     "wheel",
     (event) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
       wheelAcc += -event.deltaY;
+
       while (wheelAcc >= 100) {
         wheelAcc -= 100;
         zoomBy(1);
       }
+
       while (wheelAcc <= -100) {
         wheelAcc += 100;
         zoomBy(-1);
@@ -42,6 +45,7 @@ export function installInput(app: App) {
     );
     if (card) workspace.activeCard = card;
   };
+
   document.addEventListener("pointerdown", track, true);
   // Record any pending undo step before the next edit starts, so that a bit
   // click followed instantly by typing (or the reverse) stays two steps.
@@ -63,6 +67,7 @@ export function installInput(app: App) {
     const target = event.target as Element;
     if (target.closest(".bit, .row-label, .menu, .backdrop, [data-keep-sel]"))
       return;
+
     // clicks on a scrollbar land on the scrolling element itself
     if (
       target instanceof HTMLElement &&
@@ -70,6 +75,7 @@ export function installInput(app: App) {
         event.offsetY >= target.clientHeight)
     )
       return;
+
     workspace.clearSelections();
   });
 

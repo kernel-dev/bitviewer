@@ -58,12 +58,14 @@ export function findBase(
 /** Every element called `name` under `root`, at any depth. */
 export function allNamed(root: XmlElement, name: string): XmlElement[] {
   const out: XmlElement[] = [];
+
   const visit = (element: XmlElement) => {
     for (const item of element.children) {
       if (item.name === name) out.push(item);
       visit(item);
     }
   };
+
   visit(root);
   return out;
 }

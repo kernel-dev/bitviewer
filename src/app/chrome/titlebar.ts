@@ -15,6 +15,7 @@ export class Titlebar {
 
   constructor(app: App) {
     const menuBar = html("nav", { class: "menubar" });
+
     for (const [name] of menuLayout(app)) {
       // built on each open so dynamic entries (recent files, labels) are current
       const items = () =>
@@ -29,6 +30,7 @@ export class Titlebar {
       buttonElement.addEventListener("click", () =>
         openMenu(items(), buttonElement),
       );
+
       buttonElement.addEventListener("pointerenter", () => {
         // slide between open menus like a native menu bar
         if (
@@ -39,18 +41,22 @@ export class Titlebar {
           openMenu(items(), buttonElement);
         }
       });
+
       menuBar.append(buttonElement);
     }
+
     this.titleFile = html("span", { class: "title-file" });
     this.maxBtn = html(
       "button",
       { type: "button", class: "win-btn", tip: "Maximize" },
       icon(Square, 13),
     );
+
     this.maxBtn.addEventListener("click", async () => {
       await P.toggleMaximize();
       this.syncMaxButton();
     });
+
     const controls = P.isTauri
       ? html(
           "div",

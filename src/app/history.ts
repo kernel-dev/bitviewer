@@ -57,6 +57,7 @@ export class History {
     const source = active instanceof HTMLInputElement ? active : null;
     if (this.timer) return;
     this.pendingSrc = source;
+
     this.timer = window.setTimeout(() => {
       this.timer = 0;
       this.capture();
@@ -109,10 +110,12 @@ export class History {
       typing !== null &&
       typing === this.lastInput &&
       now - this.lastTime < TYPING_MERGE_MS;
+
     if (!merge) {
       this.past.push(this.current);
       if (this.past.length > LIMIT) this.past.shift();
     }
+
     this.current = snapshot;
     this.future = [];
     this.lastInput = typing;
@@ -123,12 +126,14 @@ export class History {
   private restore(snapshot: string) {
     this.current = snapshot;
     this.restoring = true;
+
     try {
       this.apply(snapshot);
     } finally {
       this.restoring = false;
       this.lastInput = null;
     }
+
     this.changed();
   }
 }

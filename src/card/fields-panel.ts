@@ -49,6 +49,7 @@ interface FieldUi {
 /** The page's one hidden colour picker (cancelling it fires no event, so a
  *  new input per click would never be removed). */
 let sharedColorInput: HTMLInputElement | null = null;
+
 function colorInput(): HTMLInputElement {
   sharedColorInput ??= document.body.appendChild(
     html("input", { type: "color", class: "hidden-color", tabindex: -1 }),
@@ -139,6 +140,7 @@ export class FieldsPanel {
       fieldUi.baseControl.set(fieldUi.group.base);
       fieldUi.edit.setFormat(fieldUi.group.width, fieldUi.group.base);
       fieldUi.edit.setValue(raw);
+
       if (fieldUi.decoded) {
         const decoded = decodeField(fieldUi.group, raw);
         if (fieldUi.decoded instanceof HTMLInputElement) {
@@ -153,6 +155,7 @@ export class FieldsPanel {
             ? `⚠ ${decoded.error}`
             : decoded.text;
       }
+
       if (fieldUi.named)
         fieldUi.named.textContent = fieldUi.group.nameOf(raw) ?? "—";
     }
@@ -264,6 +267,7 @@ export class FieldsPanel {
       fieldUi.decoded = span;
       return span;
     }
+
     const card = this.card;
     const model = card.model;
     const input = html("input", {
@@ -271,9 +275,11 @@ export class FieldsPanel {
       spellcheck: false,
       tip: "Type a value to set the raw bits",
     });
+
     const commit = () => {
       if (input.dataset.dirty !== "1") return;
       input.dataset.dirty = "";
+
       try {
         const typedValue = parseFloatText(stripUnit(input.value, group.unit));
         const raw = rawFromNumber(group, typedValue);
@@ -284,14 +290,17 @@ export class FieldsPanel {
       } catch (error) {
         if (!(error instanceof ExprError || error instanceof ParseError))
           throw error;
+
         input.classList.add("invalid");
         play("error");
         toast(error.message, "error");
       }
     };
+
     input.addEventListener("input", () => {
       input.dataset.dirty = "1";
     });
+
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") commit();
       if (event.key === "Escape") {
@@ -300,10 +309,12 @@ export class FieldsPanel {
         input.blur();
       }
     });
+
     input.addEventListener("blur", () => {
       commit();
       card.refresh();
     });
+
     fieldUi.decoded = input;
     return html(
       "span",
@@ -322,6 +333,7 @@ export class FieldsPanel {
       class: "btn outline sm named-pick",
       tip: "Pick a named value",
     });
+
     picker.addEventListener("click", () =>
       openMenu(
         group.named.map((namedValue) => ({
@@ -339,6 +351,7 @@ export class FieldsPanel {
         picker,
       ),
     );
+
     return picker;
   }
 
@@ -347,6 +360,7 @@ export class FieldsPanel {
     anchor: HTMLElement | { x: number; y: number },
   ) {
     const card = this.card;
+
     const custom = () => {
       const input = colorInput();
       input.value = expandColor(group.color);
@@ -355,6 +369,7 @@ export class FieldsPanel {
       input.onchange = () => card.rebuild();
       input.click();
     };
+
     openMenu(
       [
         ...GROUP_COLORS.map(

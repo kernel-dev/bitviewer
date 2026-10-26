@@ -45,6 +45,7 @@ let latest: (() => Session) | null = null;
 export function saveSessionSoon(get: () => Session) {
   latest = get;
   clearTimeout(timer);
+
   timer = window.setTimeout(() => {
     timer = 0;
     void writeSession(get());

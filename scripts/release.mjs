@@ -16,14 +16,17 @@ const root = join(import.meta.dirname, "..");
 const conf = JSON.parse(readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"));
 const version = conf.version;
 const args = process.argv.slice(2);
+
 const flag = (name) => {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 };
+
 // Notes shown by the updater and on the GitHub release: --notes, else this
 // version's section of CHANGELOG.md.
 const notes =
   flag("--notes") ?? readReleaseNotes(version) ?? `Bit Viewer ${version}`;
+
 if (!flag("--notes") && notes === `Bit Viewer ${version}`) {
   console.warn(
     `Warning: CHANGELOG.md has no "## [${version}] - YYYY-MM-DD" section; the release notes will be generic.`,
@@ -32,7 +35,9 @@ if (!flag("--notes") && notes === `Bit Viewer ${version}`) {
 
 // Asset URLs live next to latest.json: https://github.com/OWNER/REPO/releases/download/vX.Y.Z/<file>
 const endpoint = conf.plugins?.updater?.endpoints?.[0] ?? "";
+
 const repo = flag("--repo") ?? /github\.com\/([^/]+\/[^/]+)\/releases/.exec(endpoint)?.[1];
+
 if (!repo || repo === "OWNER/REPO") {
   console.error(
     "Set your GitHub repo first: in src-tauri/tauri.conf.json replace OWNER/REPO in plugins.updater.endpoints\n" +
@@ -43,16 +48,19 @@ if (!repo || repo === "OWNER/REPO") {
 
 const keyPath = join(homedir(), ".tauri", "bitviewer.key");
 const env = { ...process.env };
+
 if (!env.TAURI_SIGNING_PRIVATE_KEY) {
   if (!existsSync(keyPath)) {
     console.error(`No signing key: expected ${keyPath} (run: npx tauri signer generate -w "${keyPath}")`);
     process.exit(1);
   }
+
   env.TAURI_SIGNING_PRIVATE_KEY = readFileSync(keyPath, "utf8");
   env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ??= "";
 }
 
 console.log(`Building Bit Viewer ${version} with updater artifacts…`);
+
 execSync("npx tauri build --config src-tauri/tauri.updater.conf.json", {
   cwd: root,
   env,
@@ -61,10 +69,12 @@ execSync("npx tauri build --config src-tauri/tauri.updater.conf.json", {
 
 const nsisDir = join(root, "src-tauri", "target", "release", "bundle", "nsis");
 const installer = readdirSync(nsisDir).find((file) => file.includes(version) && file.endsWith("-setup.exe"));
+
 if (!installer || !existsSync(join(nsisDir, `${installer}.sig`))) {
   console.error(`Couldn't find the signed installer for ${version} in ${nsisDir}`);
   process.exit(1);
 }
+
 const manifest = {
   version,
   notes,
@@ -76,15 +86,21 @@ const manifest = {
     },
   },
 };
+
 const out = join(root, "src-tauri", "target", "release", "bundle", "latest.json");
+
 writeFileSync(out, `${JSON.stringify(manifest, null, 2)}\n`);
+
 // a file, because multi-line notes don't survive being pasted as a shell argument
 const notesFile = join(root, "src-tauri", "target", "release", "bundle", "release-notes.md");
+
 writeFileSync(notesFile, `${notes}\n`);
 console.log(`\nWrote ${out}\nWrote ${notesFile}`);
 console.log("\nPublish the release (GitHub CLI):");
+
 console.log(
   `  gh release create v${version} --repo ${repo} --title "Bit Viewer ${version}" --notes-file "${notesFile}" ` +
     `"${join(nsisDir, installer)}" "${out}"`,
 );
+
 console.log("\nNote: GitHub replaces spaces in asset names with dots; the URL above already accounts for that.");

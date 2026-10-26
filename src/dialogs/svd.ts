@@ -27,12 +27,14 @@ export function pickSvdRegisters(
     device.peripherals.flatMap((peripheral) => peripheral.registers),
   );
   const expanded = new Set<SvdPeripheral>();
+
   return modal<SvdChoice | null>({
     title: `Import from ${device.name}`,
     icon: Cpu,
     wide: true,
     cancelValue: null,
     hasChanges: () => selected.size > 0,
+
     build: (body, close) => {
       body.parentElement?.classList.add("guide-modal");
       const registerCount = device.peripherals.reduce(
@@ -63,6 +65,7 @@ export function pickSvdRegisters(
       });
 
       const query = () => search.value.trim().toLowerCase();
+
       /** The peripherals the filter lets through, each with its registers
        *  that do (all of them when the peripheral itself matches). */
       const filtered = () => {
@@ -97,6 +100,7 @@ export function pickSvdRegisters(
       const allSelected = (registers: SvdRegister[]) =>
         registers.length > 0 &&
         registers.every((register) => selected.has(register));
+
       const allButton = button({
         label: "Select all",
         className: "outline svd-all",
@@ -104,8 +108,10 @@ export function pickSvdRegisters(
         onClick: () => {
           const registers = inScope();
           const unselect = allSelected(registers);
+
           for (const register of registers)
             unselect ? selected.delete(register) : selected.add(register);
+
           render();
         },
       });
@@ -145,11 +151,14 @@ export function pickSvdRegisters(
         });
         box.indeterminate = chosen > 0 && chosen < peripheral.registers.length;
         box.addEventListener("click", (event) => event.stopPropagation());
+
         box.addEventListener("change", () => {
           for (const register of peripheral.registers)
             box.checked ? selected.add(register) : selected.delete(register);
+
           render();
         });
+
         return box;
       };
 
@@ -160,10 +169,12 @@ export function pickSvdRegisters(
           checked: selected.has(register),
           "aria-label": `Select ${register.path}`,
         });
+
         box.addEventListener("change", () => {
           box.checked ? selected.add(register) : selected.delete(register);
           render();
         });
+
         const fieldCount = register.fields.length;
         return html(
           "label",
@@ -194,6 +205,7 @@ export function pickSvdRegisters(
         list.replaceChildren();
         let rows = 0;
         let hidden = 0;
+
         for (const { peripheral, peripheralHit, registers } of filtered()) {
           // a search that only matches registers opens their peripheral
           const open =
@@ -222,28 +234,35 @@ export function pickSvdRegisters(
                 .join(" · "),
             ),
           );
+
           const toggle = () => {
             open ? expanded.delete(peripheral) : expanded.add(peripheral);
             render();
           };
+
           head.addEventListener("click", toggle);
+
           head.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               toggle();
             }
           });
+
           list.append(head);
           if (!open) continue;
+
           for (const register of registers) {
             if (rows >= MAX_ROWS) {
               hidden++;
               continue;
             }
+
             list.append(registerRow(register));
             rows++;
           }
         }
+
         if (hidden)
           list.append(
             html(
@@ -252,6 +271,7 @@ export function pickSvdRegisters(
               `${hidden} more registers aren't shown; type in the filter to narrow the list.`,
             ),
           );
+
         if (!list.childElementCount)
           list.append(
             html(
@@ -260,6 +280,7 @@ export function pickSvdRegisters(
               "Nothing matches the filter.",
             ),
           );
+
         list.scrollTop = scroll;
         updateCount();
       };

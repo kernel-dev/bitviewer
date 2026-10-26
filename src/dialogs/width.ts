@@ -26,6 +26,7 @@ export function pickWidth(
         spellcheck: false,
       });
       const errorElement = html("div", { class: "width-error" });
+
       const presetControl = segmented(
         PRESETS.map((preset) => ({ value: preset, label: String(preset) })),
         {
@@ -38,6 +39,7 @@ export function pickWidth(
           className: "width-presets",
         },
       );
+
       const confirmButton = button({
         label: okLabel,
         className: "primary",
@@ -45,6 +47,7 @@ export function pickWidth(
       });
       const parse = () =>
         /^\s*\d+\s*$/.test(input.value) ? Number(input.value) : Number.NaN;
+
       const validate = () => {
         const parsedWidth = parse();
         const valid =
@@ -64,9 +67,11 @@ export function pickWidth(
         );
         return valid;
       };
+
       const submit = () => {
         if (validate()) close(parse());
       };
+
       input.addEventListener("input", validate);
       input.addEventListener(
         "keydown",

@@ -23,6 +23,7 @@ export function inlineMarkdown(text: string): (Node | string)[] {
 export async function showWhatsNew(version = VERSION): Promise<boolean> {
   const release = findRelease(changelogText, version);
   if (!release) return false;
+
   await modal<void>({
     title: `Bit Viewer ${version} Changes`,
     icon: ScrollText,
@@ -30,8 +31,10 @@ export async function showWhatsNew(version = VERSION): Promise<boolean> {
     cancelValue: undefined,
     build: (body, close) => {
       const notes = html("div", { class: "whatsnew" });
+
       if (release.date)
         notes.append(html("p", { class: "muted" }, `Released ${release.date}`));
+
       for (const section of release.sections) {
         if (section.title) notes.append(html("h3", {}, section.title));
         notes.append(
@@ -44,6 +47,7 @@ export async function showWhatsNew(version = VERSION): Promise<boolean> {
           ),
         );
       }
+
       body.append(notes);
       return [
         button({
@@ -54,5 +58,6 @@ export async function showWhatsNew(version = VERSION): Promise<boolean> {
       ];
     },
   });
+
   return true;
 }

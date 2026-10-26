@@ -4,6 +4,7 @@ import { html } from "./dom";
 
 let toastEl: HTMLElement | null = null;
 let toastTimer = 0;
+
 export function toast(message: string, kind: "info" | "ok" | "error" = "info") {
   // role=status: screen readers announce each message without moving focus
   toastEl ??= document.body.appendChild(

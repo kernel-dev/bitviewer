@@ -5,6 +5,7 @@
 import { type Base, maxValue } from "../format/integers";
 
 export type View = "line" | "byte" | "nibble";
+
 export const VIEWS: readonly View[] = ["line", "byte", "nibble"];
 const VIEW_WIDTHS: Partial<Record<View, number>> = { byte: 8, nibble: 4 };
 
@@ -27,17 +28,21 @@ export function remapRows(
   const valueMask = maxValue(width);
   let overlay = value;
   let covered = 0n;
+
   for (const [lo, rowValue] of rows) {
     const mask = (maxValue(oldRowWidth) << BigInt(lo)) & valueMask;
     overlay = (overlay & ~mask) | ((rowValue << BigInt(lo)) & mask);
     covered |= mask;
   }
+
   const out = new Map<number, bigint>();
+
   for (let lo = 0; lo < width; lo += newRowWidth) {
     const rowWidth = Math.min(newRowWidth, width - lo);
     if (covered & (maxValue(rowWidth) << BigInt(lo)))
       out.set(lo, (overlay >> BigInt(lo)) & maxValue(rowWidth));
   }
+
   return out;
 }
 
@@ -53,6 +58,7 @@ export function remapRowBases(
   const oldRowStarts = [...rowBases.keys()].sort(
     (first, second) => first - second,
   );
+
   for (let lo = 0; lo < width; lo += newRowWidth) {
     for (const oldRowStart of oldRowStarts) {
       if (oldRowStart + oldRowWidth > lo && oldRowStart < lo + newRowWidth) {
@@ -61,5 +67,6 @@ export function remapRowBases(
       }
     }
   }
+
   return bases;
 }

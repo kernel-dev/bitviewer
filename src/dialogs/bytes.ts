@@ -38,9 +38,11 @@ export function pasteBytes(
         className: "primary",
         onClick: () => result !== null && close(result),
       });
+
       const refresh = () => {
         result = null;
         area.classList.remove("invalid");
+
         if (!area.value.trim()) {
           preview.replaceChildren(
             html(
@@ -70,8 +72,10 @@ export function pasteBytes(
             );
           }
         }
+
         confirmButton.disabled = result === null;
       };
+
       const orderSeg = segmented(
         [
           {
@@ -93,7 +97,9 @@ export function pasteBytes(
           },
         },
       );
+
       area.addEventListener("input", refresh);
+
       area.addEventListener("keydown", (event) => {
         if (
           event.key === "Enter" &&
@@ -102,6 +108,7 @@ export function pasteBytes(
         )
           close(result);
       });
+
       body.append(
         html("label", { class: "modal-label" }, "Bytes"),
         area,

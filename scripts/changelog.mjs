@@ -16,10 +16,12 @@ export function releaseNotes(text, version) {
   const start = lines.findIndex((line) => heading.test(line));
   if (start < 0) return null;
   const body = [];
+
   for (const line of lines.slice(start + 1)) {
     if (line.startsWith("## ") || /^\[[^\]]+\]:\s/.test(line)) break;
     body.push(line);
   }
+
   const notes = body.join("\n").trim();
   return notes || null;
 }
@@ -35,5 +37,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error(`CHANGELOG.md has no entry "## [${version ?? "x.y.z"}] - YYYY-MM-DD" with changes under it.`);
     process.exit(1);
   }
+
   console.log(notes);
 }

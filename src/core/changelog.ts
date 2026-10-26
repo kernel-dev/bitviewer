@@ -5,18 +5,22 @@
 export interface ChangelogSection {
   /** "Added", "Changed", "Fixed"… (empty when items come before any `###` heading). */
   title: string;
+
   items: string[];
 }
 
 export interface ChangelogRelease {
   version: string;
+
   /** "YYYY-MM-DD", or "" when the heading has no date. */
   date: string;
+
   sections: ChangelogSection[];
 }
 
 const RELEASE_HEADING =
   /^##\s+\[(\d+\.\d+\.\d+[^\]\s]*)\](?:\s+-\s+(\d{4}-\d{2}-\d{2}))?\s*$/;
+
 const LINK_REFERENCE = /^\[[^\]]+\]:\s/;
 
 export function parseChangelog(text: string): ChangelogRelease[] {
@@ -46,12 +50,14 @@ export function parseChangelog(text: string): ChangelogRelease[] {
         section = { title: "", items: [] };
         release.sections.push(section);
       }
+
       section.items.push(line.slice(2).trim());
       item = section.items.length - 1;
     } else if (line.trim() && section && item >= 0) {
       section.items[item] += ` ${line.trim()}`; // wrapped continuation of the bullet above
     }
   }
+
   return releases;
 }
 

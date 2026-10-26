@@ -23,6 +23,7 @@ function parseText(lineText: string, line: number): Node {
     } else if (lineText.startsWith("${", cursor)) {
       let scan = cursor + 2;
       let inStr = false;
+
       for (; scan < lineText.length; scan++) {
         const character = lineText[scan];
         if (inStr) {
@@ -31,8 +32,10 @@ function parseText(lineText: string, line: number): Node {
         } else if (character === '"') inStr = true;
         else if (character === "}") break;
       }
+
       if (scan >= lineText.length)
         throw new TemplateError("Missing } to close ${", line);
+
       if (pendingText) parts.push(pendingText);
       pendingText = "";
       parts.push({
@@ -41,6 +44,7 @@ function parseText(lineText: string, line: number): Node {
       cursor = scan + 1;
     } else pendingText += lineText[cursor++];
   }
+
   if (pendingText || !parts.length) parts.push(pendingText);
   return { kind: "text", line, parts };
 }
@@ -70,6 +74,7 @@ export function compileTemplate(source: string): Compiled {
   const stack: Frame[] = [root];
   const top = () => stack[stack.length - 1];
   const lines = source.replace(/\r/g, "").split("\n");
+
   lines.forEach((raw, index) => {
     const lineNumber = index + 1;
     const trimmed = raw.trimStart();
@@ -77,33 +82,41 @@ export function compileTemplate(source: string): Compiled {
       top().currentNodes.push(parseText(raw.replace("@@", "@"), lineNumber));
       return;
     }
+
     const match = trimmed.startsWith("@")
       ? DIRECTIVE.exec(trimmed.slice(1))
       : null;
+
     if (!match) {
       top().currentNodes.push(parseText(raw, lineNumber));
       return;
     }
+
     const word = match[1];
     const argument = match[2].trim();
     if (word === "#") return;
+
     if (word === "scope") {
       if (argument !== "register" && argument !== "peripheral")
         throw new TemplateError(
           "Write it as: @scope register, or @scope peripheral",
           lineNumber,
         );
+
       meta.scope = argument;
       return;
     }
+
     if (word === "name" || word === "ext" || word === "about") {
       meta[word === "ext" ? "extension" : word] = argument;
       return;
     }
+
     if (word === "for") {
       const forMatch = /^([A-Za-z_]\w*)\s+in\s+(.+)$/.exec(argument);
       if (!forMatch)
         throw new TemplateError("Write it as: @for item in list", lineNumber);
+
       const node = {
         kind: "for" as const,
         line: lineNumber,
@@ -116,6 +129,7 @@ export function compileTemplate(source: string): Compiled {
       stack.push({ kind: "for", node, currentNodes: node.body, inElse: false });
       return;
     }
+
     if (word === "if") {
       const node = {
         kind: "if" as const,
@@ -136,10 +150,12 @@ export function compileTemplate(source: string): Compiled {
       });
       return;
     }
+
     if (word === "set") {
       const setMatch = /^([A-Za-z_]\w*)\s*=\s*(.+)$/.exec(argument);
       if (!setMatch)
         throw new TemplateError("Write it as: @set name = value", lineNumber);
+
       top().currentNodes.push({
         kind: "set",
         line: lineNumber,
@@ -148,28 +164,35 @@ export function compileTemplate(source: string): Compiled {
       });
       return;
     }
+
     // elif / else / end
     const frame = top();
+
     if (word === "end") {
       if (argument)
         throw new TemplateError("@end takes nothing after it", lineNumber);
+
       if (frame.kind === "root")
         throw new TemplateError(
           "@end without a matching @for or @if",
           lineNumber,
         );
+
       stack.pop();
     } else if (word === "else") {
       if (argument)
         throw new TemplateError("@else takes nothing after it", lineNumber);
+
       if (frame.kind === "for") {
         if (frame.inElse)
           throw new TemplateError("@for already has an @else", lineNumber);
+
         frame.inElse = true;
         frame.currentNodes = frame.node.orelse;
       } else if (frame.kind === "if") {
         if (frame.sawElse)
           throw new TemplateError("@if already has an @else", lineNumber);
+
         frame.sawElse = true;
         const branch = { cond: null, body: [] as Node[] };
         frame.node.branches.push(branch);
@@ -183,8 +206,10 @@ export function compileTemplate(source: string): Compiled {
       // elif
       if (frame.kind !== "if")
         throw new TemplateError("@elif without a matching @if", lineNumber);
+
       if (frame.sawElse)
         throw new TemplateError("@elif can't come after @else", lineNumber);
+
       const branch = {
         cond: parseExpression(argument, lineNumber) as Ex | null,
         body: [] as Node[],
@@ -193,6 +218,7 @@ export function compileTemplate(source: string): Compiled {
       frame.currentNodes = branch.body;
     }
   });
+
   if (stack.length > 1) {
     const openFrame = stack[stack.length - 1] as Exclude<
       Frame,
@@ -203,5 +229,6 @@ export function compileTemplate(source: string): Compiled {
       openFrame.node.line,
     );
   }
+
   return { meta, body: root.currentNodes };
 }

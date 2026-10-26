@@ -33,7 +33,9 @@ const VIEW_UI: { value: View; label: string; icon: IconNode; tip: string }[] = [
   { value: "byte", label: "Bytes", icon: Rows3, tip: "One row per byte" },
   { value: "nibble", label: "Nibbles", icon: Rows4, tip: "One row per nibble" },
 ];
+
 const SEL_NOTE = " — applies to the selection when bits are selected";
+
 const OPS_UI: { value: Op; label?: string; icon?: IconNode; tip: string }[] = [
   {
     value: "invert",

@@ -144,6 +144,7 @@ export interface PeripheralForm {
   name: string;
   base: bigint | null;
   description: string;
+
   /** Only asked for when a value starts a new peripheral. */
   offset?: bigint | null;
 }
@@ -161,6 +162,7 @@ export function editPeripheralDialog(
     icon: Cpu,
     cancelValue: null,
     hasChanges: () => changed(),
+
     build: (body, close) => {
       const field = (value: string, placeholder: string, mono = true) =>
         html("input", {
@@ -185,13 +187,16 @@ export function editPeripheralDialog(
         className: "primary",
         onClick: () => submit(),
       });
+
       const read = (): PeripheralForm | null => {
         const nameText = name.value.trim();
         if (!nameText) throw new ParseError("Give the peripheral a name");
+
         if (isTaken(nameText))
           throw new ParseError(
             `There is already a peripheral called “${nameText}”`,
           );
+
         const out: PeripheralForm = {
           name: nameText,
           base: parseAddress(base.value),
@@ -200,6 +205,7 @@ export function editPeripheralDialog(
         if (offset) out.offset = parseAddress(offset.value);
         return out;
       };
+
       const check = () => {
         try {
           read();
@@ -211,6 +217,7 @@ export function editPeripheralDialog(
           ok.disabled = true;
         }
       };
+
       const submit = () => {
         try {
           const result = read();
@@ -219,13 +226,16 @@ export function editPeripheralDialog(
           /* the error is already shown */
         }
       };
+
       for (const input of [name, base, description, offset]) {
         if (!input) continue;
         input.addEventListener("input", check);
+
         input.addEventListener("keydown", (event) => {
           if (event.key === "Enter") submit();
         });
       }
+
       const label = (text: string, hint = "") =>
         html(
           "label",
@@ -284,6 +294,7 @@ export function askOffset(
         className: "primary",
         onClick: () => submit(),
       });
+
       const submit = () => {
         try {
           close(parseAddress(input.value));
@@ -292,12 +303,15 @@ export function askOffset(
           error.textContent = caught.message;
         }
       };
+
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") submit();
       });
+
       input.addEventListener("input", () => {
         error.textContent = "";
       });
+
       body.append(
         html(
           "label",

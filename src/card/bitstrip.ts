@@ -17,24 +17,33 @@ export interface StripHost {
   updateDrag(bit: number): void;
   extendSelection(bit: number): void;
   clearSelection(): void;
+
   /** Flips a bit of the value (the host may ask first for protected fields). */
   flipBit(bit: number): void;
+
   /** Keyboard cursor position (a bit index), or null. */
   cursor: number | null;
+
   setCursor(bit: number): void;
+
   /** Alt+drag "paint": start / set one bit / end (one undo step). */
   paintStart(): void;
+
   paintBit(bit: number, isOn: boolean): void;
   paintEnd(): void;
+
   /** DOM id for a bit cell (for aria-activedescendant). */
   bitId(bit: number): string;
+
   bitTip(bit: number, lo: number, compare: boolean): string;
+
   openRowMenu(
     lo: number,
     compare: boolean,
     bit: number | null,
     position: { x: number; y: number },
   ): void;
+
   root: HTMLElement;
 }
 
@@ -63,6 +72,7 @@ export class BitStrip {
   get lineBits(): number {
     return this.flex ? this.perLine : this.host.model.rowWidth;
   }
+
   private resizeObserver?: ResizeObserver;
   private lines: HTMLElement[] = [];
 
@@ -77,18 +87,22 @@ export class BitStrip {
     BitStrip.due.add(strip);
     if (BitStrip.frameRequested) return;
     BitStrip.frameRequested = true;
+
     requestAnimationFrame(() => {
       BitStrip.frameRequested = false;
       const strips = [...BitStrip.due].filter(
         (candidate) => candidate.element.isConnected,
       );
       BitStrip.due.clear();
+
       for (const candidate of strips)
         if (candidate.rebuildDue) {
           candidate.rebuildDue = false;
           candidate.build(candidate.lineLength(candidate.width));
         }
+
       const plans = strips.map((candidate) => candidate.measureBars());
+
       strips.forEach((candidate, index) => {
         candidate.drawBars(plans[index]);
       });
@@ -105,6 +119,7 @@ export class BitStrip {
       class: `strip${flex ? " flex" : ""}${compare ? " cmp" : ""}`,
     });
     this.element.addEventListener("pointerdown", (event) => this.onDown(event));
+
     this.element.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       host.openRowMenu(lo, compare, this.bitOf(event.target), {
@@ -112,12 +127,14 @@ export class BitStrip {
         y: event.clientY,
       });
     });
+
     // Watch a zero-height sizer rather than the strip: it only changes with the
     // available width. The observer just records the width (reading it from
     // the DOM would force a layout); changes to the bits wait for the next
     // frame, since changing heights inside the observer makes the browser
     // report a ResizeObserver loop.
     this.element.append(this.sizer);
+
     this.resizeObserver = new ResizeObserver((entries) => {
       const width = Math.round(
         entries[entries.length - 1]?.contentRect.width ?? 0,
@@ -128,6 +145,7 @@ export class BitStrip {
       if (this.lineLength(width) !== this.perLine) this.rebuildDue = true;
       BitStrip.schedule(this);
     });
+
     this.resizeObserver.observe(this.sizer);
     // Build right away, so the card has its full height at once (and the bits
     // never flash empty): byte and nibble rows don't depend on the width, and
@@ -166,8 +184,10 @@ export class BitStrip {
     const bitCount = this.n;
     if (!this.flex || bitCount <= 8) return [bitCount];
     const options = [bitCount];
+
     for (let bitsPerRow = 256; bitsPerRow >= 8; bitsPerRow /= 2)
       if (bitsPerRow < bitCount) options.push(bitsPerRow);
+
     return options;
   }
 
@@ -202,6 +222,7 @@ export class BitStrip {
     );
     const keys = [...Array(Math.ceil(bitCount / slots)).keys()];
     if (msbLeft) keys.reverse();
+
     for (const key of keys) {
       const line = html("div", {
         class: `bit-line${hasGroups ? " has-bars" : ""}`,
@@ -213,11 +234,13 @@ export class BitStrip {
         (offset) => start + offset,
       );
       if (msbLeft) positions.reverse();
+
       positions.forEach((bit, slot) => {
         const style = `margin-left:${slot ? this.gapBetween(positions[slot - 1], bit) : 0}px`;
         const indexElement = this.compare
           ? null
           : html("span", { class: "idx" }, bit <= top ? String(bit) : "");
+
         if (bit > top) {
           line.append(
             html(
@@ -229,6 +252,7 @@ export class BitStrip {
           );
           return;
         }
+
         const cell = html(
           "div",
           {
@@ -246,6 +270,7 @@ export class BitStrip {
         line.append(cell);
       });
     }
+
     for (const line of this.lines) line.append(html("div", { class: "bars" }));
     this.update();
     // the field bars are placed once the strip has been laid out (see schedule)
@@ -259,16 +284,19 @@ export class BitStrip {
       const segments: BarSegment[] = [];
       if (!model.groups.length) return segments;
       let currentSegment: BarSegment | null = null;
+
       for (const cell of line.querySelectorAll<HTMLElement>(".bit:not(.pad)")) {
         const group = model.groupAt(Number(cell.dataset.bit));
         const startX = cell.offsetLeft;
         const endX = startX + cell.offsetWidth;
+
         if (group && currentSegment && currentSegment.group === group)
           currentSegment.endX = endX;
         else if (group)
           segments.push((currentSegment = { group, startX, endX }));
         else currentSegment = null;
       }
+
       return segments;
     });
   }
@@ -299,6 +327,7 @@ export class BitStrip {
     const model = this.host.model;
     const selection = this.compare ? null : this.host.selection;
     const parentRow = model.rowValue(this.lo);
+
     for (const [bit, cellElement] of this.cells) {
       const bitValue = this.compare
         ? model.compareBit(this.lo, bit)
@@ -323,6 +352,7 @@ export class BitStrip {
         "aria-label",
         `${this.compare ? "Compare bit" : "Bit"} ${bit}${group ? `, field ${group.name}` : ""}`,
       );
+
       if (this.compare)
         cellElement.classList.toggle(
           "diff",
@@ -346,13 +376,16 @@ export class BitStrip {
     host.paintStart();
     host.paintBit(first, isOn);
     document.body.classList.add("painting");
+
     const move = (event: PointerEvent) => {
       const under = document
         .elementFromPoint(event.clientX, event.clientY)
         ?.closest<HTMLElement>(".strip:not(.cmp) .bit");
+
       if (under && host.root.contains(under) && under.dataset.bit)
         host.paintBit(Number(under.dataset.bit), isOn);
     };
+
     // The stroke must always end: until paintEnd() the undo history is on
     // hold. A cancelled pointer (pen, touch, Alt+Tab mid-stroke) or the window
     // losing focus may never deliver a pointerup.
@@ -364,6 +397,7 @@ export class BitStrip {
       document.body.classList.remove("painting");
       host.paintEnd();
     };
+
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", finish);
     document.addEventListener("pointercancel", finish);
@@ -376,19 +410,24 @@ export class BitStrip {
     if (bit === null) return;
     event.preventDefault();
     const host = this.host;
+
     if (!this.compare && event.altKey) {
       this.paint(bit, !event.shiftKey);
       return;
     }
+
     if (!this.compare) host.setCursor(bit);
+
     if (!this.compare && event.shiftKey) {
       host.extendSelection(bit);
       return;
     }
+
     if (!this.compare) host.beginDrag(bit);
     const startX = event.clientX;
     const startY = event.clientY;
     let dragging = false;
+
     const move = (moveEvent: PointerEvent) => {
       if (this.compare) return;
       const under = document
@@ -396,6 +435,7 @@ export class BitStrip {
         ?.closest<HTMLElement>(".strip:not(.cmp) .bit");
       const target =
         under && host.root.contains(under) ? Number(under.dataset.bit) : null;
+
       if (!dragging) {
         if (
           Math.abs(moveEvent.clientX - startX) +
@@ -404,11 +444,14 @@ export class BitStrip {
           target === bit
         )
           return;
+
         dragging = true;
         document.body.classList.add("dragging");
       }
+
       if (target !== null) host.updateDrag(target);
     };
+
     const stop = () => {
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", onPointerUp);
@@ -416,11 +459,13 @@ export class BitStrip {
       window.removeEventListener("blur", stop);
       document.body.classList.remove("dragging");
     };
+
     const onPointerUp = (upEvent: PointerEvent) => {
       stop();
       if (dragging) return;
       const under = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
       if (this.bitOf(under) !== bit) return;
+
       if (this.compare) {
         host.model.flipCompareBit(this.lo, bit);
         play(host.model.compareBit(this.lo, bit) ? "bitOn" : "bitOff");
@@ -429,6 +474,7 @@ export class BitStrip {
         host.flipBit(bit);
       }
     };
+
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", onPointerUp);
     document.addEventListener("pointercancel", stop);

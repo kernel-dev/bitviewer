@@ -227,6 +227,7 @@ export function validTemplate(candidate: any): Template | null {
     !Array.isArray(candidate.fields)
   )
     return null;
+
   const fields = candidate.fields
     .filter(
       (field: any) =>

@@ -33,12 +33,14 @@ export class SelectionBar {
         this.key = "";
         this.input = null;
       }
+
       this.element.classList.remove("active");
       this.element.replaceChildren(
         html("span", { class: "sel-hint mono" }, "drag across bits to select"),
       );
       return;
     }
+
     const [lo, hi] = selection;
     const width = hi - lo + 1;
     const key = `${lo}:${hi}:${this.base}`;
@@ -62,6 +64,7 @@ export class SelectionBar {
           ),
         ),
       );
+
       const baseControl = segmented(
         BASES.map((base) => ({ value: base, label: BASE_NAMES[base] })),
         {
@@ -73,6 +76,7 @@ export class SelectionBar {
           className: "xs",
         },
       );
+
       this.element.replaceChildren(
         html(
           "span",
@@ -83,6 +87,7 @@ export class SelectionBar {
         this.input.element,
       );
     }
+
     this.element.classList.add("active");
     this.input?.setValue(this.model.bitsValue(lo, width));
   }

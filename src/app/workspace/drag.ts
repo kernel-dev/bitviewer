@@ -25,6 +25,7 @@ export function dragCard(
 
   const place = () => {
     let index = 0;
+
     for (const card of workspace.cards) {
       // a collapsed peripheral's registers aren't laid out: use its header
       const shown = card.root.offsetParent
@@ -33,26 +34,31 @@ export function dragCard(
       const rect = shown.getBoundingClientRect();
       if (lastY > rect.top + rect.height / 2) index++;
     }
+
     target = index;
     const before = workspace.cards[index]?.root;
     if (before?.parentElement) before.parentElement.insertBefore(line, before);
     else scroller.append(line);
   };
+
   // keep scrolling while the pointer rests near the top or bottom edge
   const autoScroll = window.setInterval(() => {
     const rect = scroller.getBoundingClientRect();
     const edge = 48;
     const scrollStep =
       lastY < rect.top + edge ? -14 : lastY > rect.bottom - edge ? 14 : 0;
+
     if (scrollStep) {
       scroller.scrollTop += scrollStep;
       place();
     }
   }, 16);
+
   const onPointerMove = (pointerEvent: PointerEvent) => {
     lastY = pointerEvent.clientY;
     place();
   };
+
   const finishDrag = (commit: boolean) => {
     window.clearInterval(autoScroll);
     document.removeEventListener("pointermove", onPointerMove);
@@ -70,6 +76,7 @@ export function dragCard(
       destination,
       workspace.blockOf,
     );
+
     if (
       commit &&
       reordered.some((item, index) => item !== workspace.cards[index])
@@ -78,14 +85,17 @@ export function dragCard(
       play("toggle");
     }
   };
+
   const onPointerUp = () => finishDrag(true);
   const cancel = () => finishDrag(false);
+
   const onEscape = (keyEvent: KeyboardEvent) => {
     if (keyEvent.key === "Escape") {
       keyEvent.stopPropagation();
       finishDrag(false);
     }
   };
+
   document.addEventListener("pointermove", onPointerMove);
   document.addEventListener("pointerup", onPointerUp);
   document.addEventListener("pointercancel", cancel);

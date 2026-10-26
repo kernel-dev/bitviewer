@@ -27,6 +27,7 @@ import { resizeValue } from "./value-dialogs";
 function setChildren(parent: Element, wanted: Node[]) {
   const keep = new Set(wanted);
   let current = parent.firstChild;
+
   for (const node of wanted) {
     // drop what doesn't belong here any more, so it isn't counted as "in place"
     while (current && current !== node && !keep.has(current)) {
@@ -34,9 +35,11 @@ function setChildren(parent: Element, wanted: Node[]) {
       current.remove();
       current = next;
     }
+
     if (current === node) current = current.nextSibling;
     else parent.insertBefore(node, current);
   }
+
   while (current) {
     const next: ChildNode | null = current.nextSibling;
     current.remove();
@@ -93,6 +96,7 @@ export class Workspace {
       ),
     );
     this.element = html("main", { class: "workspace" }, this.empty);
+
     this.nearView = new IntersectionObserver(
       (entries) => {
         for (const entry of entries)
@@ -125,38 +129,48 @@ export class Workspace {
     const data = JSON.parse(snapshotJson);
     const peripherals = peripheralsFromJSON(data.peripherals);
     const reusable = new Map<string, ValueCard[]>();
+
     for (const card of this.cards) {
       const key = JSON.stringify(valueToJSON(card.model));
       reusable.set(key, [...(reusable.get(key) ?? []), card]);
     }
+
     const kept = new Set<ValueCard>();
+
     const next = (data.values as unknown[]).map((serialized) => {
       const card = reusable.get(JSON.stringify(serialized))?.shift();
       if (card) {
         kept.add(card);
         return card;
       }
+
       return this.createCard(valueFromJSON(serialized));
     });
+
     // a kept register shows its peripheral's base address: redraw it when that changed
     const describe = (map: Map<string, Peripheral>, name: string) => {
       const peripheral = map.get(name);
       return peripheral ? JSON.stringify(peripheralToJSON(peripheral)) : "";
     };
+
     const changedBlocks = new Set(
       [...new Set([...this.peripherals.keys(), ...peripherals.keys()])].filter(
         (name) =>
           describe(this.peripherals, name) !== describe(peripherals, name),
       ),
     );
+
     this.batch(() => {
       for (const card of [...this.cards]) if (!kept.has(card)) this.drop(card);
       this.peripherals = peripherals;
       this.cards = next;
+
       for (const card of kept)
         if (changedBlocks.has(card.model.block)) card.rebuildWhenShown();
+
       this.relayout();
     });
+
     this.element.scrollTop = scroll;
   }
 
@@ -164,9 +178,11 @@ export class Workspace {
   replace(values: unknown[], peripherals: unknown) {
     const models = values.map((serialized) => valueFromJSON(serialized));
     const blocks = peripheralsFromJSON(peripherals);
+
     this.batch(() => {
       this.clear();
       this.peripherals = blocks;
+
       for (const model of models)
         this.addValue(model.width, model, undefined, false);
     });
@@ -189,10 +205,12 @@ export class Workspace {
   /** Peripherals that have registers, in workspace order. */
   usedPeripherals(): Peripheral[] {
     const out: Peripheral[] = [];
+
     for (const card of this.cards) {
       const peripheral = this.peripherals.get(card.model.block);
       if (peripheral && !out.includes(peripheral)) out.push(peripheral);
     }
+
     return out;
   }
 
@@ -216,10 +234,12 @@ export class Workspace {
         defaultRowBase: appSettings.get("default_base"),
       });
     }
+
     const card = this.createCard(model);
     this.cards.splice(index ?? this.cards.length, 0, card);
     this.relayout();
     this.app.history.touch();
+
     if (reveal) {
       play("add");
       card.root.classList.add("enter");
@@ -227,6 +247,7 @@ export class Workspace {
         bringIntoView(card.root, "nearest", () => this.buildNearView()),
       );
     }
+
     return card;
   }
 
@@ -267,6 +288,7 @@ export class Workspace {
       );
       if (answer !== "yes") return;
     }
+
     this.drop(card);
     this.relayout();
     this.app.history.touch();
@@ -348,14 +370,17 @@ export class Workspace {
       this.layoutDue = true;
       return;
     }
+
     if (this.activeCard && !this.cards.includes(this.activeCard))
       this.activeCard = null;
+
     this.tidyPeripherals();
     const focused = document.activeElement;
     // what goes where: loose cards and peripheral blocks in the workspace,
     // each peripheral's cards in its block (they are next to each other)
     const children: HTMLElement[] = [];
     const blocks: { name: string; cards: HTMLElement[] }[] = [];
+
     for (const card of this.cards) {
       const block = card.model.block;
       if (!block) children.push(card.root);
@@ -366,19 +391,23 @@ export class Workspace {
         children.push(card.root); // stands for the block until it exists
       }
     }
+
     for (const { name, cards } of blocks) {
       const section = this.app.peripherals.section(name, cards.length);
       setChildren(section.body, cards);
       children[children.indexOf(cards[0])] = section.element;
     }
+
     this.app.peripherals.keepSections(new Set(blocks.map(({ name }) => name)));
     setChildren(this.element, this.cards.length ? children : [this.empty]);
+
     if (
       focused instanceof HTMLElement &&
       focused !== document.activeElement &&
       this.element.contains(focused)
     )
       focused.focus({ preventScroll: true });
+
     if (this.app.search.isOpen) this.app.search.apply();
     this.buildNearView();
   }
@@ -412,9 +441,11 @@ export class Workspace {
         card.rebuildWhenShown(); // its header shows the peripheral's address
       }
     }
+
     for (const name of [...this.peripherals.keys()])
       if (!this.cards.some((card) => card.model.block === name))
         this.peripherals.delete(name);
+
     this.cards = groupOrder(this.cards, this.blockOf);
   }
 }

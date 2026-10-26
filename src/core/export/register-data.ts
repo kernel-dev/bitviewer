@@ -16,6 +16,7 @@ export interface ExportOptions {
   includeValue: boolean; // emit the current value as a constant
   accessors?: boolean; // emit get/set helpers (default true)
   platform?: 32 | 64; // register width of the target: values wider than this are split into words
+
   /** The peripheral the value belongs to, for its address. */
   peripheral?: Peripheral;
 }
@@ -47,19 +48,25 @@ export function placement(
 }
 
 const maskOf = (width: number) => (1n << BigInt(width)) - 1n;
+
 const rangeOf = (lo: number, hi: number) =>
   hi > lo ? `[${hi}:${lo}]` : `[${lo}]`;
+
 const STORAGE = [8, 16, 32, 64];
 
 /** The pieces of a field's description: [range, access, signed, formula/unit, description]. */
 function describe(group: Group): { comment: string; note: string } {
   const rest: string[] = [];
+
   if (group.access !== "rw")
     rest.push(group.access === "ro" ? "read-only" : "reserved");
+
   if (group.signed) rest.push("signed");
+
   if (group.formula)
     rest.push(`value = ${group.formula}${group.unit ? ` ${group.unit}` : ""}`);
   else if (group.unit) rest.push(group.unit);
+
   if (group.description) rest.push(group.description);
   return {
     comment: [group.label(), ...rest].join(" · "),
@@ -84,6 +91,7 @@ const RESERVED_SUFFIXES = new Set([
 function namedItems(group: Group): Record<string, unknown>[] {
   const used = new Set<string>();
   const mask = maskOf(group.width);
+
   return group.named.map((namedValue) => {
     let base = ident(namedValue.label, "VALUE");
     if (RESERVED_SUFFIXES.has(base)) base = `${base}_VAL`;
@@ -187,6 +195,7 @@ export function exportContext(
           : String(wordIndex + 1);
     const items: Item[] = [];
     let next = lo;
+
     for (const group of ascending) {
       if (group.hi < lo || group.lo > hi) continue;
       const partLow = Math.max(group.lo, lo);
@@ -196,8 +205,10 @@ export function exportContext(
       const partial = spans > 1;
       const part = wordIndex - firstWord + 1;
       const base = ids.get(group) ?? "FIELD";
+
       if (partLow > next)
         items.push(item(model, null, "", next, partLow - 1, lo, {}));
+
       const description = describe(group);
       items.push(
         item(
@@ -220,8 +231,10 @@ export function exportContext(
       );
       next = Math.max(next, partHigh + 1);
     }
+
     if (next < lo + storage)
       items.push(item(model, null, "", next, lo + storage - 1, lo, {}));
+
     return {
       index: wordIndex + 1,
       name,

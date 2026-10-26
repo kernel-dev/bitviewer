@@ -31,15 +31,18 @@ export function newValueFromExpression(
         placeholder: "Name (optional)",
         spellcheck: false,
       });
+
       const field = exprField({
         width: () => width,
         lookup,
         placeholder: "e.g. {Value 1} ^ {Value 2}   ·   CTRL | bit(31)",
         onEnter: () => submit(),
+
         onChange: (result) => {
           confirmButton.disabled = !result;
         },
       });
+
       const widthIn = html("input", {
         class: "field mono width-input",
         type: "number",
@@ -47,6 +50,7 @@ export function newValueFromExpression(
         max: MAX_WIDTH,
         value: String(width),
       });
+
       const presets = segmented(
         [8, 16, 32, 64, 128].map((bits) => ({
           value: bits,
@@ -61,6 +65,7 @@ export function newValueFromExpression(
           className: "sm width-presets",
         },
       );
+
       const setWidth = (newWidth: number) => {
         if (
           Number.isInteger(newWidth) &&
@@ -75,12 +80,15 @@ export function newValueFromExpression(
           confirmButton.disabled = true;
         }
       };
+
       widthIn.addEventListener("input", () => setWidth(Number(widthIn.value)));
+
       const submit = () => {
         const result = field.result();
         if (result && !widthIn.classList.contains("invalid"))
           close({ name: name.value.trim(), width, value: result.value });
       };
+
       body.append(
         html(
           "label",

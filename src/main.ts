@@ -18,12 +18,14 @@ window.addEventListener("error", (event) => {
     "error",
   );
 });
+
 window.addEventListener("unhandledrejection", (event) => {
   toast(`Something went wrong: ${message(event.reason)}`, "error");
 });
 
 const root = document.getElementById("app")!;
 const app = new App(root);
+
 appSettings
   .load()
   .then(() => app.start())
@@ -44,4 +46,5 @@ appSettings
       ),
     );
   });
+
 if (import.meta.env.DEV) (window as any).__app = app; // for scripted UI checks

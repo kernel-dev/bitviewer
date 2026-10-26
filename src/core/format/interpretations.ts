@@ -5,6 +5,7 @@ import { formatInt, maxValue, ParseError } from "./integers";
 
 // ------------------------------------------------------------------ floats
 export type FloatKind = "f16" | "bf16" | "f32" | "f64";
+
 export const FLOAT_NAMES: Record<FloatKind, string> = {
   f16: "float16",
   bf16: "bfloat16",
@@ -53,8 +54,10 @@ function halfToNumber(bits: number): number {
   const exponentBits = (bits >> 10) & 0x1f;
   const fraction = bits & 0x3ff;
   if (exponentBits === 0) return sign * fraction * 2 ** -24;
+
   if (exponentBits === 31)
     return fraction ? Number.NaN : sign * Number.POSITIVE_INFINITY;
+
   return sign * (1 + fraction / 1024) * 2 ** (exponentBits - 15);
 }
 
@@ -72,6 +75,7 @@ function numberToHalf(value: number): number {
     mantissa = 0;
     exponent++;
   }
+
   if (exponent > 15) return sign | 0x7c00;
   return sign | ((exponent + 15) << 10) | mantissa;
 }
@@ -82,6 +86,7 @@ export function decodeFloat(value: bigint, kind: FloatKind): number {
     case "f64":
       dataView.setBigUint64(0, value & maxValue(64));
       return dataView.getFloat64(0);
+
     case "f32":
       return f32FromBits(Number(value & 0xffffffffn));
     case "bf16":
@@ -97,13 +102,16 @@ export function encodeFloat(value: number, kind: FloatKind): bigint {
     case "f64":
       dataView.setFloat64(0, value);
       return dataView.getBigUint64(0);
+
     case "f32":
       return BigInt(f32Bits(value));
+
     case "bf16": {
       if (Number.isNaN(value)) return 0x7fc0n;
       const bits = f32Bits(value);
       return BigInt(((bits + 0x7fff + ((bits >>> 16) & 1)) >>> 16) & 0xffff);
     }
+
     case "f16":
       return BigInt(numberToHalf(value));
   }
@@ -115,6 +123,7 @@ export function formatFloatKind(value: number, kind: FloatKind): string {
   if (!Number.isFinite(value)) return value > 0 ? "+Inf" : "-Inf";
   if (Object.is(value, -0)) return "-0.0";
   let formatted = String(value);
+
   if (kind !== "f64") {
     const bits = encodeFloat(value, kind);
     for (let digits = 1; digits <= 9; digits++) {
@@ -125,6 +134,7 @@ export function formatFloatKind(value: number, kind: FloatKind): string {
       }
     }
   }
+
   if (!/[.eEn]/.test(formatted)) formatted += ".0";
   return formatted;
 }
@@ -132,8 +142,10 @@ export function formatFloatKind(value: number, kind: FloatKind): string {
 /** "−1.5 × 2^3" style breakdown of a float. */
 export function floatBreakdown(value: number): string {
   if (Number.isNaN(value)) return "not a number";
+
   if (!Number.isFinite(value))
     return value > 0 ? "positive infinity" : "negative infinity";
+
   if (value === 0) return Object.is(value, -0) ? "negative zero" : "zero";
   const absolute = Math.abs(value);
   const exponent = exponentOf(absolute);
@@ -144,19 +156,24 @@ export function floatBreakdown(value: number): string {
 export function parseFloatText(text: string): number {
   const cleaned = text.trim().toLowerCase().replace(/_/g, "");
   if (!cleaned) throw new ParseError("Enter a number", true);
+
   if (/^[+-]?(inf|infinity)$/.test(cleaned)) {
     return cleaned.startsWith("-")
       ? Number.NEGATIVE_INFINITY
       : Number.POSITIVE_INFINITY;
   }
+
   if (cleaned === "nan") return Number.NaN;
+
   if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/.test(cleaned))
     throw new ParseError(`"${text.trim()}" is not a number`);
+
   return Number(cleaned);
 }
 
 // ------------------------------------------------------------------ bytes
 export type ByteOrder = "be" | "le";
+
 export type ByteStyle = "c" | "py" | "hex";
 
 /** The value as ceil(width / 8) bytes; "be" puts the most significant first. */
@@ -167,8 +184,10 @@ export function valueToBytes(
 ): number[] {
   const byteCount = Math.ceil(width / 8);
   const out: number[] = [];
+
   for (let i = byteCount - 1; i >= 0; i--)
     out.push(Number((value >> BigInt(i * 8)) & 0xffn));
+
   return order === "be" ? out : out.reverse();
 }
 
@@ -188,6 +207,7 @@ const PYTHON_ESCAPES: Record<string, number> = {
 /** The body of a Python bytes literal (between the quotes) as bytes. */
 function parsePythonBytes(body: string): number[] {
   const out: number[] = [];
+
   for (let i = 0; i < body.length; i++) {
     const character = body[i];
     if (character !== "\\") {
@@ -196,14 +216,17 @@ function parsePythonBytes(body: string): number[] {
         throw new ParseError(
           `"${character}" isn't ASCII; write it as \\x escapes`,
         );
+
       out.push(code);
       continue;
     }
+
     const escaped = body[i + 1] ?? "";
     if (escaped === "x") {
       const hex = body.slice(i + 2, i + 4);
       if (!/^[0-9a-f]{2}$/i.test(hex))
         throw new ParseError("Bad \\x escape in the bytes literal");
+
       out.push(Number.parseInt(hex, 16));
       i += 3;
     } else if (/[0-7]/.test(escaped)) {
@@ -219,6 +242,7 @@ function parsePythonBytes(body: string): number[] {
       out.push(0x5c); // Python keeps unknown escapes as a backslash and the character
     }
   }
+
   return out;
 }
 
@@ -239,10 +263,12 @@ export function parseBytes(text: string): number[] {
       tokens = (one.length % 2 ? `0${one}` : one).match(/../g) ?? [];
     }
   }
+
   return tokens.map((token) => {
     const hex = token.replace(/^0x/i, "");
     if (!/^[0-9a-f]{1,2}$/i.test(hex))
       throw new ParseError(`"${token}" is not a byte (use 00–FF)`);
+
     return Number.parseInt(hex, 16);
   });
 }
@@ -258,11 +284,14 @@ export function bytesToValue(
     throw new ParseError(
       `${bytes.length} bytes don't fit in ${width} bits (max ${byteCount})`,
     );
+
   const msbFirst = order === "be" ? bytes : [...bytes].reverse();
   let value = 0n;
   for (const byte of msbFirst) value = (value << 8n) | BigInt(byte);
+
   if (value > maxValue(width))
     throw new ParseError(`The bytes don't fit in ${width} bits`);
+
   return value;
 }
 
@@ -270,8 +299,10 @@ export function formatBytes(bytes: number[], style: ByteStyle): string {
   const toHexByte = (byte: number) =>
     byte.toString(16).toUpperCase().padStart(2, "0");
   if (style === "hex") return bytes.map(toHexByte).join(" ");
+
   if (style === "c")
     return `{ ${bytes.map((byte) => `0x${toHexByte(byte)}`).join(", ")} }`;
+
   return `b'${bytes.map((byte) => `\\x${toHexByte(byte).toLowerCase()}`).join("")}'`;
 }
 
@@ -320,6 +351,7 @@ export function bytesAsText(value: bigint, width: number): string {
   const bytes = valueToBytes(value, width, "be");
   const first = bytes.findIndex((byte) => byte !== 0);
   const used = first < 0 ? [] : bytes.slice(first);
+
   try {
     const decoded = new TextDecoder("utf-8", { fatal: true }).decode(
       new Uint8Array(used),
@@ -329,6 +361,7 @@ export function bytesAsText(value: bigint, width: number): string {
   } catch {
     /* not UTF-8 */
   }
+
   return used
     .map((byte) =>
       byte >= 0x20 && byte < 0x7f ? String.fromCharCode(byte) : "·",

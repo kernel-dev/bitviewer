@@ -18,6 +18,7 @@ const context = {
   zero: Num.of(0n, 8),
   five: Num.of(5n, 8),
 };
+
 const render = (source: string) => renderSource(source, context);
 
 describe("export template language", () => {
@@ -97,8 +98,10 @@ describe("export template language", () => {
         if (error instanceof TemplateError) return error.message;
         throw error;
       }
+
       return "";
     };
+
     expect(errorMessage("ok\n${nope}")).toBe('Line 2: Unknown name "nope"');
     expect(errorMessage("${fields.size}")).toContain('has no "size"');
     expect(errorMessage("@for field in fields\nx")).toBe(

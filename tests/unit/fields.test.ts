@@ -104,6 +104,7 @@ describe("templates", () => {
       const model = new ValueModel({ width: template.width });
       model.applyTemplate(template);
       expect(model.groups.length).toBe(template.fields.length);
+
       for (const field of template.fields)
         expect(field.hi).toBeLessThan(template.width);
     }

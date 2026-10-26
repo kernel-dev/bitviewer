@@ -18,6 +18,7 @@ type Tok = {
 };
 
 const TWO_CHARACTER_OPERATORS = new Set(["**", "<<", ">>"]);
+
 const SINGLE_CHARACTER_OPERATORS = new Set([
   "+",
   "-",
@@ -33,6 +34,7 @@ const SINGLE_CHARACTER_OPERATORS = new Set([
   ")",
   ",",
 ]);
+
 const BINARY_PREC: Record<string, number> = {
   "|": 1,
   "^": 2,
@@ -55,7 +57,9 @@ function tokenize(source: string): Tok[] {
       cursor++;
       continue;
     }
+
     const start = cursor;
+
     if (character === "{" || character === "`") {
       const close = character === "{" ? "}" : "`";
       const closeIndex = source.indexOf(close, cursor + 1);
@@ -63,6 +67,7 @@ function tokenize(source: string): Tok[] {
         throw new ExprError(
           `Missing ${close} for the name at position ${cursor + 1}`,
         );
+
       out.push({
         kind: "name",
         text: source.slice(cursor + 1, closeIndex).trim(),
@@ -71,34 +76,41 @@ function tokenize(source: string): Tok[] {
       cursor = closeIndex + 1;
       continue;
     }
+
     const numberMatch =
       /^(0x[0-9a-f_]+|0b[01_]+|0o[0-7_]+|(\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(e[+-]?\d+)?)/i.exec(
         source.slice(cursor),
       );
+
     if (numberMatch && /[0-9.]/.test(character)) {
       out.push({ kind: "num", text: numberMatch[0], position: start });
       cursor += numberMatch[0].length;
       continue;
     }
+
     const name = /^[A-Za-z_][A-Za-z0-9_.]*/.exec(source.slice(cursor));
     if (name) {
       out.push({ kind: "name", text: name[0], position: start });
       cursor += name[0].length;
       continue;
     }
+
     const two = source.slice(cursor, cursor + 2);
     if (TWO_CHARACTER_OPERATORS.has(two)) {
       out.push({ kind: "op", text: two, position: start });
       cursor += 2;
       continue;
     }
+
     if (SINGLE_CHARACTER_OPERATORS.has(character)) {
       out.push({ kind: "op", text: character, position: start });
       cursor++;
       continue;
     }
+
     throw new ExprError(`Unexpected "${character}" at position ${cursor + 1}`);
   }
+
   out.push({ kind: "end", text: "", position: source.length });
   return out;
 }
@@ -108,9 +120,11 @@ function numberNode(text: string): Expr {
   if (/^0[xbo]/.test(cleaned)) {
     if (cleaned.length < 3)
       throw new ExprError(`"${text}" needs digits after the prefix`);
+
     const value = BigInt(cleaned); // BigInt understands 0x / 0b / 0o
     return { kind: "num", integer: value, real: Number(value), text };
   }
+
   if (/[.e]/.test(cleaned)) {
     const real = Number(cleaned);
     if (Number.isNaN(real)) throw new ExprError(`"${text}" is not a number`);
@@ -124,6 +138,7 @@ function numberNode(text: string): Expr {
       text,
     };
   }
+
   const newValue = BigInt(cleaned);
   return { kind: "num", integer: newValue, real: Number(newValue), text };
 }
@@ -133,6 +148,7 @@ export function parseExpr(source: string): Expr {
   let position = 0;
   const peek = () => tokens[position];
   const next = () => tokens[position++];
+
   const expect = (expected: string) => {
     const token = next();
     if (token.text !== expected)
@@ -146,10 +162,12 @@ export function parseExpr(source: string): Expr {
   const parsePrimary = (): Expr => {
     const token = next();
     if (token.kind === "num") return numberNode(token.text);
+
     if (token.kind === "name") {
       if (peek().text === "(") {
         next();
         const argumentExpressions: Expr[] = [];
+
         if (peek().text !== ")") {
           argumentExpressions.push(parseBinary(1));
           while (peek().text === ",") {
@@ -157,6 +175,7 @@ export function parseExpr(source: string): Expr {
             argumentExpressions.push(parseBinary(1));
           }
         }
+
         expect(")");
         return {
           kind: "call",
@@ -164,21 +183,26 @@ export function parseExpr(source: string): Expr {
           argumentExpressions,
         };
       }
+
       return { kind: "name", name: token.text };
     }
+
     if (token.text === "(") {
       const expression = parseBinary(1);
       expect(")");
       return expression;
     }
+
     throw new ExprError(
       token.kind === "end"
         ? "The expression ends too early"
         : `Unexpected "${token.text}" at position ${token.position + 1}`,
     );
   };
+
   const parsePower = (): Expr => {
     const base = parsePrimary();
+
     if (peek().text === "**") {
       next();
       return {
@@ -188,16 +212,20 @@ export function parseExpr(source: string): Expr {
         right: parseUnary(),
       }; // right-associative, binds tighter than unary minus on the left
     }
+
     return base;
   };
+
   const parseUnary = (): Expr => {
     const token = peek();
     if (token.kind === "op" && ["-", "+", "~", "!"].includes(token.text)) {
       next();
       return { kind: "unary", operator: token.text, operand: parseUnary() };
     }
+
     return parsePower();
   };
+
   const parseBinary = (minPrec: number): Expr => {
     let left = parseUnary();
     for (;;) {
@@ -217,10 +245,12 @@ export function parseExpr(source: string): Expr {
 
   if (peek().kind === "end") throw new ExprError("Enter an expression");
   const parsed = parseBinary(1);
+
   if (peek().kind !== "end")
     throw new ExprError(
       `Unexpected "${peek().text}" at position ${peek().position + 1}`,
     );
+
   return parsed;
 }
 
@@ -237,5 +267,6 @@ export function namesIn(
   } else if (expression.kind === "call")
     for (const argument of expression.argumentExpressions)
       namesIn(argument, out);
+
   return out;
 }

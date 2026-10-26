@@ -101,6 +101,7 @@ test("the bottom edge of a bit is clickable, with and without fields", async ({
       .page()
       .mouse.click(box.x + box.width / 2, box.y + box.height - 3);
   };
+
   await clickBottom(0);
   expect(await app.value()).toBe("1");
   await app.run(

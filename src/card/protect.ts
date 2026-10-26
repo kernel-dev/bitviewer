@@ -26,6 +26,7 @@ export class ProtectedFields {
   async confirm(blocked: Group[], typing?: HTMLElement): Promise<boolean> {
     const answer = await this.ask(blocked);
     if (answer === "cancel") return false;
+
     if (answer === "always")
       for (const group of blocked) this.unlocked.add(group);
     else if (typing) {
@@ -34,6 +35,7 @@ export class ProtectedFields {
         once: true,
       });
     }
+
     return true;
   }
 

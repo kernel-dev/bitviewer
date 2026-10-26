@@ -114,6 +114,7 @@ describe("expressions", () => {
       return (x: number) =>
         evalReal(expression, (name) => (name === "x" ? x : undefined));
     };
+
     expect(compile("x * 0.5 - 40")(100)).toBe(10);
     expect(compile("sqrt(x)")(16)).toBe(4);
     expect(compile("pi * 2")(0)).toBeCloseTo(6.283185, 5);
@@ -138,10 +139,12 @@ describe("floats", () => {
       [0x0400, 2 ** -14],
       [0x3555, 0.333251953125],
     ];
+
     for (const [bits, floatValue] of cases) {
       expect(decodeFloat(BigInt(bits), "f16")).toBe(floatValue);
       expect(encodeFloat(floatValue, "f16")).toBe(BigInt(bits));
     }
+
     expect(encodeFloat(1 / 3, "f16")).toBe(0x3555n);
     expect(encodeFloat(65520, "f16")).toBe(0x7c00n); // rounds to infinity
     expect(encodeFloat(1 + 2 ** -11, "f16")).toBe(0x3c00n); // tie → even

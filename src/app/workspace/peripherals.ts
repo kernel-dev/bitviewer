@@ -82,6 +82,7 @@ export class PeripheralController {
       section.header = header;
       section.shows = shows;
     }
+
     section.element.classList.toggle("collapsed", peripheral.collapsed);
     return section;
   }
@@ -104,6 +105,7 @@ export class PeripheralController {
     const others = this.workspace
       .usedPeripherals()
       .filter((peripheral) => peripheral.name !== model.block);
+
     if (others.length)
       items.push({
         label: model.block ? "Move to another peripheral" : "Add to peripheral",
@@ -113,6 +115,7 @@ export class PeripheralController {
           action: () => this.moveTo(card, peripheral.name),
         })),
       });
+
     if (model.block)
       items.push(
         "sep",
@@ -128,6 +131,7 @@ export class PeripheralController {
           },
         },
       );
+
     return items;
   }
 
@@ -149,19 +153,23 @@ export class PeripheralController {
     const workspace = this.workspace;
     const history = this.app.history;
     const peripheral = () => workspace.peripherals.get(name)!;
+
     return {
       toggle: () => {
         peripheral().collapsed = !peripheral().collapsed;
         play("toggle");
         this.changed();
       },
+
       edit: () => void this.edit(name),
+
       exportCode: () =>
         void exportCode({
           kind: "peripheral",
           peripheral: peripheral(),
           models: workspace.members(name).map((card) => card.model),
         }),
+
       addRegister: () => {
         const members = workspace.members(name);
         const taken = new Set(workspace.cards.map((card) => card.model.name));
@@ -181,13 +189,16 @@ export class PeripheralController {
         const last = workspace.cards.indexOf(members[members.length - 1]);
         workspace.addValue(32, model, last + 1);
       },
+
       sortByOffset: () => {
         const sorted = [...workspace.members(name)].sort((first, second) => {
           const [a, b] = [first.model.offset, second.model.offset];
           if (a === null || b === null)
             return a === null ? (b === null ? 0 : 1) : -1;
+
           return a < b ? -1 : a > b ? 1 : 0;
         });
+
         let next = 0;
         workspace.reorder(
           workspace.cards.map((card) =>
@@ -195,22 +206,27 @@ export class PeripheralController {
           ),
         );
       },
+
       move: (direction) => {
         workspace.reorder(
           moveBlock(workspace.cards, name, direction, workspace.blockOf),
         );
       },
+
       ungroup: () => {
         const members = workspace.members(name);
         history.hold(); // one undo step
+
         try {
           for (const card of members) card.model.setPeripheral("", null);
         } finally {
           history.release();
         }
+
         workspace.relayout();
         toast(`Ungrouped ${name}; Ctrl+Z puts it back`);
       },
+
       remove: async () => {
         const members = workspace.members(name);
         const answer = await ask(
@@ -243,6 +259,7 @@ export class PeripheralController {
     );
     if (!result) return;
     history.hold(); // renaming touches every register: one undo step
+
     try {
       workspace.peripherals.delete(name);
       workspace.peripherals.set(result.name, {
@@ -251,14 +268,17 @@ export class PeripheralController {
         base: result.base,
         description: result.description,
       });
+
       for (const card of workspace.members(name)) {
         const model = card.model;
         // "UART0.CTRL" follows a rename of UART0
         if (result.name !== name && model.name.startsWith(`${name}.`))
           model.setName(result.name + model.name.slice(name.length));
+
         model.setPeripheral(result.name, model.offset);
         card.rebuildWhenShown(); // the address badge depends on the base
       }
+
       workspace.relayout();
       history.touch();
     } finally {

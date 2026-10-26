@@ -14,14 +14,17 @@ export interface SvdField {
   description: string;
   lsb: number;
   msb: number;
+
   /** SVD access, e.g. "read-only", "read-write", "write-only". */
   access: string;
+
   enums: SvdEnum[];
 }
 
 export interface SvdRegister {
   /** Peripheral, clusters and register joined with ".", e.g. "USART1.CR1". */
   path: string;
+
   name: string;
   description: string;
   peripheral: string;
@@ -30,6 +33,7 @@ export interface SvdRegister {
   access: string;
   resetValue: bigint;
   fields: SvdField[];
+
   /** Fields left out, and why (overlaps, outside the register…). */
   warnings: string[];
 }
@@ -46,6 +50,7 @@ export interface SvdDevice {
   name: string;
   description: string;
   peripherals: SvdPeripheral[];
+
   /** Problems that didn't stop the import (e.g. a register wider than 512 bits). */
   warnings: string[];
 }

@@ -24,6 +24,7 @@ describe("parse", () => {
     expect(parseValue("255", 10, 8)).toBe(255n);
     expect(parseValue("fF", 16, 8)).toBe(255n);
   });
+
   it("lets prefixes override and ignores separators", () => {
     expect(parseValue("0xff", 10, 8)).toBe(255n);
     expect(parseValue("0b1010", 10, 8)).toBe(10n);
@@ -31,12 +32,15 @@ describe("parse", () => {
     expect(parseValue("dead_beef", 16, 32)).toBe(0xdeadbeefn);
     expect(parseValue("1111 0000", 2, 8)).toBe(0xf0n);
   });
+
   it("reads 0b as hex digits in HEX mode", () => {
     expect(parseValue("0b1", 16, 32)).toBe(0xb1n);
   });
+
   it("rejects bad input and flags incomplete input", () => {
     expect(() => parseValue("256", 10, 8)).toThrow(ParseError);
     expect(() => parseValue("12", 2, 8)).toThrow(ParseError);
+
     for (const prefix of ["", "0x"]) {
       try {
         parseValue(prefix, prefix ? 10 : 16, 8);
@@ -46,6 +50,7 @@ describe("parse", () => {
       }
     }
   });
+
   it("stores negatives as two's complement", () => {
     expect(parseValue("-1", 10, 32, true)).toBe(0xffffffffn);
     expect(parseValue("-2147483648", 10, 32, true)).toBe(0x80000000n);
@@ -64,6 +69,7 @@ describe("format", () => {
     );
     expect(formatInt(8n, 8, 8, { prefix: true })).toBe("0o10");
   });
+
   it("interprets signed and float values", () => {
     expect(toSigned(0xffffffffn, 32)).toBe(-1n);
     expect(formatFloatKind(decodeFloat(0x3f800000n, "f32"), "f32")).toBe("1.0");

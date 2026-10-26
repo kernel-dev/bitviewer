@@ -18,17 +18,21 @@ import type { Command } from "./registry";
 export function valueCommands(app: App): Command[] {
   const workspace = app.workspace;
   const card = () => workspace.activeCard ?? workspace.cards[0] ?? null;
+
   const named = (label: string) => () => {
     const activeCard = card();
     return activeCard
       ? `${label} — ${activeCard.model.name || "value"}`
       : label;
   };
+
   const has = () => card() !== null;
+
   const runOnActiveCard = (action: (card: ValueCard) => unknown) => () => {
     const activeCard = card();
     if (activeCard) void action(activeCard);
   };
+
   return [
     {
       id: "card.collapse",

@@ -21,20 +21,24 @@ export function evaluateFor(
   const mask = maxValue(width);
   const value = raw & mask;
   let note = "";
+
   if (raw < 0n)
     note =
       raw >= -(1n << BigInt(width - 1))
         ? "negative: stored as two's complement"
         : `wrapped to ${width} bits`;
   else if (raw > mask) note = `truncated to ${width} bits`;
+
   return { value, note };
 }
 
 export interface ExprField {
   element: HTMLElement;
   input: HTMLInputElement;
+
   /** Current result, or null while the text is empty or invalid. */
   result(): ExprResult | null;
+
   refresh(): void;
 }
 
@@ -60,6 +64,7 @@ export function exprField(options: {
     const source = input.value.trim();
     current = null;
     input.classList.remove("invalid");
+
     if (!source) {
       preview.replaceChildren(
         html("span", { class: "muted" }, "Result appears here"),
@@ -87,22 +92,26 @@ export function exprField(options: {
         ) {
           throw error;
         }
+
         input.classList.add("invalid");
         preview.replaceChildren(
           html("span", { class: "expr-error" }, error.message),
         );
       }
     }
+
     options.onChange?.(current);
   };
 
   input.addEventListener("input", refresh);
+
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && current) {
       event.preventDefault();
       options.onEnter?.();
     }
   });
+
   refresh();
   return {
     element: html("div", { class: "expr-field" }, input, preview),

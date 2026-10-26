@@ -50,22 +50,28 @@ export class Group implements FieldDetails {
     public color: string,
     public base: Base = 16,
   ) {}
+
   get width(): number {
     return this.hi - this.lo + 1;
   }
+
   contains(bit: number): boolean {
     return this.lo <= bit && bit <= this.hi;
   }
+
   label(): string {
     return this.width > 1 ? `[${this.hi}:${this.lo}]` : `[${this.lo}]`;
   }
+
   get protected(): boolean {
     return this.access !== "rw";
   }
+
   /** The label of a named value, if `raw` has one. */
   nameOf(raw: bigint): string | undefined {
     return this.named.find((namedValue) => namedValue.value === raw)?.label;
   }
+
   details(): FieldDetails {
     return {
       signed: this.signed,
@@ -76,6 +82,7 @@ export class Group implements FieldDetails {
       access: this.access,
     };
   }
+
   /** Only non-default details are written, so plain fields stay compact. */
   toJSON() {
     const out: Record<string, unknown> = {
@@ -88,11 +95,13 @@ export class Group implements FieldDetails {
     if (this.signed) out.signed = true;
     if (this.formula) out.formula = this.formula;
     if (this.unit) out.unit = this.unit;
+
     if (this.named.length)
       out.named = this.named.map((namedValue) => ({
         value: namedValue.value.toString(),
         label: namedValue.label,
       }));
+
     if (this.description) out.description = this.description;
     if (this.access !== "rw") out.access = this.access;
     return out;
@@ -111,12 +120,15 @@ export function isColor(value: unknown): value is string {
 export function fitNamed(named: NamedValue[], width: number): NamedValue[] {
   const mask = maxValue(width);
   const out: NamedValue[] = [];
+
   for (const namedValue of named) {
     let value = namedValue.value;
     if (value < 0n && -value <= 1n << BigInt(width)) value &= mask;
+
     if (value >= 0n && value <= mask)
       out.push({ value, label: namedValue.label });
   }
+
   return out;
 }
 
@@ -127,8 +139,10 @@ export function detailsFromJSON(json: any): Partial<FieldDetails> {
   if (typeof json?.formula === "string") out.formula = json.formula;
   if (typeof json?.unit === "string") out.unit = json.unit;
   if (typeof json?.description === "string") out.description = json.description;
+
   if (json?.access === "ro" || json?.access === "reserved")
     out.access = json.access;
+
   if (Array.isArray(json?.named)) {
     out.named = [];
     for (const named of json.named) {
@@ -140,6 +154,7 @@ export function detailsFromJSON(json: any): Partial<FieldDetails> {
       }
     }
   }
+
   return out;
 }
 
@@ -179,12 +194,14 @@ export function fieldRange(
   const clash = overlappingFields(groups, lo, hi).filter(
     (other) => other !== except,
   );
+
   if (clash.length) {
     throw new ModelError(
       "Groups cannot overlap: " +
         clash.map((other) => `${other.name} ${other.label()}`).join(", "),
     );
   }
+
   return [lo, hi];
 }
 

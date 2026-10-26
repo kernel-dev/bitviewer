@@ -20,11 +20,13 @@ const REAL_FUNCS: Record<string, (...numbers: number[]) => number> = {
   log10: Math.log10,
   exp: Math.exp,
 };
+
 const REAL_CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E };
 
 function asInteger(value: number, operator: string): bigint {
   if (!Number.isInteger(value))
     throw new ExprError(`"${operator}" needs whole numbers`);
+
   return BigInt(value);
 }
 
@@ -41,6 +43,7 @@ export function evalReal(
   switch (expression.kind) {
     case "num":
       return expression.real;
+
     case "name": {
       const constant = expression.name.toLowerCase();
       const value =
@@ -48,10 +51,13 @@ export function evalReal(
         (Object.hasOwn(REAL_CONSTS, constant)
           ? REAL_CONSTS[constant]
           : undefined);
+
       if (value === undefined)
         throw new ExprError(`Unknown name "${expression.name}"`);
+
       return value;
     }
+
     case "unary": {
       const operand = evaluate(expression.operand);
       if (expression.operator === "-") return -operand;
@@ -59,9 +65,11 @@ export function evalReal(
       if (expression.operator === "!") return operand === 0 ? 1 : 0;
       return Number(~asInteger(operand, "~"));
     }
+
     case "binary": {
       const left = evaluate(expression.left);
       const right = evaluate(expression.right);
+
       switch (expression.operator) {
         case "+":
           return left + right;
@@ -86,16 +94,20 @@ export function evalReal(
         case "^":
           return Number(asInteger(left, "^") ^ asInteger(right, "^"));
       }
+
       throw new ExprError(`Unknown operator ${expression.operator}`);
     }
+
     case "call": {
       const realFunction = Object.hasOwn(REAL_FUNCS, expression.functionName)
         ? REAL_FUNCS[expression.functionName]
         : undefined;
+
       if (!realFunction)
         throw new ExprError(
           `Unknown function ${expression.functionName}() — try ${Object.keys(REAL_FUNCS).join(", ")}`,
         );
+
       return realFunction(...expression.argumentExpressions.map(evaluate));
     }
   }
@@ -110,6 +122,7 @@ export function linearity(
   const slope = evaluate(1) - intercept;
   if (!Number.isFinite(slope) || !Number.isFinite(intercept) || slope === 0)
     return null;
+
   for (const x of samples) {
     const expected = slope * x + intercept;
     const actual = evaluate(x);
@@ -118,5 +131,6 @@ export function linearity(
     )
       return null;
   }
+
   return [slope, intercept];
 }

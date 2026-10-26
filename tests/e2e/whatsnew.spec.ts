@@ -4,6 +4,7 @@ import { expect, test } from "./helpers";
 const version: string = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ).version;
+
 const dialog = (page: import("@playwright/test").Page) =>
   page.locator(".modal", { hasText: `Bit Viewer ${version} Changes` });
 
@@ -27,6 +28,7 @@ test("shows once after an update, not on later starts", async ({
   page,
 }) => {
   await expect(app.card()).toBeVisible();
+
   await page.evaluate(() => {
     const key = "bitviewer.settings";
     const saved = JSON.parse(localStorage.getItem(key) ?? "{}");
@@ -35,6 +37,7 @@ test("shows once after an update, not on later starts", async ({
       JSON.stringify({ ...saved, last_seen_version: "0.0.1" }),
     );
   });
+
   await page.reload();
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press("Escape");

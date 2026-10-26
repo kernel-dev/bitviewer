@@ -16,6 +16,7 @@ export function matchValue(
   const fields = new Set<string>();
   if (!query) return { hit: true, fields };
   const containsQuery = (text: string) => text.toLowerCase().includes(query);
+
   for (const group of model.groups) {
     if (
       containsQuery(group.name) ||
@@ -24,6 +25,7 @@ export function matchValue(
     )
       fields.add(group.name);
   }
+
   const hex = formatInt(model.value, 16, model.width).toLowerCase();
   const hit =
     containsQuery(model.name) ||
@@ -57,11 +59,13 @@ export class SearchBar {
       spellcheck: false,
     });
     this.count = html("span", { class: "muted small search-count" });
+
     this.input.addEventListener("input", () => {
       // an emptied box shows everything again at once
       if (!this.typed) this.search();
       else this.showCount();
     });
+
     this.input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -72,6 +76,7 @@ export class SearchBar {
         this.close();
       }
     });
+
     this.element = html(
       "div",
       { class: "search-bar", hidden: true },
@@ -151,6 +156,7 @@ export class SearchBar {
     // while searching, collapsed peripherals open so their matches show
     document.body.classList.toggle("searching", !!this.query);
     this.matchCount = 0;
+
     for (const card of this.cards()) {
       const result = matchValue(card.model, this.query);
       // only touch cards whose state changes: each change restyles the card
@@ -158,6 +164,7 @@ export class SearchBar {
       card.markMatches(result.fields);
       if (result.hit) this.matchCount++;
     }
+
     this.showCount();
     this.shown();
   }

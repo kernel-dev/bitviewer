@@ -19,6 +19,7 @@ export class BasesPanel {
     this.edits.clear();
     if (!model.showBases) return null;
     const list = html("div", { class: "bases-list" });
+
     for (const base of [16, 10, 8, 2] as Base[]) {
       const edit = new NumberInput(
         model.width,
@@ -51,6 +52,7 @@ export class BasesPanel {
         ),
       );
     }
+
     return html(
       "div",
       { class: "bases" },

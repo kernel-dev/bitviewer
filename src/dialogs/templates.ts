@@ -13,11 +13,13 @@ function preview(template: Template): HTMLElement {
     (first, second) => second.hi - first.hi,
   );
   let next = template.width - 1;
+
   for (const field of fields) {
     if (field.hi < next)
       bar.append(
         html("span", { class: "tpl-gap", style: `flex:${next - field.hi}` }),
       );
+
     bar.append(
       html(
         "span",
@@ -33,8 +35,10 @@ function preview(template: Template): HTMLElement {
     );
     next = field.lo - 1;
   }
+
   if (next >= 0)
     bar.append(html("span", { class: "tpl-gap", style: `flex:${next + 1}` }));
+
   return bar;
 }
 
@@ -57,9 +61,11 @@ export function pickTemplate(
       });
       confirmButton.disabled = true;
       const list = html("div", { class: "tpl-list", role: "listbox" });
+
       const render = () => {
         list.replaceChildren();
         const userTemplates = appSettings.get("templates");
+
         const section = (
           name: string,
           items: Template[],
@@ -67,6 +73,7 @@ export function pickTemplate(
         ) => {
           if (!items.length) return;
           list.append(html("h4", { class: "tpl-section" }, name));
+
           for (const template of items) {
             const item = html(
               "button",
@@ -112,18 +119,22 @@ export function pickTemplate(
                 : null,
               preview(template),
             );
+
             item.addEventListener("click", () => {
               chosen = template;
               confirmButton.disabled = false;
               render();
             });
+
             item.addEventListener("dblclick", () => close(template));
             list.append(item);
           }
         };
+
         section("Your templates", userTemplates, true);
         section("Built-in", BUILTIN_TEMPLATES, false);
       };
+
       render();
       body.append(list);
       return [
