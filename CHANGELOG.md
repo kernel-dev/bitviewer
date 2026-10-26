@@ -4,7 +4,7 @@ All notable changes to Bit Viewer are recorded here. The format follows [Keep a 
 
 Add each change under **Unreleased** as you make it. When a version is released, rename that section to `## [x.y.z] - YYYY-MM-DD` and start a new empty **Unreleased** above it. Keep that exact heading format: the release script and workflow use the section as the release notes, and the app shows it in its "What's new" dialog.
 
-## [Unreleased]
+## [2.1.3] - 2026-10-26
 
 ### Added
 - Peripherals: group values into a block with a name, base address and description (a value's ⋯ › Peripheral). Each register shows its address (base + offset) and can be moved, sorted by offset or collapsed with its block. **Export** on a peripheral writes a C struct with every register at its offset and `_Static_assert` checks, C `#define`s for the addresses, or a Rust module. SVD imports now create peripherals automatically. New guide page "Peripherals"; workspaces from older versions open unchanged, and older versions can still open new files (without the grouping).
