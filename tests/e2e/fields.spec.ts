@@ -55,7 +55,7 @@ test("template, formula entry, named values and protected bits", async ({
 
 test("shrinking below a named field is refused", async ({ app, page }) => {
   await app.run("window.__app.cards[0].model.addGroup(8, 15, 'CTRL')");
-  await app.run("void window.__app.resizeValue(window.__app.cards[0])");
+  await app.run("window.__app.commands.run('card.width')");
   await page.locator(".width-input").fill("8");
   await page.keyboard.press("Enter");
   // the width dialog may still be fading out, so look at the one that's showing

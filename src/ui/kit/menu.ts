@@ -31,10 +31,15 @@ export function closeMenus(depth = 0) {
   });
 }
 
+/** Where a menu opens: at a point, or under an element. A point can say where
+ *  the menu should end instead (`flipX`) when it doesn't fit to the right:
+ *  submenus use that to open on the left of their parent rather than over it. */
+type MenuAnchor = { x: number; y: number; flipX?: number } | HTMLElement;
+
 /** Opens a menu at a point, or under an anchor element. */
 export function openMenu(
   items: MenuItem[],
-  anchor: { x: number; y: number } | HTMLElement,
+  anchor: MenuAnchor,
   depth = 0,
 ): HTMLElement {
   closeMenus(depth);
@@ -74,10 +79,15 @@ export function openMenu(
     if (item.submenu) {
       const submenu = item.submenu;
       const openSub = () => {
-        const rect = row.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        const menuRect = menu.getBoundingClientRect();
         openMenu(
           submenu,
-          { x: rect.right + 2, y: rect.top - 5 },
+          {
+            x: menuRect.right + 2,
+            y: rowRect.top - 5,
+            flipX: menuRect.left - 2,
+          },
           depth + 1,
         ).dataset.parentRow = "1";
       };
@@ -130,7 +140,13 @@ export function openMenu(
     x = anchor.x;
     y = anchor.y;
 
-    if (x + menuWidth > innerWidth - 6) x = innerWidth - menuWidth - 6;
+    if (x + menuWidth > innerWidth - 6) {
+      // no room on the right: open on the left of `flipX` when that fits,
+      // otherwise push it in from the window's right edge
+      const flipped =
+        anchor.flipX === undefined ? -1 : anchor.flipX - menuWidth;
+      x = flipped >= 6 ? flipped : innerWidth - menuWidth - 6;
+    }
     if (y + menuHeight > innerHeight - 6)
       y = Math.max(6, innerHeight - menuHeight - 6);
   }

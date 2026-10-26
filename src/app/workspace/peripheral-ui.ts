@@ -15,9 +15,9 @@ import {
   Trash,
   Ungroup,
 } from "lucide";
-import { ParseError, parseValue } from "../core/format/integers";
-import type { Peripheral } from "../core/workspace";
-import { button, html, icon, modal, openMenu } from "../ui/kit";
+import { ParseError, parseValue } from "../../core/format/integers";
+import type { Peripheral } from "../../core/workspace";
+import { button, html, icon, modal, openMenu } from "../../ui/kit";
 
 const hex = (value: bigint) => `0x${value.toString(16).toUpperCase()}`;
 

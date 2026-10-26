@@ -1,7 +1,7 @@
 // Every user-facing action in one place. Menus, keyboard shortcuts, the
 // command palette and the help dialog are all built from this registry.
 import type { IconNode } from "lucide";
-import type { MenuItem } from "../ui/kit";
+import type { MenuItem } from "../../ui/kit";
 
 export type CommandGroup = "File" | "Edit" | "Value" | "View" | "Help";
 

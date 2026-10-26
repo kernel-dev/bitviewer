@@ -122,7 +122,7 @@ test("a file from a newer format version asks before opening", async ({
   page,
 }) => {
   await app.run(
-    `void window.__app.loadText(JSON.stringify({ app: "bitviewer", version: 99, values: [] }), null, "new.bitview")`,
+    `void window.__app.document.loadText(JSON.stringify({ app: "bitviewer", version: 99, values: [] }), null, "new.bitview")`,
   );
   const question = page.locator(".modal", {
     hasText: "Saved by a newer version",
@@ -130,4 +130,21 @@ test("a file from a newer format version asks before opening", async ({
   await expect(question).toBeVisible();
   await question.getByRole("button", { name: "Cancel" }).click();
   await expect(page.locator(".card")).toHaveCount(1); // the workspace is untouched
+});
+
+test("a submenu without room on the right opens left of its menu, not over it", async ({
+  app,
+  page,
+}) => {
+  // the card's "More" menu sits at the right edge of the window
+  await app.card().locator(".more-btn").click();
+  // submenu rows open on hover; Playwright never sees them as "stable", so force the click
+  await page
+    .getByRole("menuitem", { name: "Snapshots ›" })
+    .click({ force: true });
+  const menus = page.locator(".menu");
+  await expect(menus).toHaveCount(2);
+  const parent = (await menus.nth(0).boundingBox())!;
+  const submenu = (await menus.nth(1).boundingBox())!;
+  expect(submenu.x + submenu.width).toBeLessThanOrEqual(parent.x);
 });

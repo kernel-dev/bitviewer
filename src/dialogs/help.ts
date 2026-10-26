@@ -1,7 +1,7 @@
 // Help (searchable topics + shortcuts) and About dialogs.
 import { BookOpen, CircleQuestionMark, Info, Search, Sparkles } from "lucide";
 import pkg from "../../package.json";
-import type { CommandRegistry } from "../app/commands";
+import type { CommandRegistry } from "../app/commands/registry";
 import { button, html, icon, modal } from "../ui/kit";
 import { logoSvg } from "../ui/logo";
 

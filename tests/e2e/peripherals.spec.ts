@@ -76,7 +76,7 @@ test("renaming a peripheral renames its registers", async ({ app, page }) => {
     const model = window.__app.cards[0].model;
     model.setName("UART0.CTRL");
     model.setPeripheral("UART0", 0n);
-    window.__app.relayout();
+    window.__app.workspace.relayout();
   })()`);
   await page.locator(".periph-name", { hasText: "UART0" }).click();
   const form = page.locator(".modal", { hasText: "Peripheral “UART0”" });
