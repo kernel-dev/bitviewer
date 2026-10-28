@@ -17,6 +17,7 @@ use serde_json::value::RawValue;
 use serde_json::{Map, Value as Json, json};
 
 use crate::ModelError;
+use crate::integers::Bits;
 use crate::json::{TextPool, value_from_json, value_to_json};
 use crate::value::Value;
 
@@ -30,6 +31,31 @@ pub struct Peripheral {
     pub base: Option<u64>,
     pub description: Arc<str>,
     pub collapsed: bool,
+    /// Named copies of all its registers' values, oldest first.
+    pub snapshots: Vec<PeripheralSnapshot>,
+}
+
+/// Every register of a peripheral at some moment, by register name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PeripheralSnapshot {
+    pub name: Arc<str>,
+    /// Milliseconds since the Unix epoch.
+    pub at: i64,
+    pub values: Vec<(Arc<str>, Bits)>,
+}
+
+impl PeripheralSnapshot {
+    /// The value the snapshot has for the register called `name`.
+    pub fn value_of(&self, name: &str) -> Option<Bits> {
+        self.values.iter().find(|(register, _)| &**register == name).map(|(_, bits)| *bits)
+    }
+}
+
+impl Peripheral {
+    /// A peripheral with just a name (no base address yet).
+    pub fn named(name: Arc<str>) -> Peripheral {
+        Peripheral { name, base: None, description: "".into(), collapsed: false, snapshots: Vec::new() }
+    }
 }
 
 pub fn peripheral_to_json(peripheral: &Peripheral) -> Json {
@@ -47,6 +73,17 @@ pub fn peripheral_to_json(peripheral: &Peripheral) -> Json {
     }
     if peripheral.collapsed {
         out.insert("collapsed".into(), json!(true));
+    }
+    if !peripheral.snapshots.is_empty() {
+        let list: Vec<Json> = peripheral
+            .snapshots
+            .iter()
+            .map(|snapshot| {
+                let values: Map<String, Json> = snapshot.values.iter().map(|(name, bits)| (name.to_string(), json!(format!("0x{bits:X}")))).collect();
+                json!({ "name": &*snapshot.name, "at": snapshot.at, "values": values })
+            })
+            .collect();
+        out.insert("snapshots".into(), Json::Array(list));
     }
     Json::Object(out)
 }
@@ -73,11 +110,34 @@ pub fn peripheral_from_json(json: &Json, pool: &mut TextPool) -> Result<Peripher
         }
     };
 
+    // snapshots: anything malformed is skipped
+    let snapshots = json
+        .get("snapshots")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|snapshot| {
+            let name = snapshot.get("name")?.as_str()?;
+            let at = snapshot.get("at").and_then(Json::as_f64).unwrap_or(0.0) as i64;
+            let values = snapshot
+                .get("values")?
+                .as_object()?
+                .iter()
+                .filter_map(|(register, bits)| {
+                    let big = crate::json::to_big(bits).ok()?;
+                    let bits = crate::field::big_to_bits(&big)?;
+                    Some((pool.get(register), bits))
+                })
+                .collect();
+            Some(PeripheralSnapshot { name: pool.get(name), at, values })
+        })
+        .collect();
     Ok(Peripheral {
         name: pool.get(name),
         base,
         description: pool.get(json.get("description").and_then(Json::as_str).unwrap_or("")),
         collapsed: json.get("collapsed") == Some(&Json::Bool(true)),
+        snapshots,
     })
 }
 
@@ -135,7 +195,7 @@ impl WorkspaceState {
         }
         for block in &used {
             if !self.peripherals.contains_key(block) {
-                let peripheral = Peripheral { name: block.clone(), base: None, description: "".into(), collapsed: false };
+                let peripheral = Peripheral::named(block.clone());
                 self.peripherals.insert(block.clone(), Arc::new(peripheral));
             }
         }
@@ -382,7 +442,22 @@ pub fn workspace_file_text(state: &WorkspaceState) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::integers::Bits;
+
+    #[test]
+    fn peripheral_snapshots_round_trip() {
+        let mut pool = TextPool::default();
+        let source = json!({ "name": "UART0", "base": "0x40011000", "snapshots": [
+            { "name": "working", "at": 1700000000000i64, "values": { "UART0.CTRL": "0x2303", "UART0.BAUD": "0x683" } },
+            { "name": "broken", "values": "not a map" }
+        ] });
+        let peripheral = peripheral_from_json(&source, &mut pool).unwrap();
+        assert_eq!(peripheral.snapshots.len(), 1);
+        let snapshot = &peripheral.snapshots[0];
+        assert_eq!(snapshot.value_of("UART0.BAUD"), Some(Bits::from(0x683u32)));
+        assert_eq!(snapshot.value_of("UART0.DATA"), None);
+        let again = peripheral_from_json(&peripheral_to_json(&peripheral), &mut pool).unwrap();
+        assert_eq!(again, peripheral);
+    }
 
     const SMALL: &str = r##"{
   "app": "bitviewer",

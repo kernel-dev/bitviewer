@@ -343,6 +343,36 @@ fn a_previewed_write_follows_each_field_rule(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_peripheral_snapshot_finds_and_restores_changed_registers(cx: &mut TestAppContext) {
+    let mut ctrl = value(16, 0x1234);
+    ctrl.name = "UART0.CTRL".into();
+    ctrl.set_peripheral("UART0", Some(0));
+    let mut baud = value(16, 0x00FF);
+    baud.name = "UART0.BAUD".into();
+    baud.set_peripheral("UART0", Some(4));
+    let (view, cx) = open(cx, vec![ctrl, baud]);
+    let uart: Arc<str> = "UART0".into();
+
+    let name = uart.clone();
+    cx.update(|window, cx| view.update(cx, |view, cx| view.snapshot_peripheral(&name, window, cx)));
+    draw(cx);
+    answer(cx, "working");
+    let kept = view.read_with(cx, |view, _| view.state().peripherals[&uart].snapshots.len());
+    assert_eq!(kept, 1);
+
+    // BAUD changes; the comparison finds it, and restores it when ticked
+    click(cx, "v1-bit-0");
+    assert_eq!(view.read_with(cx, |view, _| view.state().values[1].value), Bits::from(0x00FEu16));
+    let name = uart.clone();
+    cx.update(|window, cx| view.update(cx, |view, cx| view.compare_peripheral(&name, window, cx)));
+    draw(cx);
+    click(cx, "diff-tick-1");
+    click(cx, "diff-restore");
+    assert_eq!(view.read_with(cx, |view, _| view.state().values[1].value), Bits::from(0x00FFu16));
+    assert_eq!(view.read_with(cx, |view, _| view.state().values[0].value), Bits::from(0x1234u16));
+}
+
+#[gpui::test]
 fn menu_operations_take_any_expression(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(8, 0b0011_0110)]);
     menu_action(&view, cx, |card, window, cx| card.operand_prompt(bitviewer_core::ops::Op::And, window, cx));

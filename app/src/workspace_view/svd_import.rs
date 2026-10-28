@@ -43,6 +43,7 @@ impl WorkspaceView {
                             base,
                             description: register.peripheral_description.as_str().into(),
                             collapsed: false,
+                            snapshots: Vec::new(),
                         }),
                     );
                 }

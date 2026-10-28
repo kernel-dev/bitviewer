@@ -222,6 +222,7 @@ impl WorkspaceView {
                                 base: form.base,
                                 description: form.description.as_str().into(),
                                 collapsed: peripheral.collapsed,
+                                snapshots: peripheral.snapshots.clone(),
                             }),
                         );
                         for index in 0..this.state.len() {
@@ -268,7 +269,13 @@ impl WorkspaceView {
                         let name: Arc<str> = form.name.as_str().into();
                         this.state.peripherals.insert(
                             name.clone(),
-                            Arc::new(Peripheral { name: name.clone(), base: form.base, description: form.description.as_str().into(), collapsed: false }),
+                            Arc::new(Peripheral {
+                                name: name.clone(),
+                                base: form.base,
+                                description: form.description.as_str().into(),
+                                collapsed: false,
+                                snapshots: Vec::new(),
+                            }),
                         );
                         let offset = form.offset.flatten();
                         this.state.edit(index, |value| value.set_peripheral(&name, offset));

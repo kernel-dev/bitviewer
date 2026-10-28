@@ -12,6 +12,7 @@ Add each change under **Unreleased** as you make it. When a version is released,
 - A long value, such as a 32- or 64-bit number in binary, no longer covers the register name, address and width. It moves to a line of its own under the name when it doesn't fit beside it, and gets a smaller font only when it doesn't fit the card at all (pointing at it then shows the whole number).
 
 ### Added
+- Peripheral snapshots and comparing: a peripheral's ⋯ › **Take snapshot…** keeps all its registers under a name, and **Compare with…** lists the registers that differ from a snapshot or from another workspace file, with the fields that changed and their named values. Tick registers to restore them, or copy the comparison as text.
 - Write semantics: a field can say what writing or reading does to it, such as **Write 1 to clear** (`w1c`) for status flags or **Reading clears it** (`rc`). Set them in Field details (**When written**, **When read**); SVD imports fill them in from `modifiedWriteValues`, `readAction` and write-only access. They show as chips in the fields list and under the bits, and generated code mentions them (template variables `field.write` and `field.read`).
 - **⋯ › Preview a write…** shows what a register becomes when a number is written to it, following those rules (read-only fields keep their bits), and can apply it.
 - Long descriptions can be read in full: click a register's description (cut to one line) or a field's (cut to two lines) to open it in a dialog, with Copy and Edit….

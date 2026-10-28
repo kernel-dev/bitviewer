@@ -3,6 +3,7 @@
 //! undo history and the rest of the logic the app is built on.
 
 pub mod changelog;
+pub mod diff;
 pub mod export;
 pub mod expr;
 pub mod field;

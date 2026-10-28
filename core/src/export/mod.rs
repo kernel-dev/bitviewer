@@ -572,7 +572,7 @@ mod tests {
         value.add_field(0, 3, Some("MODE"), None, None).unwrap();
         value.add_field(28, 39, Some("SPAN"), None, None).unwrap();
         value.set_peripheral("UART0", Some(8));
-        let peripheral = Peripheral { name: "UART0".into(), base: Some(0x4001_1000), description: "".into(), collapsed: false };
+        let peripheral = Peripheral { base: Some(0x4001_1000), ..Peripheral::named("UART0".into()) };
         let options = ExportOptions { prefix: "CTRL".into(), include_value: true, accessors: true, platform: 32 };
         for template in builtin_exports() {
             let result = if template.scope == "peripheral" {

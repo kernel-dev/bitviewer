@@ -27,6 +27,7 @@ pub const SCENES: &[&str] = &[
     "search",
     "locked-bits",
     "settings",
+    "peripheral-diff",
 ];
 
 /// The settings every shot is taken with.
@@ -74,6 +75,18 @@ impl WorkspaceView {
         let uart = Some(std::sync::Arc::from("UART0"));
         match scene {
             "bits-selection" | "expr-bar" | "locked-bits" | "peripheral" => self.set_page(uart, cx),
+            "peripheral-diff" => {
+                // a snapshot, then two registers change: BAUD halves, CTRL's receiver goes off
+                let block: std::sync::Arc<str> = "UART0".into();
+                self.keep_snapshot(&block, "working build", cx);
+                let index = |name: &str| self.state.values.iter().position(|value| &*value.name == name);
+                let changes: Vec<(usize, bitviewer_core::integers::Bits)> = [("UART0.BAUD", 0x341u32), ("UART0.CTRL", 0x2103)]
+                    .into_iter()
+                    .filter_map(|(name, bits)| Some((index(name)?, bitviewer_core::integers::Bits::from(bits))))
+                    .collect();
+                self.restore_registers(changes, cx);
+                self.set_page(uart, cx);
+            }
             "fields" => {
                 self.set_page(uart, cx);
                 self.shot_scroll("UART0.CTRL", 330.0);
@@ -106,6 +119,7 @@ impl WorkspaceView {
                     card.update(cx, |card, cx| card.flip(26, window, cx));
                 }
             }
+            "peripheral-diff" => self.compare_peripheral(&"UART0".into(), window, cx),
             "export-code" | "export-struct" | "export-editor" => {
                 let name = if scene == "export-struct" { "TIMER.CFG" } else { "UART0.CTRL" };
                 if let Some(id) = self.state.values.iter().find(|value| &*value.name == name).map(|value| value.id) {

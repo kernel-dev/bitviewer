@@ -27,6 +27,7 @@ mod actions;
 mod bench;
 mod blocks;
 mod chrome;
+mod diff_dialog;
 mod document;
 mod drag;
 mod onboarding;

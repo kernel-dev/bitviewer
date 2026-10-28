@@ -23,6 +23,17 @@ Each peripheral also gets an entry in the sidebar. Click it to show only its reg
 - **Ungroup** keeps the values but forgets the peripheral; **Remove peripheral** deletes it with its registers. Both can be undone.
 - A value's ⋯ › **Add description…** notes what it is for. It shows under the name, cut to one line; click it to read all of it. SVD imports fill it in.
 
+## Snapshots and comparing
+
+When a peripheral stops working after a change, the question is usually "what is different from when it worked?" across all of its registers.
+
+- The peripheral's ⋯ › **Take snapshot…** keeps every register's value under a name, such as `working build`. Snapshots are saved with the workspace.
+- ⋯ › **Compare with…** lists the registers that differ from a snapshot, and inside each one the fields that changed, with their named values (`RXIE: On → Off`). It can also compare with the same peripheral in another workspace file: registers are matched by name, then by address.
+- Click a register's name to go to it. Tick registers and press **Restore ticked** to put their old values back (one undo step). **Copy as text** gives a plain table for a bug report.
+- The bin button deletes the snapshot shown.
+
+![UART0 compared with the snapshot “working build”](img/peripheral-diff.png)
+
 ## Exporting
 
 The **Export code** button on a peripheral generates code for all of its registers at once:
