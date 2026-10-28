@@ -3,11 +3,11 @@
 
 use std::rc::Rc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::notification::Notification;
+use crate::kit::component::tooltip::Tooltip;
+use crate::kit::*;
 use bitviewer_core::templates::{Template, builtin_templates, template_from_json, template_to_json};
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::notification::Notification;
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::*;
 
 use crate::app_state;
 use crate::modal;
@@ -94,7 +94,7 @@ fn preview(template: &Template) -> Div {
             .min_w(px(3.0))
             .rounded(px(3.0))
             .bg(color)
-            .text_color(gpui_kit::white())
+            .text_color(crate::kit::white())
             .font_weight(FontWeight::BOLD)
             .text_size(r(9.5))
             .line_height(r(16.0))
@@ -188,7 +188,7 @@ impl RenderOnce for TemplateList {
                     .child(head);
                 if on {
                     item = item.shadow(vec![BoxShadow {
-                        color: palette.accent_soft.into(),
+                        color: crate::theme::hsla(palette.accent_soft),
                         offset: point(px(0.0), px(0.0)),
                         blur_radius: px(0.0),
                         spread_radius: px(3.0),

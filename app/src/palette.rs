@@ -1,8 +1,8 @@
 //! The command palette (Ctrl+K): type to find any command, Enter runs it.
 //! The ranking and the look are the web app's palette.ts and overlays.css.
 
-use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::*;
+use crate::kit::component::input::{Input, InputEvent, InputState};
+use crate::kit::*;
 
 use crate::commands::{COMMANDS, Command};
 use crate::theme;
@@ -192,13 +192,13 @@ impl Render for PaletteView {
             .justify_center()
             .items_start()
             .pt(viewport.height * 0.12)
-            .bg(Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.45 })
+            .bg(Rgba::new(0.0, 0.0, 0.0, 0.45))
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.close(window, cx)))
             .child(panel)
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;
 
 #[cfg(test)]
 mod palette_tests {

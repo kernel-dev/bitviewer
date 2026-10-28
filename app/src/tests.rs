@@ -6,12 +6,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::kit::component::Root;
 use bitviewer_core::integers::{Base, Bits};
 use bitviewer_core::rows::View;
 use bitviewer_core::value::Value;
 use bitviewer_core::workspace::WorkspaceState;
 use gpui::{AppContext as _, Entity, Modifiers, MouseButton, TestAppContext, VisualTestContext};
-use gpui_kit::base::Root;
 
 use crate::workspace_view::{self, WorkspaceView};
 

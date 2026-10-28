@@ -4,9 +4,9 @@
 
 use std::rc::Rc;
 
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::*;
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{InputEvent, InputState};
+use crate::kit::*;
 
 use crate::theme;
 use crate::widgets::{Btn, Look, r};

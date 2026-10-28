@@ -1,9 +1,9 @@
 //! Help (searchable topics and shortcuts) and About, as the web app's
 //! dialogs/help.ts.
 
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::*;
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{Input, InputEvent, InputState};
+use crate::kit::*;
 
 use crate::commands::COMMANDS;
 use crate::modal;
@@ -112,8 +112,24 @@ impl Render for HelpView {
             let link = body.len() + 1..text.len();
             let font = Font { family: theme::ui().into(), ..Font::default() };
             let runs = vec![
-                TextRun { len: body.len() + 1, font: font.clone(), color: palette.muted.into(), background_color: None, underline: None, strikethrough: None },
-                TextRun { len: "Learn more".len(), font, color: palette.accent.into(), background_color: None, underline: None, strikethrough: None },
+                TextRun {
+                    len: body.len() + 1,
+                    font: font.clone(),
+                    color: crate::theme::hsla(palette.muted),
+                    background_color: None,
+                    underline: None,
+                    strikethrough: None,
+                    letter_spacing: None,
+                },
+                TextRun {
+                    len: "Learn more".len(),
+                    font,
+                    color: crate::theme::hsla(palette.accent),
+                    background_color: None,
+                    underline: None,
+                    strikethrough: None,
+                    letter_spacing: None,
+                },
             ];
             let page = GUIDE_PAGES[index];
             list = list
@@ -221,7 +237,15 @@ fn changelog_line(text: &str) -> StyledText {
         if piece.is_empty() {
             return;
         }
-        runs.push(TextRun { len: piece.len(), font, color: palette.text.into(), background_color: None, underline: None, strikethrough: None });
+        runs.push(TextRun {
+            len: piece.len(),
+            font,
+            color: crate::theme::hsla(palette.text),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+            letter_spacing: None,
+        });
         out.push_str(piece);
     };
     let mut rest = text;

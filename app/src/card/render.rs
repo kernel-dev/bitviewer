@@ -3,6 +3,11 @@
 //! and compare rows), the "All bases" and "Register fields" panels, the
 //! expression bar and the readout chips. Sizes are CSS pixels (see `r`).
 
+use crate::kit::component::input::Input;
+use crate::kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
+use crate::kit::component::tooltip::Tooltip;
+use crate::kit::prelude::FluentBuilder as _;
+use crate::kit::*;
 use bitviewer_core::field::Access;
 use bitviewer_core::integers::{Base, Bits, format_int, popcount, signed_decimal};
 use bitviewer_core::interpretations::{
@@ -12,11 +17,6 @@ use bitviewer_core::interpretations::{
 use bitviewer_core::meaning::{decode_field, is_invertible};
 use bitviewer_core::ops::Op;
 use bitviewer_core::rows::View;
-use gpui_kit::component::input::Input;
-use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::*;
 
 use super::{CardView, Slot};
 use crate::app_state;
@@ -55,7 +55,7 @@ fn line_length(bits: usize, available: f32) -> usize {
 }
 
 fn shadow(color: Rgba, x: f32, y: f32, blur: f32, spread: f32, inset: bool) -> BoxShadow {
-    BoxShadow { color: color.into(), offset: point(px(x), px(y)), blur_radius: px(blur), spread_radius: px(spread), inset }
+    BoxShadow { color: theme::hsla(color), offset: point(px(x), px(y)), blur_radius: px(blur), spread_radius: px(spread), inset }
 }
 
 /// A row's left edge: a bar in `color` (the link to its compare row).
@@ -193,7 +193,7 @@ pub(super) fn entry(
         card.update(cx, |card, cx| action(card, window, cx)).ok();
     });
     if let Some(name) = icon_name {
-        item = item.icon(gpui_kit::component::Icon::empty().path(format!("icons/{name}.svg")));
+        item = item.icon(crate::kit::component::Icon::empty().path(format!("icons/{name}.svg")));
     }
     item
 }
@@ -1732,7 +1732,7 @@ pub(super) fn row_menu_items(
             menu = menu
                 .item(entry(card, format!("Rename “{name}”…"), Some("pencil-line"), move |c, w, cx| c.rename_field_prompt(index, w, cx)))
                 .submenu_with_icon(
-                    Some(gpui_kit::component::Icon::empty().path("icons/palette.svg")),
+                    Some(crate::kit::component::Icon::empty().path("icons/palette.svg")),
                     format!("Colour of “{name}”"),
                     window,
                     cx,
@@ -1764,11 +1764,12 @@ pub(super) fn row_menu_items(
         menu = menu.item(entry(card, text, None, move |c, w, cx| row_op(c, op, w, cx)));
     }
     let more_card = card.clone();
-    menu = menu.submenu_with_icon(Some(gpui_kit::component::Icon::empty().path("icons/chevron-down.svg")), "More operations", window, cx, move |menu, _, _| {
-        more_ops_menu(menu, &more_card, row_width, Some((lo, compare)), row_op)
-    });
+    menu =
+        menu.submenu_with_icon(Some(crate::kit::component::Icon::empty().path("icons/chevron-down.svg")), "More operations", window, cx, move |menu, _, _| {
+            more_ops_menu(menu, &more_card, row_width, Some((lo, compare)), row_op)
+        });
     let copy_card = card.clone();
-    menu = menu.separator().submenu_with_icon(Some(gpui_kit::component::Icon::empty().path("icons/copy.svg")), "Copy", window, cx, move |mut menu, _, _| {
+    menu = menu.separator().submenu_with_icon(Some(crate::kit::component::Icon::empty().path("icons/copy.svg")), "Copy", window, cx, move |mut menu, _, _| {
         for base in Base::ORDER {
             menu = menu.item(entry(&copy_card, format!("as {}", base.name()), None, move |c, w, cx| c.copy_row_as(lo, compare, base, w, cx)));
         }
@@ -1879,7 +1880,7 @@ fn hatching(on: bool, light: bool) -> impl IntoElement {
         (true, true) => 0.22,
     };
     let level = if on == light { 1.0 } else { 0.0 };
-    let stripe = Rgba { r: level, g: level, b: level, a: alpha };
+    let stripe = Rgba::new(level, level, level, alpha);
     canvas(
         |_, _, _| {},
         move |bounds, _, window, _| {

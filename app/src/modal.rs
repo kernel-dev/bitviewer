@@ -1,8 +1,8 @@
 //! Dialogs drawn like the web app's modals (overlays.css .modal): a framed
 //! panel with an icon tile and title, the content, and a footer of buttons.
 
-use gpui_kit::component::dialog::Dialog;
-use gpui_kit::*;
+use crate::kit::component::dialog::Dialog;
+use crate::kit::*;
 
 use crate::theme;
 use crate::widgets::{icon, r};
@@ -96,8 +96,8 @@ pub fn switch(id: impl Into<ElementId>, on: bool, toggle: impl Fn(bool, &mut Win
         .rounded(r(11.0))
         .bg(if on { palette.accent } else { palette.border_strong })
         .cursor_pointer()
-        .child(div().absolute().top(r(2.0)).left(r(if on { 18.0 } else { 2.0 })).size(r(18.0)).rounded_full().bg(gpui_kit::white()).shadow(vec![BoxShadow {
-            color: Hsla::from(Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.35 }),
+        .child(div().absolute().top(r(2.0)).left(r(if on { 18.0 } else { 2.0 })).size(r(18.0)).rounded_full().bg(crate::kit::white()).shadow(vec![BoxShadow {
+            color: crate::theme::hsla(Rgba::new(0.0, 0.0, 0.0, 0.35)),
             offset: point(px(0.0), px(1.0)),
             blur_radius: px(3.0),
             spread_radius: px(0.0),
@@ -106,7 +106,7 @@ pub fn switch(id: impl Into<ElementId>, on: bool, toggle: impl Fn(bool, &mut Win
         .on_click(move |_, window, cx| toggle(!on, window, cx))
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;
 
 /// Asks a yes/no question; `on_yes` runs when the user agrees.
 pub fn confirm(
@@ -118,7 +118,7 @@ pub fn confirm(
     danger: bool,
     on_yes: impl Fn(&mut Window, &mut App) + 'static,
 ) {
-    use gpui_kit::component::WindowExt;
+    use crate::kit::component::WindowExt;
     let on_yes = std::rc::Rc::new(on_yes);
     window.open_dialog(cx, move |dialog, _, _| {
         let palette = theme::current();
@@ -146,7 +146,7 @@ pub fn confirm(
 /// Esc, the ✕ or a click outside: asks first when a form has edits
 /// (`changed`), as the web app's forms do.
 pub fn guard(dialog: Dialog, changed: impl Fn(&App) -> bool + 'static) -> Dialog {
-    use gpui_kit::component::WindowExt;
+    use crate::kit::component::WindowExt;
     dialog.on_cancel(move |_, window, cx| {
         if !changed(cx) {
             return true;

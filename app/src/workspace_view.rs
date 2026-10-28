@@ -13,15 +13,15 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::kit::component::menu::AppMenuBar;
+use crate::kit::component::scroll::ScrollableElement;
+use crate::kit::*;
 use bitviewer_core::ModelError;
 use bitviewer_core::history::History;
 use bitviewer_core::integers::Bits;
 use bitviewer_core::settings::Settings;
 use bitviewer_core::value::{Value, ValueId};
 use bitviewer_core::workspace::WorkspaceState;
-use gpui_kit::component::menu::AppMenuBar;
-use gpui_kit::component::scroll::ScrollableElement;
-use gpui_kit::*;
 
 mod actions;
 mod bench;
@@ -48,7 +48,7 @@ pub use search::match_value;
 /// fonts, the settings (theme, accent) and the shortcuts. Tests pass their
 /// own settings so they never read the user's.
 pub fn init(settings: Option<Settings>, cx: &mut App) {
-    gpui_kit::init(cx);
+    crate::kit::init(cx);
     app_state::init(settings, cx);
     commands::bind_keys(cx);
     install_menus(cx);
@@ -580,7 +580,7 @@ impl Render for WorkspaceView {
             |_, _, _| {},
             move |_, _, window, _| {
                 let me = me.clone();
-                window.on_mouse_event(move |event: &ScrollEvent, phase, _, cx| {
+                window.on_mouse_event(move |event: &ScrollWheelEvent, phase, _, cx| {
                     if phase != DispatchPhase::Capture || !(event.modifiers.control || event.modifiers.platform) {
                         return;
                     }
@@ -660,5 +660,10 @@ impl Render for WorkspaceView {
             .child(Self::drop_overlay().on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| this.files_dropped(paths, window, cx))))
             .children(self.palette.clone())
             .children(self.render_tour(window, cx))
+            // the component library draws its sheets, dialogs and notifications
+            // over the window when the content asks it to
+            .children(crate::kit::component::Root::render_sheet_layer(window, cx))
+            .children(crate::kit::component::Root::render_dialog_layer(window, cx))
+            .children(crate::kit::component::Root::render_notification_layer(window, cx))
     }
 }

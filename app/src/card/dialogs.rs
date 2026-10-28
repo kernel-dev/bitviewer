@@ -3,12 +3,12 @@
 //! card/more-ops.ts): pasting bytes, what to compare with, and the amount or
 //! mask of an operation. Expressions preview their result as they are typed.
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{InputEvent, InputState, Textarea, TextareaState};
+use crate::kit::*;
 use bitviewer_core::integers::{Base, Bits, format_int};
 use bitviewer_core::interpretations::{ByteOrder, bytes_to_value, parse_bytes};
 use bitviewer_core::ops::Op;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{InputEvent, InputState, Textarea, TextareaState};
-use gpui_kit::*;
 
 use super::CardView;
 use crate::expr_field::{self, Fitted};
@@ -156,7 +156,7 @@ impl Render for ExprView {
             ] {
                 kinds = kinds.child(
                     seg_button(text, text, chosen == op, SegSize::Normal)
-                        .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
+                        .tooltip(move |window, cx| crate::kit::component::tooltip::Tooltip::new(tip).build(window, cx))
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.kinds = Some(op);
                             cx.notify();
@@ -412,4 +412,4 @@ impl CardView {
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

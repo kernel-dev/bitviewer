@@ -4,6 +4,10 @@
 
 use std::sync::Arc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{InputEvent, InputState, Textarea, TextareaState};
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use bitviewer_core::export::language::{TemplateError, compile_template};
 use bitviewer_core::export::{
     ExportOptions, ExportTemplate, NEW_PERIPHERAL_TEMPLATE_SOURCE, NEW_TEMPLATE_SOURCE, builtin_exports, custom_export, default_prefix, ident, render_export,
@@ -11,10 +15,6 @@ use bitviewer_core::export::{
 };
 use bitviewer_core::value::Value;
 use bitviewer_core::workspace::Peripheral;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{InputEvent, InputState, Textarea, TextareaState};
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 use serde_json::json;
 
 use crate::app_state;
@@ -529,4 +529,4 @@ impl Render for EditorView {
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

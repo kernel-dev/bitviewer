@@ -4,13 +4,13 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::kit::component::Icon;
+use crate::kit::component::WindowExt;
+use crate::kit::component::menu::PopupMenuItem;
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use bitviewer_core::integers::{Base, Bits, format_int};
 use bitviewer_core::interpretations::{ByteOrder, ByteStyle, format_bytes, value_to_bytes};
-use gpui_kit::component::Icon;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::menu::PopupMenuItem;
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 
 use super::CardView;
 use super::render::entry;

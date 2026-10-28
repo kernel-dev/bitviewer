@@ -10,7 +10,7 @@
 //! Give it a width from its parent (`w_full`, `flex_1` with `min_w_0`, a
 //! fixed width) and a height; the text is centred in that height.
 
-use gpui_kit::*;
+use crate::kit::*;
 
 use crate::theme;
 use crate::widgets::r;
@@ -41,7 +41,7 @@ pub fn fit_text(text: impl Into<SharedString>) -> FitText {
         weight: FontWeight::NORMAL,
         size: 13.0,
         min_size: 9.0,
-        color: theme::current().text.into(),
+        color: theme::hsla(theme::current().text),
         align: Align::Left,
         style: StyleRefinement::default(),
     }
@@ -70,8 +70,8 @@ impl FitText {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Hsla>) -> Self {
-        self.color = color.into();
+    pub fn color(mut self, color: Rgba) -> Self {
+        self.color = theme::hsla(color);
         self
     }
 
@@ -116,7 +116,7 @@ pub fn fit(text: &SharedString, font: &Font, color: Hsla, size: f32, min_size: f
     let rem = window.rem_size();
     let to_px = |css: f32| r(css).to_pixels(rem);
     let shape = |text: SharedString, css: f32| {
-        let run = TextRun { len: text.len(), font: font.clone(), color, background_color: None, underline: None, strikethrough: None };
+        let run = TextRun { len: text.len(), font: font.clone(), color, background_color: None, underline: None, strikethrough: None, letter_spacing: None };
         window.text_system().shape_line(text, to_px(css), &[run], None)
     };
     let mut css = size;
@@ -168,12 +168,12 @@ fn cut_to_fit(text: &str, width: Pixels, measure: impl Fn(SharedString) -> Pixel
 #[cfg(test)]
 mod tests {
     use super::cut_to_fit;
-    use gpui_kit::px;
+    use crate::kit::px;
 
     #[test]
     fn cuts_the_end_off_at_a_character() {
         // 10 px a character, "…" included
-        let measure = |text: gpui_kit::SharedString| px(text.chars().count() as f32 * 10.0);
+        let measure = |text: crate::kit::SharedString| px(text.chars().count() as f32 * 10.0);
         assert_eq!(cut_to_fit("BIST_DELAY_ENABLE", px(60.0), measure), "BIST_…");
         assert_eq!(cut_to_fit("ÅBC", px(25.0), measure), "Å…");
         assert_eq!(cut_to_fit("ABC", px(5.0), measure), "…");

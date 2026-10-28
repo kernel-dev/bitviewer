@@ -23,6 +23,7 @@ mod fit;
 mod fonts;
 mod guide_dialog;
 mod help_dialog;
+mod kit;
 mod modal;
 mod palette;
 mod prompt;
@@ -45,11 +46,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::kit::*;
 use bitviewer_core::integers::{Base, Bits};
 use bitviewer_core::rows::View;
 use bitviewer_core::value::{Value, ValueId};
 use bitviewer_core::workspace::{Peripheral, WorkspaceState, parse_workspace_file};
-use gpui_kit::*;
 
 use workspace_view::WorkspaceView;
 
@@ -202,7 +203,7 @@ enum Start {
 }
 
 fn run(start: Start, bench: Option<workspace_view::BenchOptions>, import_svd: Option<SvdStart>) {
-    gpui_kit::application().with_assets(assets::Assets).run(move |cx| {
+    crate::kit::application().with_assets(assets::Assets).run(move |cx| {
         workspace_view::init(None, cx);
         let opened = match start {
             Start::Opened(opened) => opened,
@@ -218,11 +219,11 @@ fn run(start: Start, bench: Option<workspace_view::BenchOptions>, import_svd: Op
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1280.0), px(900.0)), cx))),
             // the title bar is drawn by the app (chrome.rs); the title still names the window
-            titlebar: Some(TitlebarOptions { title: Some(format!("{name} — Bit Viewer").into()), ..gpui_kit::component::TitleBar::title_bar_options() }),
+            titlebar: Some(TitlebarOptions { title: Some(format!("{name} — Bit Viewer").into()), ..crate::kit::component::TitleBar::title_bar_options() }),
             window_min_size: Some(size(px(640.0), px(420.0))),
-            ..gpui_kit::component::TitleBar::window_options()
+            ..crate::kit::component::TitleBar::window_options()
         };
-        gpui_kit::open_window(options, cx, |window, cx| {
+        crate::kit::open_window(options, cx, |window, cx| {
             let view = cx.new(|cx| WorkspaceView::new(state, name.clone(), bench, window, cx));
             view.update(cx, |view, cx| {
                 view.set_origin(path, name, dirty, window, cx);

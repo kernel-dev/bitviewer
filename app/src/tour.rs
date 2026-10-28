@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use gpui_kit::*;
+use crate::kit::*;
 
 use crate::theme;
 use crate::widgets::{Btn, Look, r};
@@ -115,7 +115,7 @@ impl Tour {
             origin: point(target.origin.x - padding, target.origin.y - padding),
             size: size(target.size.width + padding * 2.0, target.size.height + padding * 2.0),
         };
-        let dim = Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.55 };
+        let dim = Rgba::new(0.0, 0.0, 0.0, 0.55);
         let shade = |left: Pixels, top: Pixels, width: Pixels, height: Pixels| {
             div().absolute().left(left).top(top).w(width.max(px(0.0))).h(height.max(px(0.0))).bg(dim)
         };

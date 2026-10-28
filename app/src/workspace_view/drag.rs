@@ -5,8 +5,8 @@
 
 use std::time::Duration;
 
+use crate::kit::*;
 use bitviewer_core::value::ValueId;
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::theme;
@@ -108,7 +108,7 @@ impl WorkspaceView {
         (drag.target == index && drag.target != drag.from && drag.target != drag.from + 1).then(|| {
             let palette = theme::current();
             div().h(r(3.0)).mx(r(6.0)).mb(r(6.0)).rounded(r(3.0)).bg(palette.accent).shadow(vec![BoxShadow {
-                color: palette.accent.into(),
+                color: crate::theme::hsla(palette.accent),
                 offset: point(px(0.0), px(0.0)),
                 blur_radius: px(10.0),
                 spread_radius: px(0.0),
@@ -144,7 +144,7 @@ impl WorkspaceView {
             .items_center()
             .justify_center()
             .opacity(0.0)
-            .drag_over::<ExternalPaths>(move |style, _, _, _| style.opacity(1.0).bg(Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.45 }))
+            .drag_over::<ExternalPaths>(move |style, _, _, _| style.opacity(1.0).bg(Rgba::new(0.0, 0.0, 0.0, 0.45)))
             .child(
                 div()
                     .flex()

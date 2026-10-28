@@ -8,13 +8,13 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::rc::Rc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{InputEvent, InputState};
+use crate::kit::component::notification::Notification;
+use crate::kit::component::tooltip::Tooltip;
+use crate::kit::*;
 use bitviewer_core::svd::{IndexSet, SvdDevice, SvdRegister, hex_address, picked_registers, register_template};
 use bitviewer_core::templates::template_to_json;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::notification::Notification;
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::*;
 
 use crate::app_state;
 use crate::modal;
@@ -57,9 +57,9 @@ fn check(chosen: usize, total: usize) -> Div {
         .border_color(if on || partial { palette.accent } else { palette.border_strong })
         .bg(if on || partial { palette.accent } else { palette.input });
     if on {
-        box_ = box_.child(icon("check", 11.0).text_color(gpui_kit::white()));
+        box_ = box_.child(icon("check", 11.0).text_color(crate::kit::white()));
     } else if partial {
-        box_ = box_.child(div().w(r(8.0)).h(r(2.0)).rounded(r(1.0)).bg(gpui_kit::white()));
+        box_ = box_.child(div().w(r(8.0)).h(r(2.0)).rounded(r(1.0)).bg(crate::kit::white()));
     }
     box_
 }
@@ -520,4 +520,4 @@ impl Render for SvdPicker {
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

@@ -4,14 +4,14 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::menu::{PopupMenu, PopupMenuItem};
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use bitviewer_core::integers::Bits;
 use bitviewer_core::value::Value;
 use bitviewer_core::workspace::{FILE_VERSION, WorkspaceState, parse_workspace_file, workspace_file_text};
 use futures::channel::oneshot;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::commands::{COMMANDS, MENUS, OpenRecent};
@@ -66,7 +66,7 @@ pub fn menus(cx: &App) -> Vec<Menu> {
 pub fn install_menus(cx: &mut App) {
     // (menus can't be cloned: build them once for each)
     let owned = menus(cx).into_iter().map(Menu::owned).collect();
-    gpui_kit::base::GlobalState::global_mut(cx).set_app_menus(owned);
+    crate::kit::component::GlobalState::global_mut(cx).set_app_menus(owned);
     cx.set_menus(menus(cx));
 }
 

@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
-use gpui_kit::App;
+use crate::kit::App;
 
 pub struct FontSet {
     /// The id kept in the settings (core's FONT_SETS).

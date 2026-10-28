@@ -10,8 +10,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::kit::*;
 use bitviewer_core::settings::{Settings, clamp_zoom};
-use gpui_kit::*;
 
 use crate::theme;
 

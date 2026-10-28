@@ -6,7 +6,7 @@
 
 use std::cell::RefCell;
 
-use gpui_kit::{Rgba, rgb};
+use crate::kit::{Hsla, Rgba, rgb};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ThemeName {
@@ -86,25 +86,32 @@ pub struct Palette {
 
 fn rgba(hex: u32, alpha: f32) -> Rgba {
     let mut color = rgb(hex);
-    color.a = alpha;
+    color.alpha = alpha;
     color
+}
+
+/// A colour for the parts of GPUI that take HSL (shadows, text runs, the
+/// component library's theme). GPUI CE's colours are `palette` types, which
+/// convert explicitly.
+pub fn hsla(color: Rgba) -> Hsla {
+    crate::kit::rgb_to_hsla(color)
 }
 
 /// CSS color-mix(in srgb, a p%, b): each channel (alpha too) weighted.
 pub fn mix(a: Rgba, percent: f32, b: Rgba) -> Rgba {
     let p = percent / 100.0;
     // mixing with a translucent colour weights by alpha (premultiplied), as CSS does
-    let alpha = a.a * p + b.a * (1.0 - p);
+    let alpha = a.alpha * p + b.alpha * (1.0 - p);
     if alpha == 0.0 {
         return TRANSPARENT;
     }
-    let channel = |x: f32, y: f32| (x * a.a * p + y * b.a * (1.0 - p)) / alpha;
-    Rgba { r: channel(a.r, b.r), g: channel(a.g, b.g), b: channel(a.b, b.b), a: alpha }
+    let channel = |x: f32, y: f32| (x * a.alpha * p + y * b.alpha * (1.0 - p)) / alpha;
+    Rgba::new(channel(a.red, b.red), channel(a.green, b.green), channel(a.blue, b.blue), alpha)
 }
 
-const TRANSPARENT: Rgba = Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
-const WHITE: Rgba = Rgba { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
-const BLACK: Rgba = Rgba { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
+const TRANSPARENT: Rgba = Rgba::new(0.0, 0.0, 0.0, 0.0);
+const WHITE: Rgba = Rgba::new(1.0, 1.0, 1.0, 1.0);
+const BLACK: Rgba = Rgba::new(0.0, 0.0, 0.0, 1.0);
 
 impl Palette {
     pub fn dark() -> Palette {
@@ -462,7 +469,7 @@ pub fn transparent() -> Rgba {
 
 /// The title bar stays black in every theme.
 pub mod title {
-    use gpui_kit::{Rgba, rgb};
+    use crate::kit::{Rgba, rgb};
     pub fn bg() -> Rgba {
         rgb(0x060607)
     }
@@ -480,16 +487,16 @@ pub mod title {
 /// Switches the theme and accent everywhere: our own drawing, and the
 /// component library's controls (inputs, buttons, menus, dialogs), which
 /// get the same colours, fonts and corner radius as the web app's.
-pub fn apply(name: ThemeName, scheme: &str, accent: Option<u32>, cx: &mut gpui_kit::App) {
-    use gpui_kit::component::{Theme, ThemeMode};
-    use gpui_kit::{Hsla, px};
+pub fn apply(name: ThemeName, scheme: &str, accent: Option<u32>, cx: &mut crate::kit::App) {
+    use crate::kit::component::{Theme, ThemeMode};
+    use crate::kit::px;
 
     let palette = Palette::new(name, scheme, accent);
     set(palette);
     let mode = if name == ThemeName::Light { ThemeMode::Light } else { ThemeMode::Dark };
     Theme::change(mode, None, cx);
 
-    let h = |color: Rgba| -> Hsla { color.into() };
+    let h = hsla;
     let theme = Theme::global_mut(cx);
     theme.font_family = ui().into();
     theme.mono_font_family = mono().into();
@@ -575,28 +582,29 @@ pub fn mono() -> &'static str {
 
 /// Makes these the fonts the UI draws with (apply the theme after); the
 /// number font's character width is measured for the widths of fields.
-pub fn set_fonts(ui: &'static str, mono: &'static str, cx: &gpui_kit::App) {
+pub fn set_fonts(ui: &'static str, mono: &'static str, cx: &crate::kit::App) {
     FONTS.with(|fonts| fonts.set((ui, mono)));
     let text = cx.text_system();
-    let id = text.resolve_font(&gpui_kit::font(mono));
-    let em = text.advance(id, gpui_kit::px(100.0), '0').map_or(0.6, |size| f32::from(size.width) / 100.0);
+    let id = text.resolve_font(&crate::kit::font(mono));
+    let em = text.advance(id, crate::kit::px(100.0), '0').map_or(0.6, |size| f32::from(size.width) / 100.0);
     MONO_EM.with(|cell| cell.set(if em > 0.3 && em < 1.0 { em } else { 0.6 }));
 }
 
 /// The width of `text` in the interface font (CSS px, before zoom).
-pub fn ui_text_width(text: &str, size: f32, weight: gpui_kit::FontWeight, window: &gpui_kit::Window) -> f32 {
+pub fn ui_text_width(text: &str, size: f32, weight: crate::kit::FontWeight, window: &crate::kit::Window) -> f32 {
     if text.is_empty() {
         return 0.0;
     }
-    let run = gpui_kit::TextRun {
+    let run = crate::kit::TextRun {
         len: text.len(),
-        font: gpui_kit::Font { weight, ..gpui_kit::font(ui()) },
-        color: gpui_kit::black(),
+        font: crate::kit::Font { weight, ..crate::kit::font(ui()) },
+        color: crate::kit::black(),
         background_color: None,
         underline: None,
         strikethrough: None,
+        letter_spacing: None,
     };
-    let line = window.text_system().shape_line(text.to_string().into(), gpui_kit::px(size), &[run], None);
+    let line = window.text_system().shape_line(text.to_string().into(), crate::kit::px(size), &[run], None);
     f32::from(line.width())
 }
 
@@ -604,15 +612,15 @@ pub fn ui_text_width(text: &str, size: f32, weight: gpui_kit::FontWeight, window
 mod tests {
     // not `use super::*`: that brings in GPUI's `test` macro, which shadows #[test]
     use super::{Palette, TRANSPARENT, ThemeName, mix};
-    use gpui_kit::rgb;
+    use crate::kit::rgb;
 
     #[test]
     fn mixes_like_css_color_mix() {
         let half = mix(rgb(0xff0000), 50.0, rgb(0x0000ff));
-        assert!((half.r - 0.5).abs() < 1e-6 && (half.b - 0.5).abs() < 1e-6);
+        assert!((half.red - 0.5).abs() < 1e-6 && (half.blue - 0.5).abs() < 1e-6);
         let soft = mix(rgb(0xe5383b), 14.0, TRANSPARENT);
-        assert!((soft.a - 0.14).abs() < 1e-6);
-        assert!((soft.r - rgb(0xe5383b).r).abs() < 1e-6); // transparent doesn't darken
+        assert!((soft.alpha - 0.14).abs() < 1e-6);
+        assert!((soft.red - rgb(0xe5383b).red).abs() < 1e-6); // transparent doesn't darken
     }
 
     #[test]
@@ -622,7 +630,7 @@ mod tests {
             let dark = Palette::new(ThemeName::Dark, id, None);
             assert_ne!(light.bg, dark.bg, "{id}");
             // the light one is light, the dark one dark
-            assert!(light.bg.r > 0.8 && dark.bg.r < 0.2, "{id}");
+            assert!(light.bg.red > 0.8 && dark.bg.red < 0.2, "{id}");
         }
         assert_eq!(Palette::new(ThemeName::Light, "signal", None).accent, Palette::light().accent);
         assert_eq!(Palette::new(ThemeName::Light, "lagoon", None).accent, rgb(0x0f766e));

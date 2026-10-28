@@ -4,13 +4,13 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use bitviewer_core::field::wrap_big;
 use bitviewer_core::svd::{SvdDevice, SvdRegister, parse_svd, register_template};
 use bitviewer_core::value::Value;
 use bitviewer_core::workspace::Peripheral;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 use num_traits::ToPrimitive;
 
 use super::WorkspaceView;

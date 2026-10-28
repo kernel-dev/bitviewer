@@ -5,12 +5,12 @@
 
 use std::sync::Arc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::menu::PopupMenuItem;
+use crate::kit::component::notification::Notification;
+use crate::kit::component::tooltip::Tooltip;
+use crate::kit::*;
 use bitviewer_core::workspace::Peripheral;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::menu::PopupMenuItem;
-use gpui_kit::component::notification::Notification;
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::theme;
@@ -145,7 +145,7 @@ impl WorkspaceView {
             let action = |label: &'static str, icon_name: &'static str, run: fn(&mut WorkspaceView, &Arc<str>, &mut Window, &mut Context<WorkspaceView>)| {
                 let workspace = workspace.clone();
                 let name = menu_name.clone();
-                PopupMenuItem::new(label).icon(gpui_kit::component::Icon::empty().path(format!("icons/{icon_name}.svg"))).on_click(move |_, window, cx| {
+                PopupMenuItem::new(label).icon(crate::kit::component::Icon::empty().path(format!("icons/{icon_name}.svg"))).on_click(move |_, window, cx| {
                     workspace.update(cx, |this, cx| run(this, &name, window, cx)).ok();
                 })
             };

@@ -3,8 +3,8 @@
 
 use std::sync::{Arc, OnceLock};
 
-use gpui_kit::component::WindowExt;
-use gpui_kit::*;
+use crate::kit::component::WindowExt;
+use crate::kit::*;
 
 use crate::modal;
 use crate::theme;
@@ -126,20 +126,20 @@ impl GuideView {
         let mut links = Vec::new();
         let font = |family: &'static str, weight: FontWeight| Font { family: family.into(), weight, ..Font::default() };
         let mut push = |piece: &str, font: Font, color: Hsla, text: &mut String| {
-            runs.push(TextRun { len: piece.len(), font, color, background_color: None, underline: None, strikethrough: None });
+            runs.push(TextRun { len: piece.len(), font, color, background_color: None, underline: None, strikethrough: None, letter_spacing: None });
             text.push_str(piece);
         };
         for span in spans(source) {
             match span {
                 Span::Text(piece) => push(&piece, font(theme::ui(), FontWeight::NORMAL), base, &mut text),
-                Span::Code(piece) => push(&piece, font(theme::mono(), FontWeight::NORMAL), palette.text.into(), &mut text),
-                Span::Bold(piece) => push(&piece, font(theme::ui(), FontWeight::SEMIBOLD), palette.text.into(), &mut text),
+                Span::Code(piece) => push(&piece, font(theme::mono(), FontWeight::NORMAL), crate::theme::hsla(palette.text), &mut text),
+                Span::Bold(piece) => push(&piece, font(theme::ui(), FontWeight::SEMIBOLD), crate::theme::hsla(palette.text), &mut text),
                 Span::Link(label, target) if target.starts_with("http://") || target.starts_with("https://") => {
                     push(&format!("{label} ({target})"), font(theme::ui(), FontWeight::NORMAL), base, &mut text)
                 }
                 Span::Link(label, target) => {
                     let start = text.len();
-                    push(&label, font(theme::ui(), FontWeight::NORMAL), palette.accent.into(), &mut text);
+                    push(&label, font(theme::ui(), FontWeight::NORMAL), crate::theme::hsla(palette.accent), &mut text);
                     links.push((start..text.len(), target));
                 }
             }
@@ -163,7 +163,7 @@ impl GuideView {
 
     fn render_page(&self, cx: &mut Context<Self>) -> Div {
         let palette = theme::current();
-        let muted: Hsla = palette.muted.into();
+        let muted: Hsla = crate::theme::hsla(palette.muted);
         let lines: Vec<&str> = PAGES[self.page].1.split('\n').map(|line| line.trim_end_matches('\r')).collect();
         let mut page = div().flex().flex_col();
         let mut i = 0;
@@ -205,7 +205,7 @@ impl GuideView {
                     div().mt(r(if first { 0.0 } else { 18.0 })).mb(r(if first { 8.0 } else { 4.0 })).font_weight(FontWeight::BOLD).child(self.inline(
                         id,
                         heading,
-                        palette.text.into(),
+                        crate::theme::hsla(palette.text),
                         if first { 18.0 } else { 14.0 },
                         cx,
                     )),
@@ -265,7 +265,7 @@ impl GuideView {
                     let mut tr = div().flex().py(r(5.0));
                     for (column, cell) in row.iter().enumerate() {
                         id += 1;
-                        let color: Hsla = if header || column == 0 { palette.text.into() } else { muted };
+                        let color: Hsla = if header || column == 0 { crate::theme::hsla(palette.text) } else { muted };
                         let mut td = div().pr(r(12.0)).child(self.inline(id, cell, color, 13.0, cx));
                         td = if column == 0 { td.w(r(220.0)).flex_none() } else { td.flex_1() };
                         if header {
@@ -351,7 +351,7 @@ pub fn open(file: Option<&str>, window: &mut Window, cx: &mut App) {
     });
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;
 
 #[cfg(test)]
 mod guide_tests {

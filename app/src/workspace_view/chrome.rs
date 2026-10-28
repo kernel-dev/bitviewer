@@ -3,8 +3,8 @@
 //! toolbar, the status bar with the zoom, and the empty state. Buttons
 //! dispatch the same actions as the menus and shortcuts (commands.rs).
 
+use crate::kit::*;
 use bitviewer_core::integers::Base;
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::app_state;
@@ -55,7 +55,7 @@ impl WorkspaceView {
                 .text_size(r(13.0))
                 .text_color(title::text())
                 .cursor_pointer()
-                .hover(|style| style.bg(title::hover()).text_color(gpui_kit::white()))
+                .hover(|style| style.bg(title::hover()).text_color(crate::kit::white()))
                 .child(*name);
             menus = menus.child(crate::widgets::with_menu(item, Anchor::TopLeft, move |menu, window, cx| super::document::menu_items(index, menu, window, cx)));
         }
@@ -72,7 +72,9 @@ impl WorkspaceView {
                 .group(id)
                 .hover(move |style| style.bg(hover))
                 .window_control_area(area)
-                .child(icon(icon_name, if close { 16.0 } else { 13.0 }).text_color(title::text()).group_hover(id, |style| style.text_color(gpui_kit::white())))
+                .child(
+                    icon(icon_name, if close { 16.0 } else { 13.0 }).text_color(title::text()).group_hover(id, |style| style.text_color(crate::kit::white())),
+                )
         };
         div()
             .id("titlebar")
@@ -195,7 +197,7 @@ impl WorkspaceView {
                 Btn::new("tb-bases", Look::Ghost).icon("binary").tip("Show every value in one base").menu(Anchor::TopRight, move |mut menu, _, _| {
                     for base in Base::ORDER {
                         let workspace = workspace.clone();
-                        menu = menu.item(gpui_kit::component::menu::PopupMenuItem::new(format!("All values in {}", base.name())).on_click(
+                        menu = menu.item(crate::kit::component::menu::PopupMenuItem::new(format!("All values in {}", base.name())).on_click(
                             move |_, window, cx| {
                                 workspace.update(cx, |this, cx| this.apply_global_base(base, window, cx)).ok();
                             },

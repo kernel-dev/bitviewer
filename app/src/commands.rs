@@ -3,7 +3,7 @@
 //! from this table. Each command is a GPUI action, handled by the workspace
 //! view (or the active value's card for the Value group).
 
-use gpui_kit::*;
+use crate::kit::*;
 
 actions!(
     bitviewer,
@@ -180,13 +180,16 @@ pub fn keystroke(spec: &str) -> String {
 pub fn bind_keys(cx: &mut App) {
     let mut bindings = Vec::new();
     let context = std::rc::Rc::new(KeyBindingContextPredicate::parse("Workspace").expect("a valid context"));
+    let mapper = cx.keyboard_mapper().clone();
     for command in COMMANDS {
         for key in command.keys {
             // Esc stays with text fields and dialogs; the workspace handles it itself
             if *key == "Esc" {
                 continue;
             }
-            bindings.push(KeyBinding::load(&keystroke(key), (command.action)(), Some(context.clone()), false, None, cx).expect("command shortcuts parse"));
+            bindings.push(
+                KeyBinding::load(&keystroke(key), (command.action)(), Some(context.clone()), false, None, mapper.as_ref()).expect("command shortcuts parse"),
+            );
         }
     }
     cx.bind_keys(bindings);

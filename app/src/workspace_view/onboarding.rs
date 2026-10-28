@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use gpui_kit::*;
+use crate::kit::*;
 
 use super::WorkspaceView;
 use crate::app_state;

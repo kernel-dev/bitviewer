@@ -3,10 +3,10 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::kit::*;
 use bitviewer_core::expr::{eval_int, names_in, parse_expr};
 use bitviewer_core::field::wrap_big;
 use bitviewer_core::integers::{Base, Bits, format_int};
-use gpui_kit::*;
 use num_bigint::{BigInt, Sign};
 
 use crate::theme;
@@ -63,4 +63,4 @@ pub fn preview(result: Option<&Result<Fitted, String>>, width: usize) -> Div {
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

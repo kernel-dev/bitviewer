@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use crate::kit::*;
 use bitviewer_core::workspace::parse_workspace_file;
-use gpui_kit::*;
 use serde_json::{Map, Value as Json, json};
 
 use super::WorkspaceView;

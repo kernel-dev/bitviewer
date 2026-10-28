@@ -10,6 +10,11 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{InputEvent, InputState};
+use crate::kit::component::notification::Notification;
+use crate::kit::prelude::FluentBuilder as _;
+use crate::kit::*;
 use bitviewer_core::ModelError;
 use bitviewer_core::expr::{eval_int, names_in, parse_expr};
 use bitviewer_core::field::{Access, DetailsDraft, wrap_big};
@@ -19,11 +24,6 @@ use bitviewer_core::meaning::{compile_formula, field_number, format_real, raw_fr
 use bitviewer_core::ops::Op;
 use bitviewer_core::rows::View;
 use bitviewer_core::value::{Value, ValueId};
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::notification::Notification;
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::*;
 use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 
@@ -1056,7 +1056,7 @@ impl Render for CardView {
                 // a wash in the selection colour that fades out
                 window.request_animation_frame();
                 let mut wash = palette.select_soft;
-                wash.a *= 1.0 - at.elapsed().as_secs_f32() / 0.9;
+                wash.alpha *= 1.0 - at.elapsed().as_secs_f32() / 0.9;
                 card.bg(wash)
             })
             // the card the user works in is the one "Value" commands act on

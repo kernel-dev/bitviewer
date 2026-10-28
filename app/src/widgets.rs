@@ -6,11 +6,11 @@
 
 use std::rc::Rc;
 
-use gpui_kit::component::Selectable;
-use gpui_kit::component::menu::{DropdownMenu, PopupMenu};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::*;
+use crate::kit::component::Selectable;
+use crate::kit::component::menu::{DropdownMenu, PopupMenu};
+use crate::kit::component::tooltip::Tooltip;
+use crate::kit::prelude::FluentBuilder as _;
+use crate::kit::*;
 
 use crate::theme;
 
@@ -151,7 +151,7 @@ impl Btn {
             Look::AccentGhost => (palette.accent, palette.accent),
             Look::Danger => (palette.text, palette.muted),
             Look::On => (palette.accent, palette.accent),
-            Look::DangerFill => (gpui_kit::white().into(), gpui_kit::white().into()),
+            Look::DangerFill => (crate::kit::rgb(0xffffff), crate::kit::rgb(0xffffff)),
         };
         let disabled = self.disabled;
         let text = if disabled { palette.faint } else { text };
@@ -174,7 +174,7 @@ impl Btn {
             Look::Danger => button.when(!disabled, |b| b.hover(move |style| style.text_color(palette.error).bg(palette.error_bg))),
             Look::On => button.border_color(palette.accent_line).bg(palette.accent_soft),
             Look::DangerFill => {
-                let hover = theme::mix(palette.error, 88.0, gpui_kit::white().into());
+                let hover = theme::mix(palette.error, 88.0, crate::kit::rgb(0xffffff));
                 button.bg(palette.error).font_weight(FontWeight::SEMIBOLD).hover(move |style| style.bg(hover))
             }
         };
@@ -289,7 +289,7 @@ pub fn seg_icon_button(id: impl Into<ElementId>, icon_name: Option<&'static str>
     if let Some(name) = icon_name {
         let contrast = palette.name == theme::ThemeName::Contrast;
         let color = match (on, contrast) {
-            (true, true) => Rgba { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            (true, true) => Rgba::new(0.0, 0.0, 0.0, 1.0),
             (true, false) => palette.accent,
             (false, _) => palette.muted,
         };
@@ -301,14 +301,14 @@ pub fn seg_icon_button(id: impl Into<ElementId>, icon_name: Option<&'static str>
     }
     if on {
         button = button.bg(palette.seg_on).border_1().border_color(palette.border_strong).shadow(vec![BoxShadow {
-            color: Hsla::from(Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.25 }),
+            color: crate::theme::hsla(Rgba::new(0.0, 0.0, 0.0, 0.25)),
             offset: point(px(0.0), px(1.0)),
             blur_radius: px(3.0),
             spread_radius: px(0.0),
             inset: false,
         }]);
         if palette.name == theme::ThemeName::Contrast {
-            button = button.text_color(Rgba { r: 0.0, g: 0.0, b: 0.0, a: 1.0 });
+            button = button.text_color(Rgba::new(0.0, 0.0, 0.0, 1.0));
         }
     } else {
         button = button.hover(move |style| style.text_color(palette.text).bg(palette.surface_3));

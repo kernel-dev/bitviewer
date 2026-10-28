@@ -8,10 +8,10 @@
 
 use std::io::Read;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use base64::Engine;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 use serde_json::Value as Json;
 
 use crate::help_dialog::VERSION;

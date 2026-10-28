@@ -8,10 +8,10 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use crate::kit::component::input::{Input, InputEvent, InputState};
+use crate::kit::*;
 use bitviewer_core::integers::{Base, format_int};
 use bitviewer_core::value::Value;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::theme;

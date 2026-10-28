@@ -6,6 +6,9 @@ Add each change under **Unreleased** as you make it. When a version is released,
 
 ## [Unreleased]
 
+### Changed
+- Built on [GPUI CE](https://gpui-ce.github.io/), the community edition of GPUI, and its component library, instead of Zed's GPUI with GPUI Kit. The app looks and works the same.
+
 ## [3.0.0] - 2026-10-28
 
 ### Changed

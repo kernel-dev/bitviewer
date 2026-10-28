@@ -6,7 +6,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
-use gpui_kit::*;
+use crate::kit::*;
 
 use super::WorkspaceView;
 

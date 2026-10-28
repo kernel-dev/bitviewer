@@ -2,12 +2,12 @@
 //! the active card: the one last clicked or typed in, else the first one on
 //! screen, as in the web app.
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use bitviewer_core::integers::{Base, Bits};
 use bitviewer_core::ops::Op;
 use bitviewer_core::value::Value;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::app_state;

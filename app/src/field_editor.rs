@@ -4,10 +4,10 @@
 
 use std::sync::Arc;
 
+use crate::kit::component::input::{InputEvent, InputState};
+use crate::kit::*;
 use bitviewer_core::field::{Access, DetailsDraft, Field};
 use bitviewer_core::meaning::{compile_formula, format_real};
-use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::*;
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, Signed, Zero};
 

@@ -5,10 +5,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{Input, InputEvent, InputState};
+use crate::kit::*;
 use bitviewer_core::integers::{Bits, MAX_WIDTH, MIN_WIDTH};
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::*;
 
 use crate::expr_field::{self, Fitted};
 use crate::modal;
@@ -282,4 +282,4 @@ pub fn new_value_from_expression(workspace: WeakEntity<WorkspaceView>, default_w
     });
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

@@ -4,7 +4,7 @@
 
 use std::borrow::Cow;
 
-use gpui_kit::{AssetSource, Result, SharedString};
+use crate::kit::{AssetSource, Result, SharedString};
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "assets"]
@@ -17,13 +17,13 @@ impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
         match Icons::get(path) {
             Some(file) => Ok(Some(file.data)),
-            None => gpui_kit::assets::Assets.load(path),
+            None => crate::kit::assets::Assets.load(path),
         }
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
         let mut names: Vec<SharedString> = Icons::iter().filter(|name| name.starts_with(path)).map(|name| name.to_string().into()).collect();
-        names.extend(gpui_kit::assets::Assets.list(path)?);
+        names.extend(crate::kit::assets::Assets.list(path)?);
         Ok(names)
     }
 }

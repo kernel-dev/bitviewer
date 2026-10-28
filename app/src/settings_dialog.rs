@@ -1,13 +1,13 @@
 //! The Settings dialog (the web app's dialogs/settings.ts). Every change
 //! applies at once.
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::slider::{Slider, SliderEvent, SliderState};
+use crate::kit::component::tooltip::Tooltip;
+use crate::kit::*;
 use bitviewer_core::integers::Base;
 use bitviewer_core::rows::View;
 use bitviewer_core::settings::{Settings, ZOOM_MAX, ZOOM_MIN};
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::*;
 
 use crate::modal::{self, row, section, switch};
 use crate::sound::{self, Sound};
@@ -98,7 +98,7 @@ fn scheme_picker(settings: &Settings) -> Div {
                 .border_color(if on { palette.accent } else { palette.border })
                 .when(on, |card| {
                     card.shadow(vec![BoxShadow {
-                        color: palette.accent.into(),
+                        color: crate::theme::hsla(palette.accent),
                         offset: point(px(0.0), px(0.0)),
                         blur_radius: px(0.0),
                         spread_radius: px(1.0),
@@ -159,7 +159,7 @@ fn font_picker(settings: &Settings) -> Div {
                 .border_color(if on { palette.accent } else { palette.border })
                 .when(on, |card| {
                     card.shadow(vec![BoxShadow {
-                        color: palette.accent.into(),
+                        color: crate::theme::hsla(palette.accent),
                         offset: point(px(0.0), px(0.0)),
                         blur_radius: px(0.0),
                         spread_radius: px(1.0),
@@ -188,13 +188,14 @@ fn font_picker(settings: &Settings) -> Div {
 fn accent_picker(settings: &Settings) -> Div {
     let palette = theme::current();
     let own = theme::current();
-    let scheme_accent = (own.accent.r * 255.0).round() as u32 * 65536 + (own.accent.g * 255.0).round() as u32 * 256 + (own.accent.b * 255.0).round() as u32;
+    let scheme_accent =
+        (own.accent.red * 255.0).round() as u32 * 65536 + (own.accent.green * 255.0).round() as u32 * 256 + (own.accent.blue * 255.0).round() as u32;
     let current = settings.accent_color();
     let is_preset = current.is_none() || ACCENTS.iter().skip(1).any(|(_, color)| Some(*color) == current);
     let current = current.unwrap_or(0x1000000);
     let swatch = |id: usize, on: bool| {
         div().id(("accent", id)).size(r(22.0)).flex_none().rounded_full().border_2().border_color(palette.surface_2).cursor_pointer().shadow(vec![BoxShadow {
-            color: if on { palette.text } else { palette.border_strong }.into(),
+            color: crate::theme::hsla(if on { palette.text } else { palette.border_strong }),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
             spread_radius: px(if on { 2.0 } else { 1.0 }),
@@ -405,4 +406,4 @@ impl Render for SettingsView {
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

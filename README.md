@@ -111,6 +111,7 @@ app/              the GPUI app
                       open/save, drag to reorder, SVD import, the list's rows
     card/             one value: header, toolbar, bit tables, fields, readouts, menus
     fit.rs            text that fits the space layout gives it
+    kit.rs            the UI toolkit in one place: GPUI CE, its components, start-up helpers
     theme.rs, fonts.rs, widgets.rs, modal.rs   look and building blocks
     *_dialog.rs       settings, help, guide, export, templates, SVD picker…
     updates.rs        the in-app updater
@@ -125,7 +126,7 @@ scripts/          release notes from CHANGELOG.md, the updater feed
 
 ## Credits
 
-Built with [GPUI](https://www.gpui.rs) and [GPUI Component](https://github.com/longbridge/gpui-component). Icons by [Lucide](https://lucide.dev). The fonts (Outfit, Geist, Atkinson Hyperlegible, Inter, JetBrains Mono, IBM Plex, Source, Red Hat) are bundled so the app works offline; their licences are next to them in `app/assets/fonts`.
+Built with [GPUI CE](https://gpui-ce.github.io/), the community edition of Zed's GPUI, and its [GPUI Component](https://github.com/gpui-ce/gpui-component) library. Icons by [Lucide](https://lucide.dev). The fonts (Outfit, Geist, Atkinson Hyperlegible, Inter, JetBrains Mono, IBM Plex, Source, Red Hat) are bundled so the app works offline; their licences are next to them in `app/assets/fonts`.
 
 Versions up to 2.1.3 were a Tauri/TypeScript app; its last version is tagged `tauri-final`.
 

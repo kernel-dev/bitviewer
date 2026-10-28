@@ -5,13 +5,13 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::kit::component::WindowExt;
+use crate::kit::component::input::{InputEvent, InputState};
+use crate::kit::component::notification::Notification;
+use crate::kit::*;
 use bitviewer_core::integers::{Base, Bits, parse_value};
 use bitviewer_core::value::{Value, ValueId};
 use bitviewer_core::workspace::Peripheral;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::notification::Notification;
-use gpui_kit::*;
 
 use super::WorkspaceView;
 use crate::app_state;
@@ -381,4 +381,4 @@ impl WorkspaceView {
     }
 }
 
-use gpui_kit::prelude::FluentBuilder as _;
+use crate::kit::prelude::FluentBuilder as _;

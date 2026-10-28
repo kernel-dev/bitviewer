@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::sync::mpsc::{Sender, channel};
 use std::time::Instant;
 
-use gpui_kit::App;
+use crate::kit::App;
 
 use crate::app_state;
 
