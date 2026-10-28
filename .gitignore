@@ -1,20 +1,13 @@
 # Rust build output
 target/
 
-# user workspaces are data, not source
+# user workspaces are data, not source...
 *.bitview
 *.bitview.json
+# ...except the tests' own
+!core/tests/fixtures/*.bitview
 
-# left over from the Tauri app (removed in 3.0.0); safe to delete
-node_modules/
-dist/
-src-tauri/
-test-results/
-playwright-report/
-native/
-
-# local benchmarks and notes
-bench/
-pr/
+# local data for optional tests
+test-data/
 
 *.tmp
