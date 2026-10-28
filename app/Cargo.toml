@@ -4,6 +4,7 @@ description = "Bit Viewer: the GPUI user interface"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [[bin]]
 name = "bitviewer"

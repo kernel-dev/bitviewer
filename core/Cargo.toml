@@ -4,6 +4,7 @@ description = "Bit Viewer's data model: values, fields, files, undo, expressions
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 # values are up to 512 bits: a fixed-size integer, no heap per value

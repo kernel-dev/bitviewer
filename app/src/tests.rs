@@ -25,6 +25,9 @@ fn value(width: usize, bits: u64) -> Value {
 /// A window showing `values`.
 fn open(cx: &mut TestAppContext, values: Vec<Value>) -> (Entity<WorkspaceView>, &mut VisualTestContext) {
     cx.update(|cx| workspace_view::init(Some(bitviewer_core::settings::Settings::default()), cx));
+    // no animations: a dialog is where it ends up from its first frame, so a
+    // click lands on its button however fast or slow the machine is
+    cx.update(|cx| cx.set_reduce_motion(true));
     let mut state = WorkspaceState::default();
     for value in values {
         state.values.push_back(Arc::new(value));

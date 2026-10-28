@@ -9,6 +9,7 @@ resolver = "3"
 version = "3.0.1"
 edition = "2024"
 publish = false
+license = "MIT"
 
 [profile.dev.package."*"]
 # GPUI is slow unoptimized; optimize dependencies even in debug builds

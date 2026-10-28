@@ -1,0 +1,17 @@
+# cargo audit: these advisories are "unmaintained" notices (not security
+# vulnerabilities) for crates deep in the GPUI CE stack, none of which this
+# workspace depends on directly. Revisit them when GPUI CE is updated.
+# (cargo deny check leaves them to GPUI CE too: deny.toml)
+[advisories]
+ignore = [
+    "RUSTSEC-2025-0141", # bincode       (gpui_ce_components)
+    "RUSTSEC-2024-0388", # derivative    (platform crates)
+    "RUSTSEC-2024-0384", # instant       (gpui_ce_components)
+    "RUSTSEC-2024-0436", # paste         (gpui-ce and its components)
+    "RUSTSEC-2025-0134", # rustls-pemfile (zed-reqwest, via the component assets)
+    "RUSTSEC-2026-0206", # rustybuzz     (resvg / usvg, via the components)
+    "RUSTSEC-2026-0192", # ttf-parser    (resvg / fontdb, via the components)
+    "RUSTSEC-2026-0371", # zbus_names    (Linux accessibility, via gpui_ce_platform)
+    "RUSTSEC-2026-0370", # zvariant      (Linux accessibility)
+    "RUSTSEC-2026-0372", # zvariant_derive (Linux accessibility)
+]

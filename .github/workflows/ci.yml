@@ -1,7 +1,8 @@
 # Checks every push to main and every pull request on Windows, macOS and
 # Linux: formatting, clippy (warnings fail the build) and every test (the
 # core library's and the app's, which drive real windows on GPUI's test
-# platform).
+# platform); and the dependencies: licences, security advisories and
+# sources (cargo deny, deny.toml).
 #
 # Releases are built by release.yml when a version tag is pushed.
 
@@ -52,3 +53,12 @@ jobs:
 
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+
+  dependencies:
+    name: Dependencies (licences, advisories, sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
