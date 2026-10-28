@@ -40,6 +40,158 @@ impl Access {
     }
 }
 
+/// What writing to a field does to it (SVD modifiedWriteValues). Most
+/// fields take what is written; status flags often clear when 1 is written.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum WriteAction {
+    #[default]
+    Normal,
+    OneToClear,
+    ZeroToClear,
+    OneToSet,
+    ZeroToSet,
+    OneToToggle,
+    ZeroToToggle,
+    /// Any write clears the whole field.
+    Clear,
+    /// Any write sets the whole field.
+    Set,
+}
+
+impl WriteAction {
+    pub const ALL: [WriteAction; 9] = [
+        WriteAction::Normal,
+        WriteAction::OneToClear,
+        WriteAction::ZeroToClear,
+        WriteAction::OneToSet,
+        WriteAction::ZeroToSet,
+        WriteAction::OneToToggle,
+        WriteAction::ZeroToToggle,
+        WriteAction::Clear,
+        WriteAction::Set,
+    ];
+
+    /// The short form shown on chips and saved in files: "w1c" and so on.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            WriteAction::Normal => "",
+            WriteAction::OneToClear => "w1c",
+            WriteAction::ZeroToClear => "w0c",
+            WriteAction::OneToSet => "w1s",
+            WriteAction::ZeroToSet => "w0s",
+            WriteAction::OneToToggle => "w1t",
+            WriteAction::ZeroToToggle => "w0t",
+            WriteAction::Clear => "wc",
+            WriteAction::Set => "ws",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<WriteAction> {
+        WriteAction::ALL.into_iter().find(|action| *action != WriteAction::Normal && action.as_str() == text)
+    }
+
+    /// In words, for menus and generated code.
+    pub fn describe(self) -> &'static str {
+        match self {
+            WriteAction::Normal => "Takes the value written",
+            WriteAction::OneToClear => "Write 1 to clear",
+            WriteAction::ZeroToClear => "Write 0 to clear",
+            WriteAction::OneToSet => "Write 1 to set",
+            WriteAction::ZeroToSet => "Write 0 to set",
+            WriteAction::OneToToggle => "Write 1 to toggle",
+            WriteAction::ZeroToToggle => "Write 0 to toggle",
+            WriteAction::Clear => "Any write clears it",
+            WriteAction::Set => "Any write sets it",
+        }
+    }
+
+    /// From the SVD modifiedWriteValues name ("modify" is the normal case).
+    pub fn from_svd(text: &str) -> Option<WriteAction> {
+        Some(match text {
+            "oneToClear" => WriteAction::OneToClear,
+            "zeroToClear" => WriteAction::ZeroToClear,
+            "oneToSet" => WriteAction::OneToSet,
+            "zeroToSet" => WriteAction::ZeroToSet,
+            "oneToToggle" => WriteAction::OneToToggle,
+            "zeroToToggle" => WriteAction::ZeroToToggle,
+            "clear" => WriteAction::Clear,
+            "set" => WriteAction::Set,
+            _ => return None,
+        })
+    }
+
+    /// The field's bits after `written` is written over `old` (both shifted
+    /// down to bit 0; only the low `width` bits count).
+    pub fn apply(self, old: Bits, written: Bits, width: usize) -> Bits {
+        let all = mask(width);
+        let (old, written) = (old & all, written & all);
+        match self {
+            WriteAction::Normal => written,
+            WriteAction::OneToClear => old & !written & all,
+            WriteAction::ZeroToClear => old & written,
+            WriteAction::OneToSet => old | written,
+            WriteAction::ZeroToSet => (old | !written) & all,
+            WriteAction::OneToToggle => old ^ written,
+            WriteAction::ZeroToToggle => (old ^ !written) & all,
+            WriteAction::Clear => Bits::ZERO,
+            WriteAction::Set => all,
+        }
+    }
+}
+
+/// What reading a field does (SVD readAction), or that it can't be read.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ReadAction {
+    #[default]
+    Normal,
+    /// Reading clears it.
+    Clear,
+    /// Reading sets it.
+    Set,
+    /// Reading changes it in some other way.
+    Modify,
+    /// Write-only: reads back as 0 (SVD access "write-only").
+    WriteOnly,
+}
+
+impl ReadAction {
+    pub const ALL: [ReadAction; 5] = [ReadAction::Normal, ReadAction::Clear, ReadAction::Set, ReadAction::Modify, ReadAction::WriteOnly];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReadAction::Normal => "",
+            ReadAction::Clear => "rc",
+            ReadAction::Set => "rs",
+            ReadAction::Modify => "rm",
+            ReadAction::WriteOnly => "wo",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<ReadAction> {
+        ReadAction::ALL.into_iter().find(|action| *action != ReadAction::Normal && action.as_str() == text)
+    }
+
+    pub fn describe(self) -> &'static str {
+        match self {
+            ReadAction::Normal => "Reading leaves it as it is",
+            ReadAction::Clear => "Reading clears it",
+            ReadAction::Set => "Reading sets it",
+            ReadAction::Modify => "Reading changes it",
+            ReadAction::WriteOnly => "Write-only: reads back as 0",
+        }
+    }
+
+    /// From the SVD readAction name.
+    pub fn from_svd(text: &str) -> Option<ReadAction> {
+        Some(match text {
+            "clear" => ReadAction::Clear,
+            "set" => ReadAction::Set,
+            "modify" | "modifyExternal" => ReadAction::Modify,
+            _ => return None,
+        })
+    }
+}
+
 /// A named value of a field, e.g. MODE 1 = "Auto".
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NamedValue {
@@ -57,6 +209,8 @@ pub struct FieldDetails {
     pub named: Vec<NamedValue>,
     pub description: Arc<str>,
     pub access: Access,
+    pub write: WriteAction,
+    pub read: ReadAction,
 }
 
 /// Field details as read from a file: named values may be negative or too
@@ -69,6 +223,8 @@ pub struct DetailsDraft {
     pub named: Option<Vec<(BigInt, Arc<str>)>>,
     pub description: Option<Arc<str>>,
     pub access: Option<Access>,
+    pub write: Option<WriteAction>,
+    pub read: Option<ReadAction>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -122,6 +278,12 @@ impl Field {
         }
         if let Some(access) = draft.access {
             details.access = access;
+        }
+        if let Some(write) = draft.write {
+            details.write = write;
+        }
+        if let Some(read) = draft.read {
+            details.read = read;
         }
         if let Some(named) = draft.named {
             details.named = fit_named(&named, self.hi - self.lo + 1);
@@ -238,6 +400,35 @@ pub fn sort_fields(fields: &mut [Field]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn write_actions() {
+        let b = |v: u8| Bits::from(v);
+        let old = b(0b1100);
+        let written = b(0b1010);
+        let cases = [
+            (WriteAction::Normal, 0b1010),
+            (WriteAction::OneToClear, 0b0100),
+            (WriteAction::ZeroToClear, 0b1000),
+            (WriteAction::OneToSet, 0b1110),
+            (WriteAction::ZeroToSet, 0b1101),
+            (WriteAction::OneToToggle, 0b0110),
+            (WriteAction::ZeroToToggle, 0b1001),
+            (WriteAction::Clear, 0b0000),
+            (WriteAction::Set, 0b1111),
+        ];
+        for (action, expected) in cases {
+            assert_eq!(action.apply(old, written, 4), b(expected), "{action:?}");
+            if action != WriteAction::Normal {
+                assert_eq!(WriteAction::parse(action.as_str()), Some(action));
+            }
+        }
+        assert_eq!(WriteAction::parse(""), None);
+        assert_eq!(WriteAction::from_svd("oneToClear"), Some(WriteAction::OneToClear));
+        assert_eq!(WriteAction::from_svd("modify"), None);
+        assert_eq!(ReadAction::parse("rc"), Some(ReadAction::Clear));
+        assert_eq!(ReadAction::from_svd("modifyExternal"), Some(ReadAction::Modify));
+    }
 
     #[test]
     fn colors() {

@@ -197,6 +197,12 @@ fn details_json(out: &mut Map<String, Json>, details: &DetailsDraft) {
     if let Some(access) = details.access.filter(|access| *access != Access::ReadWrite) {
         out.insert("access".into(), json!(access.as_str()));
     }
+    if let Some(write) = details.write.filter(|write| *write != crate::field::WriteAction::Normal) {
+        out.insert("write".into(), json!(write.as_str()));
+    }
+    if let Some(read) = details.read.filter(|read| *read != crate::field::ReadAction::Normal) {
+        out.insert("read".into(), json!(read.as_str()));
+    }
 }
 
 /// A template as stored in the settings.
@@ -243,6 +249,8 @@ fn draft_of(field: &Field) -> DetailsDraft {
         named: (!details.named.is_empty()).then(|| named.collect()),
         description: text(&details.description),
         access: (details.access != Access::ReadWrite).then_some(details.access),
+        write: (details.write != crate::field::WriteAction::Normal).then_some(details.write),
+        read: (details.read != crate::field::ReadAction::Normal).then_some(details.read),
     }
 }
 

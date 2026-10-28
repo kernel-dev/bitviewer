@@ -1120,15 +1120,22 @@ impl CardView {
                 let mut previous = None;
                 for run in &runs {
                     let text = match run.0 {
-                        Some(index) => match value.fields[index].details.access {
-                            Access::ReadWrite => "rw",
-                            Access::ReadOnly => "r",
-                            Access::Reserved => "res",
-                        },
-                        None => "",
+                        Some(index) => {
+                            let details = &value.fields[index].details;
+                            let access = match details.access {
+                                Access::ReadWrite => "rw",
+                                Access::ReadOnly => "r",
+                                Access::Reserved => "res",
+                            };
+                            // one short label (one-bit columns are narrow): what a write
+                            // does, else what a read does, else the access; the fields
+                            // list and the bit's tooltip show all of them
+                            [details.write.as_str(), details.read.as_str(), access].into_iter().find(|part| !part.is_empty()).unwrap_or(access).to_string()
+                        }
+                        None => String::new(),
                     };
-                    access = access
-                        .child(segment(run, previous).py(r(2.0)).font_family(mono()).text_size(r(10.5)).text_color(palette.muted).child(small(text.into())));
+                    access =
+                        access.child(segment(run, previous).py(r(2.0)).font_family(mono()).text_size(r(10.5)).text_color(palette.muted).child(small(text)));
                     previous = run.1.last().copied();
                 }
                 table = table.child(access);
@@ -1514,7 +1521,8 @@ impl CardView {
                 .text_color(palette.muted)
                 .whitespace_nowrap()
                 .when(field.protected(), |bits| bits.child(icon("lock", 11.0).text_color(palette.select)))
-                .child(field.label());
+                .child(field.label())
+                .children(action_chips(index, &field.details));
             let chars = match field.base {
                 Base::Bin => field.width(),
                 Base::Hex => field.width().div_ceil(4) + 2,
@@ -1937,6 +1945,12 @@ fn bit_tip(value: &bitviewer_core::value::Value, bit: usize, lo: usize, compare:
             bitviewer_core::field::Access::Reserved => lines.push("🔒 reserved field".into()),
             bitviewer_core::field::Access::ReadWrite => {}
         }
+        if field.details.write != bitviewer_core::field::WriteAction::Normal {
+            lines.push(format!("{} ({})", field.details.write.describe(), field.details.write.as_str()));
+        }
+        if field.details.read != bitviewer_core::field::ReadAction::Normal {
+            lines.push(format!("{} ({})", field.details.read.describe(), field.details.read.as_str()));
+        }
         if !field.details.description.is_empty() {
             lines.push(field.details.description.to_string());
         }
@@ -2001,4 +2015,32 @@ fn hatching(on: bool, light: bool) -> impl IntoElement {
     .absolute()
     .size_full()
     .rounded(px(6.0))
+}
+
+/// Small chips for what writing or reading a field does ("w1c", "rc"), each
+/// explained when pointed at.
+fn action_chips(index: usize, details: &bitviewer_core::field::FieldDetails) -> Vec<Stateful<Div>> {
+    let palette = theme::current();
+    let mut chips = Vec::new();
+    let mut chip = |id: &'static str, text: &'static str, tip: &'static str, color: Rgba, background: Rgba| {
+        chips.push(
+            div()
+                .id((id, index))
+                .px(r(5.0))
+                .rounded(r(4.0))
+                .text_size(r(10.5))
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(color)
+                .bg(background)
+                .child(text)
+                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx)),
+        );
+    };
+    if details.write != bitviewer_core::field::WriteAction::Normal {
+        chip("write-chip", details.write.as_str(), details.write.describe(), palette.select, palette.select_soft);
+    }
+    if details.read != bitviewer_core::field::ReadAction::Normal {
+        chip("read-chip", details.read.as_str(), details.read.describe(), palette.error, palette.error_bg);
+    }
+    chips
 }

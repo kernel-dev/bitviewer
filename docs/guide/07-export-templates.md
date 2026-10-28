@@ -124,6 +124,7 @@ Values, masks and named values are numbers that can be written in four ways:
 | `mask` | the mask of `width` bits, a number such as `0xF` |
 | `shifted_mask` | the mask in place, a number such as `0xF0` |
 | `access` | `rw`, `ro` or `reserved`; `readonly` and `reserved` are true or false |
+| `write`, `read` | what writing or reading does when it isn't plain, such as `w1c` (write 1 to clear) or `rc` (reading clears it); empty otherwise. See [register fields](03-register-fields.md) |
 | `signed`, `formula`, `unit`, `description` | the field's details |
 | `comment` | a one-line description with the range: `[7:4] · read-only` |
 | `note` | the same without the range, empty for a plain field |

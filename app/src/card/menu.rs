@@ -144,6 +144,7 @@ impl CardView {
                 .item(entry(&card, "Move down", Some("arrow-down"), |c, _, cx| c.workspace_do(cx, |ws, id, cx| ws.move_value(id, 1, cx))))
                 .item(entry(&card, "Duplicate", Some("copy-plus"), |c, _, cx| c.workspace_do(cx, |ws, id, cx| ws.duplicate_value(id, cx))))
                 .item(entry(&card, "Change width…", Some("ruler"), |c, w, cx| c.width_prompt(w, cx)))
+                .item(entry(&card, "Preview a write…", Some("pencil-line"), |c, w, cx| c.write_prompt(w, cx)))
                 .separator()
                 .item(entry(&card, if value.show_bases { "Hide all bases" } else { "Show all bases" }, Some("binary"), |c, w, cx| c.toggle_bases(w, cx)))
                 .item(entry(&card, if expr_open { "Hide expression bar" } else { "Expression bar" }, Some("square-function"), |c, w, cx| c.toggle_expr(w, cx)))

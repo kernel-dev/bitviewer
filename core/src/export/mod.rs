@@ -102,6 +102,12 @@ fn describe(field: &Field) -> (String, String) {
     if details.access != Access::ReadWrite {
         rest.push(if details.access == Access::ReadOnly { "read-only".to_string() } else { "reserved".to_string() });
     }
+    if details.write != crate::field::WriteAction::Normal {
+        rest.push(details.write.describe().to_lowercase());
+    }
+    if details.read != crate::field::ReadAction::Normal {
+        rest.push(details.read.describe().to_lowercase());
+    }
     if details.signed {
         rest.push("signed".into());
     }
@@ -172,6 +178,8 @@ fn item(value: &Value, field: Option<&Field>, id: &str, lo: usize, hi: usize, wo
         ("access", details.map_or("rw", |details| access_text(details.access)).into()),
         ("readonly", details.is_some_and(|details| details.access == Access::ReadOnly).into()),
         ("reserved", details.is_some_and(|details| details.access == Access::Reserved).into()),
+        ("write", details.map_or("", |details| details.write.as_str()).into()),
+        ("read", details.map_or("", |details| details.read.as_str()).into()),
         ("signed", details.is_some_and(|details| details.signed).into()),
         ("formula", details.map_or(String::new(), |details| details.formula.to_string()).into()),
         ("unit", details.map_or(String::new(), |details| details.unit.to_string()).into()),

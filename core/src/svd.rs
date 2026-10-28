@@ -16,7 +16,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 
-use crate::field::{Access, DetailsDraft, FIELD_COLORS};
+use crate::field::{Access, DetailsDraft, FIELD_COLORS, ReadAction};
 use crate::integers::MAX_WIDTH;
 use crate::templates::{Template, TemplateField};
 
@@ -505,6 +505,10 @@ pub struct SvdField {
     pub msb: usize,
     /// SVD access, e.g. "read-only".
     pub access: String,
+    /// SVD modifiedWriteValues, e.g. "oneToClear" (the register's when the field has none).
+    pub modified_write: String,
+    /// SVD readAction, e.g. "clear".
+    pub read_action: String,
     pub enums: Rc<Vec<SvdEnum>>,
 }
 
@@ -836,6 +840,8 @@ impl<'s> Reader<'s> {
                     lsb: field_lsb,
                     msb: field_lsb + width - 1,
                     access: child_text(&field, "access").unwrap_or_else(|| access.to_string()),
+                    modified_write: child_text(&field, "modifiedWriteValues").or_else(|| child_text(register, "modifiedWriteValues")).unwrap_or_default(),
+                    read_action: child_text(&field, "readAction").or_else(|| child_text(register, "readAction")).unwrap_or_default(),
                     enums: enums.clone(),
                 });
             }
@@ -1068,6 +1074,8 @@ pub fn register_template(register: &SvdRegister, device_name: &str) -> Template 
                         Access::ReadWrite
                     }),
                     named: (!field.enums.is_empty()).then(|| field.enums.iter().map(|item| (item.value.clone(), item.name.as_str().into())).collect()),
+                    write: crate::field::WriteAction::from_svd(&field.modified_write),
+                    read: if field.access == "write-only" { Some(ReadAction::WriteOnly) } else { ReadAction::from_svd(&field.read_action) },
                     ..Default::default()
                 },
             })
@@ -1093,6 +1101,12 @@ mod tests {
          <enumeratedValues><enumeratedValue><name>FAST</name><value>#1x</value></enumeratedValue></enumeratedValues></field>
        <field><name>CLASH</name><bitOffset>2</bitOffset><bitWidth>2</bitWidth></field>
      </fields></register>
+   <register><name>SR</name><addressOffset>0x8</addressOffset><modifiedWriteValues>oneToClear</modifiedWriteValues>
+     <fields>
+       <field><name>OVR</name><bitOffset>0</bitOffset><bitWidth>1</bitWidth></field>
+       <field><name>RXNE</name><bitOffset>1</bitOffset><bitWidth>1</bitWidth><readAction>clear</readAction><modifiedWriteValues>modify</modifiedWriteValues></field>
+       <field><name>KEY</name><bitOffset>8</bitOffset><bitWidth>8</bitWidth><access>write-only</access><modifiedWriteValues>modify</modifiedWriteValues></field>
+     </fields></register>
    <cluster><dim>2</dim><dimIncrement>0x10</dimIncrement><name>CH%s</name><addressOffset>0x10</addressOffset>
      <register><dim>3</dim><dimIncrement>4</dimIncrement><dimIndex>A-C</dimIndex><name>CFG%s</name><addressOffset>0</addressOffset></register>
    </cluster>
@@ -1113,7 +1127,14 @@ mod tests {
         assert_eq!(ctrl.fields.len(), 2);
         assert_eq!(ctrl.warnings[0], "CLASH overlaps MODE, so it was left out");
         assert_eq!(ctrl.fields[1].enums.len(), 2);
-        let cfg = &uart.registers[1];
+        // write and read behaviour: the register's modifiedWriteValues unless the field has its own
+        let sr = uart.registers[1].at(0);
+        let template = register_template(&sr, "CHIP");
+        let details = |name: &str| template.fields.iter().find(|field| field.name == name).unwrap().details.clone();
+        assert_eq!(details("OVR").write, Some(crate::field::WriteAction::OneToClear));
+        assert_eq!((details("RXNE").write, details("RXNE").read), (None, Some(ReadAction::Clear)));
+        assert_eq!(details("KEY").read, Some(ReadAction::WriteOnly));
+        let cfg = &uart.registers[2];
         assert_eq!(cfg.label, "CH[0-1].CFG[A-C]");
         assert_eq!(cfg.count, 6);
         let last = cfg.at(5);

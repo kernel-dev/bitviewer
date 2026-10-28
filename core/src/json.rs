@@ -171,6 +171,8 @@ pub fn details_from_json(json: &Json, pool: &mut TextPool) -> DetailsDraft {
     draft.unit = text("unit", pool);
     draft.description = text("description", pool);
     draft.access = json.get("access").and_then(Json::as_str).filter(|access| *access == "ro" || *access == "reserved").and_then(Access::parse);
+    draft.write = json.get("write").and_then(Json::as_str).and_then(crate::field::WriteAction::parse);
+    draft.read = json.get("read").and_then(Json::as_str).and_then(crate::field::ReadAction::parse);
 
     if let Some(list) = json.get("named").and_then(Json::as_array) {
         draft.named = Some(
@@ -367,6 +369,12 @@ fn field_to_json(field: &crate::field::Field) -> Json {
     if details.access != Access::ReadWrite {
         out.insert("access".into(), json!(details.access.as_str()));
     }
+    if details.write != crate::field::WriteAction::Normal {
+        out.insert("write".into(), json!(details.write.as_str()));
+    }
+    if details.read != crate::field::ReadAction::Normal {
+        out.insert("read".into(), json!(details.read.as_str()));
+    }
     Json::Object(out)
 }
 
@@ -439,7 +447,7 @@ mod tests {
                 { "lo": 8, "hi": 9, "name": "MODE", "color": "#2fb344", "base": 2,
                   "named": [{ "value": "0", "label": "Off" }, { "value": "3", "label": "Fast" }],
                   "description": "Mode", "access": "ro" },
-                { "lo": 0, "hi": 0, "name": "EN", "color": "#f59f00", "base": 2 }
+                { "lo": 0, "hi": 0, "name": "EN", "color": "#f59f00", "base": 2, "write": "w1c", "read": "rc" }
             ],
             "block": "UART0", "offset": "0x0", "description": "Control register"
         });

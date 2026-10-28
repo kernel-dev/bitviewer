@@ -108,6 +108,8 @@ pub struct ExprView {
     /// Other values to take (compare): (name, width, value), a filter, and the one picked.
     candidates: Option<(Vec<(String, usize, Bits)>, Entity<InputState>, bool, Option<usize>)>,
     hint: SharedString,
+    /// Drawn under the preview for the current result (Preview a write).
+    after: Option<Box<dyn Fn(Bits) -> Div>>,
     on_submit: Box<dyn Fn(&mut CardView, Option<Op>, Bits, &mut Window, &mut Context<CardView>)>,
     _subscriptions: Vec<Subscription>,
 }
@@ -169,6 +171,9 @@ impl Render for ExprView {
             .child(label(self.hint.clone()))
             .child(div().debug_selector(|| "prompt-input".into()).child(field_box(&self.input, matches!(self.result, Some(Err(_))), 32.0, true)))
             .child(div().mt(r(6.0)).child(expr_field::preview(self.result.as_ref(), self.width)));
+        if let (Some(after), Some(Ok(fitted))) = (&self.after, &self.result) {
+            body = body.child(after(fitted.value));
+        }
         let Some((candidates, filter, open, picked)) = &self.candidates else { return body };
         let (open, picked) = (*open, *picked);
         let summary = div()
@@ -291,7 +296,7 @@ impl CardView {
         kinds: Option<Op>,
         candidates: Option<Vec<(String, usize, Bits)>>,
         on_submit: impl Fn(&mut CardView, Option<Op>, Bits, &mut Window, &mut Context<CardView>) + 'static,
-    ) {
+    ) -> Entity<ExprView> {
         let (icon, title, ok_label, hint, initial, width) = options;
         let card = cx.entity().downgrade();
         // the starting text's result (the card can't be asked while it opens the dialog)
@@ -321,11 +326,14 @@ impl CardView {
                 kinds,
                 candidates,
                 hint: hint.into(),
+                after: None,
                 on_submit: Box::new(on_submit),
                 _subscriptions: subscriptions,
             }
         });
+        let shown = view.clone();
         window.open_dialog(cx, move |dialog, _, cx| {
+            let view = shown.clone();
             let ready = view.read(cx).ready();
             let submit = view.clone();
             let wide = view.read(cx).candidates.is_some();
@@ -339,6 +347,68 @@ impl CardView {
                 ),
             )
         });
+        view
+    }
+
+    /// "Preview a write…": what the register becomes when a number is
+    /// written to it, with fields such as "write 1 to clear" following their
+    /// rule and read-only fields keeping their bits. Write sets the value to that.
+    pub(crate) fn write_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let value = self.value.clone();
+        let name = if value.name.is_empty() { "value".to_string() } else { value.name.to_string() };
+        let view = self.open_expr_dialog(
+            window,
+            cx,
+            (
+                "pencil-line",
+                format!("Preview a write to “{name}”"),
+                "Write",
+                "The number written to the register: a number or an expression (x is the register now)".to_string(),
+                String::new(),
+                value.width,
+            ),
+            None,
+            None,
+            |card, _, written, window, cx| {
+                let next = card.value.after_write(written);
+                card.set_value_guarded(next, None, None, window, cx);
+            },
+        );
+        let after = move |written: Bits| -> Div {
+            let palette = theme::current();
+            let next = value.after_write(written);
+            let mut lines = div().flex().flex_col().gap(r(4.0)).mt(r(10.0)).p(r(10.0)).rounded(r(10.0)).bg(palette.surface_2);
+            lines = lines.child(
+                div()
+                    .flex()
+                    .gap(r(8.0))
+                    .child(div().w(r(80.0)).text_color(palette.muted).child("Becomes"))
+                    .child(div().font_family(theme::mono()).font_weight(FontWeight::SEMIBOLD).child(format_int(next, Base::Hex, value.width, true, true))),
+            );
+            // the fields that don't simply take what is written
+            for field in &value.fields {
+                let width = field.width();
+                let part = |bits: Bits| (bits >> field.lo) & bitviewer_core::integers::mask(width);
+                let (old, wrote, new) = (part(value.value), part(written), part(next));
+                if wrote == new {
+                    continue;
+                }
+                let why = if field.details.access == bitviewer_core::field::Access::ReadOnly {
+                    "read-only".to_string()
+                } else {
+                    field.details.write.describe().to_lowercase()
+                };
+                let show = |bits: Bits| format_int(bits, field.base, width, false, false);
+                let what = if old == new {
+                    format!("{} stays {} ({why})", field.name, show(new))
+                } else {
+                    format!("{} {} → {} ({why})", field.name, show(old), show(new))
+                };
+                lines = lines.child(div().pl(r(88.0)).text_size(r(12.5)).text_color(palette.muted).child(what));
+            }
+            lines
+        };
+        view.update(cx, |view, _| view.after = Some(Box::new(after)));
     }
 
     /// The amount of a shift or rotate (with its kind), or the mask of AND / OR / XOR.

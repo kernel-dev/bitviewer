@@ -35,6 +35,7 @@ One **Ctrl+Z** removes everything an import added.
 | clusters | flattened into the name: `TIM1.CH0.CCR` |
 | field bits | `bitOffset` + `bitWidth`, `lsb` + `msb`, or `bitRange` `[7:4]` |
 | enumerated values | `#1x0` style values with don't-care bits become one named value per match |
+| `modifiedWriteValues`, `readAction` | the field's **When written** and **When read** (from the register when the field has none); `write-only` access becomes "write-only: reads back as 0" |
 
 Some files describe the same bits twice (for example alternative meanings of one field). Fields can't overlap in Bit Viewer, so the later one is left out; a ⚠ after a register's field count says so, and hovering shows which. Registers wider than 512 bits are skipped, and a field array keeps only the copies that fit in its register.
 

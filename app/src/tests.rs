@@ -321,6 +321,28 @@ fn menu_change_width_explains_what_it_refuses(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_previewed_write_follows_each_field_rule(cx: &mut TestAppContext) {
+    use bitviewer_core::field::{Access, WriteAction};
+    let mut register = value(8, 0b1110_0101);
+    for (lo, hi, name) in [(7, 7, "TXE"), (6, 6, "TC"), (5, 5, "RXNE"), (0, 3, "DATA")] {
+        register.add_field(lo, hi, Some(name), None, None).unwrap();
+    }
+    for field in &mut register.fields {
+        match &*field.name {
+            "TXE" => field.details.access = Access::ReadOnly,
+            "TC" | "RXNE" => field.details.write = WriteAction::OneToClear,
+            _ => {}
+        }
+    }
+    let (view, cx) = open(cx, vec![register]);
+    menu_action(&view, cx, |card, window, cx| card.write_prompt(window, cx));
+    // RXNE written 1: cleared; TC written 0: kept; TXE read-only: kept;
+    // DATA takes 0xA (bit 4, reserved, is written as it was: 0)
+    answer(cx, "0x2A");
+    assert_eq!(first(&view, cx).value, Bits::from(0b1100_1010u8));
+}
+
+#[gpui::test]
 fn menu_operations_take_any_expression(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(8, 0b0011_0110)]);
     menu_action(&view, cx, |card, window, cx| card.operand_prompt(bitviewer_core::ops::Op::And, window, cx));

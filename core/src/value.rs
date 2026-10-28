@@ -406,6 +406,27 @@ impl Value {
         Ok(self.compare_value(lo)? ^ self.row_value(lo))
     }
 
+    // ------------------------------------------------------------ writes
+    /// Whether any field does something other than take what is written.
+    pub fn has_write_rules(&self) -> bool {
+        self.fields.iter().any(|field| field.details.write != field::WriteAction::Normal || field.details.access == field::Access::ReadOnly)
+    }
+
+    /// The register after `written` is written to it, as the hardware would
+    /// do it: read-only fields keep their bits, fields such as "write 1 to
+    /// clear" follow their rule, everything else takes what is written.
+    pub fn after_write(&self, written: Bits) -> Bits {
+        let mut out = written & mask(self.width);
+        for field in &self.fields {
+            let width = field.width();
+            let field_mask = mask(width) << field.lo;
+            let old = (self.value >> field.lo) & mask(width);
+            let new = if field.details.access == field::Access::ReadOnly { old } else { field.details.write.apply(old, written >> field.lo, width) };
+            out = (out & !field_mask) | ((new & mask(width)) << field.lo);
+        }
+        out
+    }
+
     // ------------------------------------------------------------ fields
     pub fn field_at(&self, bit: usize) -> Option<usize> {
         self.fields.iter().position(|field| field.contains(bit))
@@ -503,6 +524,29 @@ mod tests {
 
     fn value(width: usize, v: u64) -> Value {
         Value::new(width, Bits::from(v), "V", View::Byte, Base::Hex).unwrap()
+    }
+
+    #[test]
+    fn writes_follow_each_field_rule() {
+        use crate::field::{Access, WriteAction};
+        // a status register: [7] TXE read-only, [6] TC w1c, [5] RXNE w1c, [3:0] DATA plain
+        let mut v = value(8, 0b1110_0101);
+        for (lo, hi, name) in [(7, 7, "TXE"), (6, 6, "TC"), (5, 5, "RXNE"), (0, 3, "DATA")] {
+            v.add_field(lo, hi, Some(name), None, None).unwrap();
+        }
+        let set = |v: &mut Value, name: &str, change: &dyn Fn(&mut crate::field::FieldDetails)| {
+            let index = v.fields.iter().position(|field| &*field.name == name).unwrap();
+            change(&mut v.fields[index].details);
+        };
+        set(&mut v, "TXE", &|d| d.access = Access::ReadOnly);
+        set(&mut v, "TC", &|d| d.write = WriteAction::OneToClear);
+        set(&mut v, "RXNE", &|d| d.write = WriteAction::OneToClear);
+        assert!(v.has_write_rules());
+        // writing RXNE = 1 clears it; TC (written 0) stays; TXE ignores the write;
+        // DATA takes 0xA; bit 4 (no field) takes what is written
+        assert_eq!(v.after_write(Bits::from(0b0011_1010u8)), Bits::from(0b1101_1010u8));
+        assert!(!value(8, 0).has_write_rules());
+        assert_eq!(value(8, 3).after_write(Bits::from(0x5Au8)), Bits::from(0x5Au8));
     }
 
     #[test]

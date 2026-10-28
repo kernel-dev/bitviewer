@@ -5,8 +5,9 @@
 use std::sync::Arc;
 
 use crate::kit::component::input::{InputEvent, InputState};
+use crate::kit::component::menu::PopupMenuItem;
 use crate::kit::*;
-use bitviewer_core::field::{Access, DetailsDraft, Field};
+use bitviewer_core::field::{Access, DetailsDraft, Field, ReadAction, WriteAction};
 use bitviewer_core::meaning::{compile_formula, format_real};
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, Signed, Zero};
@@ -55,6 +56,8 @@ pub struct FieldEditor {
     named: Vec<NamedRow>,
     signed: bool,
     access: Access,
+    write: WriteAction,
+    read: ReadAction,
     initial: String,
     _subscriptions: Vec<Subscription>,
 }
@@ -78,6 +81,8 @@ impl FieldEditor {
             named: Vec::new(),
             signed: details.signed,
             access: details.access,
+            write: details.write,
+            read: details.read,
             initial: String::new(),
             _subscriptions: Vec::new(),
         };
@@ -113,7 +118,17 @@ impl FieldEditor {
     fn snapshot(&self, cx: &App) -> String {
         let text = |input: &Entity<InputState>| input.read(cx).value().to_string();
         let rows: Vec<String> = self.named.iter().map(|row| format!("{}={}", text(&row.value), text(&row.label))).collect();
-        format!("{}\n{:?}\n{}\n{}\n{}\n{}", text(&self.description), self.access, self.signed, text(&self.formula), text(&self.unit), rows.join("\n"))
+        format!(
+            "{}\n{:?} {:?} {:?}\n{}\n{}\n{}\n{}",
+            text(&self.description),
+            self.access,
+            self.write,
+            self.read,
+            self.signed,
+            text(&self.formula),
+            text(&self.unit),
+            rows.join("\n")
+        )
     }
 
     /// Something was edited since the editor opened.
@@ -173,6 +188,8 @@ impl FieldEditor {
             named: Some(named),
             description: Some(text(&self.description).into()),
             access: Some(self.access),
+            write: Some(self.write),
+            read: Some(self.read),
         };
         let index = self.index;
         self.card.update(cx, |card, cx| card.set_field_details(index, draft, window, cx)).ok();
@@ -233,7 +250,55 @@ impl Render for FieldEditor {
                     })),
             );
         }
+        // what a write or a read does to the field (SVD modifiedWriteValues / readAction)
         let me = cx.entity().downgrade();
+        let write_label = if self.write == WriteAction::Normal {
+            "Takes the value written".to_string()
+        } else {
+            format!("{} ({})", self.write.describe(), self.write.as_str())
+        };
+        let (chosen, editor) = (self.write, me.clone());
+        let write = Btn::new("write-action", Look::Outline).label(write_label).icon("chevron-down").test_label("write-action").menu(
+            Anchor::TopLeft,
+            move |mut menu, _, _| {
+                for action in WriteAction::ALL {
+                    let editor = editor.clone();
+                    let label =
+                        if action == WriteAction::Normal { action.describe().to_string() } else { format!("{}  ·  {}", action.describe(), action.as_str()) };
+                    menu = menu.item(PopupMenuItem::new(label).checked(action == chosen).on_click(move |_, _, cx| {
+                        editor
+                            .update(cx, |this, cx| {
+                                this.write = action;
+                                cx.notify();
+                            })
+                            .ok();
+                    }));
+                }
+                menu
+            },
+        );
+        let read_label =
+            if self.read == ReadAction::Normal { "Leaves it as it is".to_string() } else { format!("{} ({})", self.read.describe(), self.read.as_str()) };
+        let (chosen, editor) = (self.read, me.clone());
+        let read = Btn::new("read-action", Look::Outline).label(read_label).icon("chevron-down").test_label("read-action").menu(
+            Anchor::TopLeft,
+            move |mut menu, _, _| {
+                for action in ReadAction::ALL {
+                    let editor = editor.clone();
+                    let label =
+                        if action == ReadAction::Normal { "Leaves it as it is".to_string() } else { format!("{}  ·  {}", action.describe(), action.as_str()) };
+                    menu = menu.item(PopupMenuItem::new(label).checked(action == chosen).on_click(move |_, _, cx| {
+                        editor
+                            .update(cx, |this, cx| {
+                                this.read = action;
+                                cx.notify();
+                            })
+                            .ok();
+                    }));
+                }
+                menu
+            },
+        );
         let signed = switch("signed", self.signed, move |on, _, cx| {
             me.update(cx, |this, cx| {
                 this.signed = on;
@@ -276,7 +341,12 @@ impl Render for FieldEditor {
             .child(div().debug_selector(|| "field-description".into()).child(field_box(&self.description, false, 34.0, false)))
             .child(section(
                 "Behaviour",
-                vec![row("Access", "", access), row("Signed", format!("Read the field as two's complement ({} bits)", self.width), signed)],
+                vec![
+                    row("Access", "", access),
+                    row("When written", "Status flags often clear when 1 is written to them", write),
+                    row("When read", "", read),
+                    row("Signed", format!("Read the field as two's complement ({} bits)", self.width), signed),
+                ],
             ))
             .child(heading("Formula & unit"))
             .child(

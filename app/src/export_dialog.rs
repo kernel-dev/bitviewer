@@ -411,7 +411,7 @@ top level: name prefix width value include_value accessors uint_bits
            platform fields words description
            has_address address has_offset offset block address_bits
 a field:   id name lo hi width range value mask shifted_mask access
-           signed formula unit description comment note named
+           write read signed formula unit description comment note named
 a word:    name suffix title lo hi width storage value items";
 
 const CHEAT_PERIPHERAL: &str = "

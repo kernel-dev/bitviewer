@@ -39,6 +39,7 @@ The sliders button on a field's row opens its **Field details**:
 - **Formula & unit**: turn the raw number into a real quantity, such as `x * 0.5 - 40` with unit °C for a temperature sensor. The list then shows `25 °C` instead of `130`. Simple straight-line formulas work in both directions: you can type `25` and the field gets the matching raw number.
 - **Named values**: names for the numbers, such as 0 = Off, 1 = Asynchronous. They appear as buttons in the list, and in [generated code](06-generating-code.md) as constants.
 - **Access**: read/write, read-only or reserved.
+- **When written** and **When read**: what the hardware does to the field. A status flag that clears when you write 1 to it is **Write 1 to clear** (`w1c`); one that clears when the register is read is **Reading clears it** (`rc`). These show as chips beside the field, and [SVD imports](08-importing-svd.md) fill them in.
 
 ## Protected bits
 
@@ -56,6 +57,10 @@ Protected bits are striped. Anything that would change one asks first: a click, 
 - **Cancel** leaves the value as it was.
 
 Alt+drag painting simply skips protected bits.
+
+## Previewing a write
+
+Writing a number to a register isn't always the same as setting it to that number: read-only fields ignore the write, and a **write 1 to clear** flag clears where you write 1 and stays where you write 0. **⋯ › Preview a write…** shows what the register becomes. Type the number you would write, and the dialog lists the result and every field that doesn't simply take what was written, such as `RXNE 1 → 0 (write 1 to clear)`. **Write** sets the value to that result.
 
 ## Using fields elsewhere
 
