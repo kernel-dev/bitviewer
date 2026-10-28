@@ -731,3 +731,37 @@ fn a_single_bit_can_be_selected_and_made_a_field(cx: &mut TestAppContext) {
     assert!(made.fields.iter().any(|field| (field.lo, field.hi) == (1, 1)));
     assert_eq!(made.value, Bits::ZERO);
 }
+
+#[gpui::test]
+fn dragging_along_the_bit_numbers_selects_a_range(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx, vec![value(8, 0)]);
+    // along the numbers
+    drag(cx, "v0-bitnum-6", "v0-bitnum-3");
+    assert_eq!(first(&view, cx).value, Bits::ZERO);
+    click(cx, "v0-make-field");
+    click(cx, "prompt-ok");
+    assert_eq!((first(&view, cx).fields[0].lo, first(&view, cx).fields[0].hi), (3, 6));
+
+    // from a number down onto the bits: still a selection, nothing flips
+    drag(cx, "v0-bitnum-1", "v0-bit-0");
+    assert_eq!(first(&view, cx).value, Bits::ZERO);
+    click(cx, "v0-make-field");
+    click(cx, "prompt-ok");
+    assert!(first(&view, cx).fields.iter().any(|field| (field.lo, field.hi) == (0, 1)));
+}
+
+#[gpui::test]
+fn dragging_back_to_the_first_bit_selects_just_it(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx, vec![value(8, 0)]);
+    let (start, away) = (center(cx, "v0-bit-5"), center(cx, "v0-bit-2"));
+    cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_move(away, MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_move(start, MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_up(start, MouseButton::Left, Modifiers::none());
+    draw(cx);
+    // a selection of one bit, not a click: nothing flipped
+    assert_eq!(first(&view, cx).value, Bits::ZERO);
+    click(cx, "v0-make-field");
+    click(cx, "prompt-ok");
+    assert_eq!((first(&view, cx).fields[0].lo, first(&view, cx).fields[0].hi), (5, 5));
+}

@@ -7,9 +7,10 @@ Add each change under **Unreleased** as you make it. When a version is released,
 ## [Unreleased]
 
 ### Added
-- A single bit can be selected (and made a field): click its number above the bit table, or Shift+click the bit. Shift+click on a number extends the selection.
+- A single bit can be selected (and made a field): click its number above the bit table, or Shift+click the bit. Dragging along the numbers selects a range, as dragging across the bits does, and Shift+click on a number extends the selection.
 
 ### Fixed
+- Dragging across bits and back to the first one now selects just that bit, instead of keeping the range.
 - Dragging across bits to select them played its sound on every mouse movement, even over bits already selected. It now plays only when a bit joins or leaves the selection.
 
 ## [3.0.1] - 2026-10-28

@@ -645,7 +645,7 @@ impl CardView {
                         .text_size(r(12.0))
                         .text_color(palette.faint)
                         .whitespace_nowrap()
-                        .child("drag across bits, or click a bit number, to select"),
+                        .child("drag across bits or their numbers to select"),
                 )
             }
             Some((lo, hi)) => {
@@ -953,7 +953,10 @@ impl CardView {
                             .when(selected, |number| number.text_color(palette.select).font_weight(FontWeight::SEMIBOLD))
                             .cursor_pointer()
                             .hover(move |style| style.text_color(palette.text).bg(palette.surface_2))
-                            .tooltip(move |window, cx| Tooltip::new(format!("Select bit {bit} (Shift+click: extend the selection)")).build(window, cx))
+                            .tooltip(move |window, cx| {
+                                Tooltip::new(format!("Select bit {bit}: drag across the numbers for more (Shift+click: extend the selection)"))
+                                    .build(window, cx)
+                            })
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(move |this, event: &MouseDownEvent, window, cx| {
@@ -961,7 +964,13 @@ impl CardView {
                                     window.focus(&this.bits_focus, cx);
                                     cx.stop_propagation();
                                 }),
-                            ),
+                            )
+                            // dragging along the numbers selects their bits
+                            .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
+                                if event.pressed_button == Some(MouseButton::Left) {
+                                    this.drag_over(bit, cx);
+                                }
+                            })),
                     );
                 }
                 table = table.child(numbers);

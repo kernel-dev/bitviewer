@@ -573,8 +573,9 @@ impl CardView {
         cx.notify();
     }
 
-    /// A bit's number in the table header was clicked: selects that bit
-    /// (Shift: extends the selection to it), without flipping anything.
+    /// A bit's number in the table header was pressed: selects that bit
+    /// (Shift: extends the selection to it), without flipping anything. A
+    /// drag from there, along the numbers or over the bits, selects a range.
     pub(crate) fn select_bit(&mut self, bit: usize, shift: bool, cx: &mut Context<Self>) {
         self.cursor = Some(bit);
         self.anchor = None;
@@ -582,6 +583,8 @@ impl CardView {
             (true, Some((lo, hi))) => Some((lo.min(bit), hi.max(bit))),
             _ => Some((bit, bit)),
         };
+        // a drag from here selects; letting go on a bit never flips it
+        self.press = if shift { None } else { Some((bit, true)) };
         if self.selection != selection {
             self.selection = selection;
             crate::sound::play(crate::sound::Sound::Select, cx);
@@ -589,9 +592,11 @@ impl CardView {
         cx.notify();
     }
 
-    fn drag_over(&mut self, bit: usize, cx: &mut Context<Self>) {
-        if let Some((start, _)) = self.press
-            && start != bit
+    pub(crate) fn drag_over(&mut self, bit: usize, cx: &mut Context<Self>) {
+        // a press on a bit starts selecting once the pointer reaches another
+        // bit; once selecting, coming back to the first bit selects just it
+        if let Some((start, dragging)) = self.press
+            && (start != bit || dragging)
         {
             self.press = Some((start, true));
             // the pointer moves over the same bits many times: only a bit
