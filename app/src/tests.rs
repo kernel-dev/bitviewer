@@ -707,3 +707,27 @@ fn search_redraw_speed(cx: &mut TestAppContext) {
     draw(cx);
     println!("a row per value: {:?} per redraw", time(cx));
 }
+
+#[gpui::test]
+fn a_single_bit_can_be_selected_and_made_a_field(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx, vec![value(8, 0)]);
+    // clicking a bit's number selects it without flipping it
+    click(cx, "v0-bitnum-5");
+    assert_eq!(first(&view, cx).value, Bits::ZERO);
+    click(cx, "v0-make-field");
+    click(cx, "prompt-ok");
+    let made = first(&view, cx);
+    assert_eq!((made.fields[0].lo, made.fields[0].hi), (5, 5));
+    assert_eq!(made.value, Bits::ZERO);
+
+    // Shift+click on a bit, with nothing selected, selects just that bit too
+    let at = center(cx, "v0-bit-1");
+    cx.simulate_click(at, Modifiers::shift());
+    draw(cx);
+    assert_eq!(first(&view, cx).value, Bits::ZERO);
+    click(cx, "v0-make-field");
+    click(cx, "prompt-ok");
+    let made = first(&view, cx);
+    assert!(made.fields.iter().any(|field| (field.lo, field.hi) == (1, 1)));
+    assert_eq!(made.value, Bits::ZERO);
+}

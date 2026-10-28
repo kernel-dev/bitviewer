@@ -639,8 +639,14 @@ impl CardView {
         let mut selection_bar = div().flex().items_center().gap(r(8.0)).min_w_0();
         match selection {
             None => {
-                selection_bar = selection_bar
-                    .child(div().font_family(mono()).text_size(r(12.0)).text_color(palette.faint).whitespace_nowrap().child("drag across bits to select"))
+                selection_bar = selection_bar.child(
+                    div()
+                        .font_family(mono())
+                        .text_size(r(12.0))
+                        .text_color(palette.faint)
+                        .whitespace_nowrap()
+                        .child("drag across bits, or click a bit number, to select"),
+                )
             }
             Some((lo, hi)) => {
                 let count = hi - lo + 1;
@@ -933,7 +939,30 @@ impl CardView {
                         number = number.border_l_1().border_color(color);
                     }
                     previous = Some(bit);
-                    numbers = numbers.child(number);
+                    if bit > top {
+                        numbers = numbers.child(number);
+                        continue;
+                    }
+                    // a bit's number selects that bit (a field may be a single bit)
+                    let selected = self.selection.is_some_and(|(lo, hi)| (lo..=hi).contains(&bit));
+                    numbers = numbers.child(
+                        number
+                            .id(("bit-number", bit))
+                            .debug_selector(self.label(format!("bitnum-{bit}")))
+                            .rounded(r(4.0))
+                            .when(selected, |number| number.text_color(palette.select).font_weight(FontWeight::SEMIBOLD))
+                            .cursor_pointer()
+                            .hover(move |style| style.text_color(palette.text).bg(palette.surface_2))
+                            .tooltip(move |window, cx| Tooltip::new(format!("Select bit {bit} (Shift+click: extend the selection)")).build(window, cx))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                                    this.select_bit(bit, event.modifiers.shift, cx);
+                                    window.focus(&this.bits_focus, cx);
+                                    cx.stop_propagation();
+                                }),
+                            ),
+                    );
                 }
                 table = table.child(numbers);
             }

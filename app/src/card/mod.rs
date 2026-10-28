@@ -562,7 +562,29 @@ impl CardView {
                 self.selection = Some((lo.min(bit), hi.max(bit)));
                 self.press = Some((bit, true)); // not a click
             }
+            // Shift+click with nothing selected: just this bit (a field can be one bit)
+            (true, None) => {
+                self.selection = Some((bit, bit));
+                self.press = Some((bit, true));
+                crate::sound::play(crate::sound::Sound::Select, cx);
+            }
             _ => self.press = Some((bit, false)),
+        }
+        cx.notify();
+    }
+
+    /// A bit's number in the table header was clicked: selects that bit
+    /// (Shift: extends the selection to it), without flipping anything.
+    pub(crate) fn select_bit(&mut self, bit: usize, shift: bool, cx: &mut Context<Self>) {
+        self.cursor = Some(bit);
+        self.anchor = None;
+        let selection = match (shift, self.selection) {
+            (true, Some((lo, hi))) => Some((lo.min(bit), hi.max(bit))),
+            _ => Some((bit, bit)),
+        };
+        if self.selection != selection {
+            self.selection = selection;
+            crate::sound::play(crate::sound::Sound::Select, cx);
         }
         cx.notify();
     }
