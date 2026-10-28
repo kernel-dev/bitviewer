@@ -402,7 +402,7 @@ impl CardView {
         self.commit(merge, window, cx, move |value| Ok(value.set_value(next)));
     }
 
-    fn open_field_editor(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open_field_editor(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(field) = self.value.fields.get(index).cloned() else {
             return;
         };

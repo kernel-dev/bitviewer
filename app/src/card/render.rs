@@ -403,13 +403,13 @@ impl CardView {
         } else {
             format!("{}\n{}\n\nClick to rename", value.name, value.description).into()
         };
+        let natural = theme::ui_text_width(&value.name, 21.0, FontWeight::SEMIBOLD, window).max(60.0) + 26.0;
         let name =
             div().id("name").flex().flex_shrink(1.0).min_w_0().tooltip(move |window, cx| Tooltip::new(name_tip.clone()).build(window, cx)).child(self.field(
                 Slot::Name,
                 {
                     // the width the name wants at full size; with less room
                     // the box shrinks and the name fits itself (fit.rs)
-                    let natural = theme::ui_text_width(&value.name, 21.0, FontWeight::SEMIBOLD, window).max(60.0) + 26.0;
                     Look2 {
                         width: Some(natural),
                         min_width: 90.0,
@@ -433,13 +433,16 @@ impl CardView {
             .on_click(cx.listener(|this, _, window, cx| this.width_prompt(window, cx)))
             .child(badge(format!("{}-bit", value.width), value.width > 32).hover(move |style| style.border_color(palette.accent).text_color(palette.accent)));
 
-        let address = (!value.block.is_empty()).then(|| {
+        let address_text = (!value.block.is_empty()).then(|| {
             let hex = |n: u64| format!("0x{n:08X}");
-            let (text, warn) = match (value.offset, self.peripheral_base) {
+            match (value.offset, self.peripheral_base) {
                 (Some(offset), Some(base)) => (hex(base + offset), false),
                 (Some(offset), None) => (format!("+{}", hex(offset)), false),
                 (None, _) => ("no offset".to_string(), true),
-            };
+            }
+        });
+        let address_width = address_text.as_ref().map_or(0.0, |(text, _)| text.chars().count() as f32 * ch(13.0) + 8.0 + 8.0);
+        let address = address_text.map(|(text, warn)| {
             let element = div()
                 .px(r(4.0))
                 .rounded(r(4.0))
@@ -480,24 +483,34 @@ impl CardView {
         }
         let bases = div().id("full-base").tooltip(|window, cx| Tooltip::new("Number base of the whole value").build(window, cx)).child(bases);
 
-        let shown = self.text_for(Slot::Value).chars().count().max(8) as f32;
+        // as wide as the number (it moves under the name when it doesn't fit
+        // beside it); a number wider than the whole card gets a smaller font
+        let shown = self.text_for(Slot::Value);
+        let text_width = crate::fit::text_width(&shown, mono(), FontWeight::MEDIUM, 26.0, cx).max(8.0 * ch(26.0));
+        let content = self.content_width(window, cx);
+        let room = content - 90.0; // less the copy and ⋯ buttons
+        let font = if text_width + 30.0 > room { (26.0 * (room - 30.0) / text_width).max(12.0) } else { 26.0 };
+        // even the smallest font can be too wide (64-bit binary in a narrow
+        // window): then the box ends at the card's edge, cutting the number
+        let value_width = (text_width * font / 26.0 + 30.0).min(room);
+        // the grip, chevron, name, address and width badge, with their gaps
+        let name_line = 8.0 + 36.0 + natural + address_width + 8.0 + 72.0;
+        let beside = name_line + 16.0 + value_width + 90.0 <= content;
         let value_field = self.field(
             Slot::Value,
-            Look2 {
-                width: Some((shown * ch(26.0) + 30.0).min(560.0)),
-                min_width: 150.0,
-                height: 42.0,
-                font: 26.0,
-                mono: true,
-                title: true,
-                select: false,
-                float: false,
-                shrink: false,
-            },
+            Look2 { width: Some(value_width), min_width: 150.0, height: 42.0, font, mono: true, title: true, select: false, float: false, shrink: false },
             window,
             cx,
         );
 
+        // cut short: pointing at it shows the whole number
+        let clipped = text_width * font / 26.0 + 30.0 > room && !self.errors.contains_key(&Slot::Value);
+        let value_field = if clipped {
+            let full: SharedString = shown.into();
+            value_field.tooltip(move |window, cx| Tooltip::new(full.clone()).build(window, cx))
+        } else {
+            value_field
+        };
         let card = cx.entity().downgrade();
         let copy = Btn::new("copy", Look::Ghost).icon("copy").tip("Copy the whole value to the clipboard").menu(Anchor::TopRight, move |mut menu, _, _| {
             for base in Base::ORDER {
@@ -506,25 +519,44 @@ impl CardView {
             menu
         });
 
+        // one line, cut short; a click shows all of it. Its width is 0 and at
+        // least the column's, so a long one never widens the header (which
+        // would push the value onto a line of its own)
         let description = (!value.description.is_empty()).then(|| {
+            let (name, text) = (value.name.to_string(), value.description.to_string());
+            let card = cx.entity().downgrade();
             div()
+                .id("description")
+                .w(px(0.0))
+                .min_w_full()
                 .pl(r(50.0))
                 .text_size(r(13.5))
                 .text_color(palette.muted)
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .text_ellipsis()
+                .cursor_pointer()
+                .hover(move |style| style.text_color(palette.text))
+                .tooltip(|window, cx| Tooltip::new("Click to read all of it").build(window, cx))
+                .on_click(move |_, window, cx| {
+                    let card = card.clone();
+                    let edit: std::rc::Rc<dyn Fn(&mut Window, &mut App)> =
+                        std::rc::Rc::new(move |window, cx| _ = card.update(cx, |card, cx| card.description_prompt(window, cx)));
+                    crate::modal::read_text(window, cx, name.clone(), text.clone(), Some(edit));
+                })
                 .child(value.description.to_string())
         });
+        // the value sits beside the name line when both fit, else on a line
+        // of its own under it (it never overlaps the name, address or width)
         div()
             .flex()
-            .flex_wrap()
-            .items_start()
-            .gap(r(16.0))
+            .when(!beside, |header| header.flex_col().items_stretch())
+            .when(beside, |header| header.items_start())
+            .gap(r(if beside { 16.0 } else { 6.0 }))
             .child(
                 div()
                     .flex_1()
-                    .min_w(r(280.0))
+                    .min_w_0()
                     .flex()
                     .flex_col()
                     .gap(r(2.0))
@@ -544,6 +576,7 @@ impl CardView {
             )
             .child(
                 div()
+                    .flex_none()
                     .flex()
                     .flex_col()
                     .items_end()
@@ -1578,7 +1611,27 @@ impl CardView {
                 .when(matched, |item| item.bg(palette.select_soft))
                 .child(first);
             if !field.details.description.is_empty() {
-                item = item.child(div().pl(r(16.0)).text_size(r(12.5)).text_color(palette.muted).child(field.details.description.to_string()));
+                // two lines at most; a click shows all of it
+                let (title, text) = (format!("{} {}", field.name, field.label()), field.details.description.to_string());
+                let card = cx.entity().downgrade();
+                item = item.child(
+                    div()
+                        .id(("field-description", index))
+                        .pl(r(16.0))
+                        .text_size(r(12.5))
+                        .text_color(palette.muted)
+                        .line_clamp(2)
+                        .cursor_pointer()
+                        .hover(move |style| style.text_color(palette.text))
+                        .tooltip(|window, cx| Tooltip::new("Click to read all of it").build(window, cx))
+                        .on_click(move |_, window, cx| {
+                            let card = card.clone();
+                            let edit: std::rc::Rc<dyn Fn(&mut Window, &mut App)> =
+                                std::rc::Rc::new(move |window, cx| _ = card.update(cx, |card, cx| card.open_field_editor(index, window, cx)));
+                            crate::modal::read_text(window, cx, title.clone(), text.clone(), Some(edit));
+                        })
+                        .child(field.details.description.to_string()),
+                );
             }
             if !field.details.named.is_empty() {
                 let card = cx.entity().downgrade();

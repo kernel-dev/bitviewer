@@ -34,7 +34,7 @@ The field keeps its name, colour, base and details. If the new range would overl
 
 The sliders button on a field's row opens its **Field details**:
 
-- **Description**: what the field does. Pointing at the field shows it.
+- **Description**: what the field does. The fields list shows up to two lines of it; click it to read all of it.
 - **Signed**: read the field as two's complement, so `0xF` in a 4-bit field reads as −1.
 - **Formula & unit**: turn the raw number into a real quantity, such as `x * 0.5 - 40` with unit °C for a temperature sensor. The list then shows `25 °C` instead of `130`. Simple straight-line formulas work in both directions: you can type `25` and the field gets the matching raw number.
 - **Named values**: names for the numbers, such as 0 = Off, 1 = Asynchronous. They appear as buttons in the list, and in [generated code](06-generating-code.md) as constants.

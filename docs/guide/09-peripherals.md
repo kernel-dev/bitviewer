@@ -21,7 +21,7 @@ Each peripheral also gets an entry in the sidebar. Click it to show only its reg
 - **Export code** on the peripheral's header generates code for all of its registers (below).
 - A peripheral's registers stay together: dragging or **Move up / down** reorders them within it, and the peripheral's ⋯ menu moves the whole block. **Sort registers by offset** puts them in address order.
 - **Ungroup** keeps the values but forgets the peripheral; **Remove peripheral** deletes it with its registers. Both can be undone.
-- A value's ⋯ › **Add description…** notes what it is for; pointing at its name shows it. SVD imports fill it in.
+- A value's ⋯ › **Add description…** notes what it is for. It shows under the name, cut to one line; click it to read all of it. SVD imports fill it in.
 
 ## Exporting
 

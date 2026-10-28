@@ -177,3 +177,45 @@ pub fn guard(dialog: Dialog, changed: impl Fn(&App) -> bool + 'static) -> Dialog
         false
     })
 }
+
+/// Shows a long text in full (a description cut short where it is shown),
+/// with Copy, and Edit… when `edit` is given (it opens the editor instead).
+pub fn read_text(
+    window: &mut Window,
+    cx: &mut App,
+    title: impl Into<SharedString>,
+    text: impl Into<SharedString>,
+    edit: Option<std::rc::Rc<dyn Fn(&mut Window, &mut App)>>,
+) {
+    use crate::kit::component::WindowExt;
+    use crate::widgets::{Btn, Look};
+    let (title, text): (SharedString, SharedString) = (title.into(), text.into());
+    window.open_dialog(cx, move |dialog, _, _| {
+        let palette = theme::current();
+        let copied = text.clone();
+        let mut buttons = footer().child(Btn::new("read-copy", Look::Ghost).icon("copy").label("Copy").on_click(move |_, window, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string(copied.to_string()));
+            window.close_dialog(cx);
+        }));
+        if let Some(edit) = edit.clone() {
+            buttons = buttons.child(Btn::new("read-edit", Look::Outline).icon("pencil-line").label("Edit…").on_click(move |_, window, cx| {
+                window.close_dialog(cx);
+                edit(window, cx);
+            }));
+        }
+        buttons = buttons.child(Btn::new("read-close", Look::Primary).label("Close").on_click(|_, window, cx| window.close_dialog(cx)));
+        frame(dialog, "scroll-text", title.clone(), true)
+            .child(
+                div()
+                    .id("read-text")
+                    .max_h(r(420.0))
+                    .overflow_y_scroll()
+                    .pr(r(6.0))
+                    .text_size(r(14.0))
+                    .line_height(rems(1.6 * 14.0 / 16.0))
+                    .text_color(palette.text)
+                    .child(text.clone()),
+            )
+            .footer(buttons)
+    });
+}

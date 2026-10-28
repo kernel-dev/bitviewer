@@ -6,6 +6,12 @@ Add each change under **Unreleased** as you make it. When a version is released,
 
 ## [Unreleased]
 
+### Fixed
+- A long value, such as a 32- or 64-bit number in binary, no longer covers the register name, address and width. It moves to a line of its own under the name when it doesn't fit beside it, and gets a smaller font only when it doesn't fit the card at all (pointing at it then shows the whole number).
+
+### Added
+- Long descriptions can be read in full: click a register's description (cut to one line) or a field's (cut to two lines) to open it in a dialog, with Copy and Edit….
+
 ## [3.0.1] - 2026-10-28
 
 ### Added
