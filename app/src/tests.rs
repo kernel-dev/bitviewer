@@ -15,6 +15,9 @@ use gpui_kit::base::Root;
 
 use crate::workspace_view::{self, WorkspaceView};
 
+/// Select all in a text field: Cmd+A on macOS, Ctrl+A elsewhere.
+const SELECT_ALL: &str = if cfg!(target_os = "macos") { "cmd-a" } else { "ctrl-a" };
+
 fn value(width: usize, bits: u64) -> Value {
     Value::new(width, Bits::from(bits), "REG", View::Byte, Base::Hex).unwrap()
 }
@@ -109,7 +112,7 @@ fn dragging_selects_bits_that_operations_and_fields_use(cx: &mut TestAppContext)
 fn typing_a_value_changes_it_and_a_bad_one_does_not(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(16, 0)]);
     click(cx, "v0-input-Value");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("12AB");
     draw(cx);
     assert_eq!(first(&view, cx).value, Bits::from(0x12ABu16));
@@ -216,7 +219,7 @@ fn the_expression_bar_sets_the_value_or_the_selection(cx: &mut TestAppContext) {
 
     drag(cx, "v0-bit-3", "v0-bit-0");
     click(cx, "v0-input-Expr");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("-1");
     click(cx, "v0-expr-apply");
     // only the selected bits: -1 is all ones there
@@ -231,7 +234,7 @@ fn a_field_meaning_can_be_typed(cx: &mut TestAppContext) {
     temperature.set_field_details(field, DetailsDraft { formula: Some("x * 0.5 - 40".into()), unit: Some("°C".into()), ..Default::default() });
     let (view, cx) = open(cx, vec![temperature]);
     click(cx, "v0-input-Meaning(0)");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("21.5");
     draw(cx);
     assert_eq!(first(&view, cx).value, Bits::from(0x7Bu8));
@@ -245,7 +248,7 @@ fn the_field_editor_changes_details_and_refuses_bad_ones(cx: &mut TestAppContext
 
     // the name is edited in the fields panel
     click(cx, "v0-input-FieldName(0)");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("TEMP");
     cx.simulate_keystrokes("enter");
     draw(cx);
@@ -258,7 +261,7 @@ fn the_field_editor_changes_details_and_refuses_bad_ones(cx: &mut TestAppContext
     assert!(first(&view, cx).fields[0].details.formula.is_empty());
 
     click(cx, "field-formula");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("x * 0.5 - 40");
     click(cx, "field-unit");
     cx.simulate_input("°C");
@@ -293,7 +296,7 @@ fn menu_action(
 
 fn answer(cx: &mut VisualTestContext, text: &str) {
     click(cx, "prompt-input");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input(text);
     click(cx, "prompt-ok");
 }
@@ -383,7 +386,7 @@ fn search_filters_values_as_you_type(cx: &mut TestAppContext) {
     pause(cx);
     assert_eq!(view.read_with(cx, |view, _| view.shown_values()), 1);
     // Enter runs it at once; hex digits match too
-    cx.simulate_keystrokes("ctrl-a backspace");
+    cx.simulate_keystrokes(&format!("{SELECT_ALL} backspace"));
     draw(cx);
     assert_eq!(view.read_with(cx, |view, _| view.shown_values()), 2);
     cx.simulate_input("0xbeef");
@@ -555,7 +558,7 @@ fn alt_drag_paints_bits_in_one_undo_step(cx: &mut TestAppContext) {
 fn a_float_can_be_typed_into_its_readout(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(32, 0)]);
     click(cx, "v0-float-0");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("1.5");
     cx.simulate_keystrokes("enter");
     draw(cx);
@@ -601,7 +604,7 @@ fn pressing_elsewhere_drops_the_selection(cx: &mut TestAppContext) {
 fn esc_puts_back_what_a_field_shows(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(8, 0x12)]);
     click(cx, "v0-input-Value");
-    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_keystrokes(SELECT_ALL);
     cx.simulate_input("zz");
     cx.simulate_keystrokes("escape");
     draw(cx);
