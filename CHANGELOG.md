@@ -6,6 +6,9 @@ Add each change under **Unreleased** as you make it. When a version is released,
 
 ## [Unreleased]
 
+### Fixed
+- Dragging across bits to select them played its sound on every mouse movement, even over bits already selected. It now plays only when a bit joins or leaves the selection.
+
 ## [3.0.1] - 2026-10-28
 
 ### Changed

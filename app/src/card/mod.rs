@@ -571,10 +571,15 @@ impl CardView {
         if let Some((start, _)) = self.press
             && start != bit
         {
-            self.selection = Some((start.min(bit), start.max(bit)));
             self.press = Some((start, true));
-            crate::sound::play(crate::sound::Sound::Select, cx);
-            cx.notify();
+            // the pointer moves over the same bits many times: only a bit
+            // joining or leaving the selection makes a sound
+            let selection = Some((start.min(bit), start.max(bit)));
+            if self.selection != selection {
+                self.selection = selection;
+                crate::sound::play(crate::sound::Sound::Select, cx);
+                cx.notify();
+            }
         }
     }
 
