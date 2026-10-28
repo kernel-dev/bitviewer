@@ -2,22 +2,29 @@
 
 ## Operations
 
-**NOT**, **CLR**, **SET**, **≪** and **≫** are on every value's toolbar. The ⌄ next to them opens more:
+Every value's toolbar has the common operations:
 
-![The operations menu](img/operations.png)
+- **NOT** inverts every bit.
+- **CLR** sets every bit to 0, **SET** sets every bit to 1.
+- **«** and **»** shift left and right by one bit.
 
-Rotates, arithmetic shifts, shift or rotate by N, swap bytes, reverse bits, negate, increment, decrement, and AND / OR / XOR with a mask (which accepts [expressions](02-expressions.md)). With bits selected, every operation applies to the selection only.
+The **⌄** next to them opens the rest: rotate left and right, arithmetic shift right, shift or rotate by any number of bits, swap bytes, reverse bits, negate (two's complement), increment, decrement, and **AND / OR / XOR with…** a mask. The mask can be a number or an [expression](02-expressions.md).
+
+With bits selected, every operation acts on the selection only. Rotating a selected byte, for example, leaves the rest of the value alone. In the Bytes and Nibbles layouts, right-click a row's label for operations on that row.
+
+Operations ask before changing [protected bits](03-register-fields.md).
 
 ## Compare rows
 
-**Compare** adds a linked row under the value with its own number. Bits that differ are outlined, and the row shows how many bits differ (Δ) and the XOR.
+**Compare** adds a linked row under the value with a number of its own. It answers "what is different between these two values?": bits that differ are outlined, and the row shows how many bits differ (**Δ**) and the XOR of the two.
 
-![A compare row differing from the value by one bit](img/compare.png)
+![CONFIG compared with a value one bit away: bit 6](img/compare.png)
 
-- Edit the compare row like any value, flip its bits, or run operations on it.
-- Closing a compare row remembers its value for next time.
-- **⋯ › Compare with…** fills compare rows with a value you type: a number, or an expression (`x` is the value itself, so `x ^ 0xFF` works, and other values can be used by name). To take another value as it is, open **Or take the value of another one in the workspace**, filter the list by name and pick it.
+- Type a number into the compare row, flip its bits or run operations on it, as with any value.
+- Its **⋯** menu can copy it into the value, reset it to the value, or remove it.
+- Closing a compare row remembers its number for next time.
+- **⋯ › Compare with…** on the value fills the compare row with a number or an expression. In it, `x` is the value itself, so `x ^ 0xFF` works, and other values can be used by name. To compare with another value as it is, open **Or take the value of another one in the workspace**, filter by name and pick it.
 
 ## Snapshots
 
-The value's ⋯ menu saves **snapshots**: named copies you can restore, or compare against later.
+A **snapshot** is a named copy of a value as it is now, kept with the value. Take one from **⋯ › Snapshots › Take snapshot…** before an experiment. The same menu lists them: restore one, compare the value with it, or delete it.

@@ -2,7 +2,9 @@
 
 A **peripheral** is a block of registers at a base address, such as a UART at `0x40011000` with CTRL at offset `0x0`, BAUD at `0x4` and DATA at `0x8`. Bit Viewer can group values into one: the block gets a header, and each register shows its address.
 
-![UART0 at 0x40011000 with three registers at their addresses](img/peripheral.png)
+Each peripheral also gets an entry in the sidebar. Click it to show only its registers (see [finding your way](10-finding-your-way.md)).
+
+![UART0 at 0x40011000 with four registers at their addresses, collapsed](img/peripheral.png)
 
 ## Making one
 
@@ -16,13 +18,14 @@ A **peripheral** is a block of registers at a base address, such as a UART at `0
 - Each register's header shows its **address** (base + offset), or just `+offset` while the peripheral has no base address. Click it to change the offset.
 - Click the peripheral's name or base address to rename it or change its base and description. Renaming `UART0` to `UART1` also renames registers called `UART0.…`.
 - The chevron collapses the whole peripheral. A search still shows matches inside collapsed peripherals.
+- **Export code** on the peripheral's header generates code for all of its registers (below).
 - A peripheral's registers stay together: dragging or **Move up / down** reorders them within it, and the peripheral's ⋯ menu moves the whole block. **Sort registers by offset** puts them in address order.
 - **Ungroup** keeps the values but forgets the peripheral; **Remove peripheral** deletes it with its registers. Both can be undone.
 - A value's ⋯ › **Add description…** notes what it is for; pointing at its name shows it. SVD imports fill it in.
 
 ## Exporting
 
-The **Export** button on a peripheral generates code for all of its registers at once:
+The **Export code** button on a peripheral generates code for all of its registers at once:
 
 | Template | Gives you |
 |---|---|

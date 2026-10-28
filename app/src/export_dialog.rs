@@ -137,7 +137,7 @@ impl ExportView {
 
     /// Opens the template editor: a new template, or the current one (a
     /// copy when it is built in).
-    fn edit(&mut self, fresh: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn edit(&mut self, fresh: bool, window: &mut Window, cx: &mut Context<Self>) {
         let current = self.current(cx);
         let scope = self.target.scope();
         let (title, source) = if fresh {
@@ -353,7 +353,8 @@ fn code_preview(id: &'static str, text: String, max_height: Pixels, stale: bool)
 }
 
 /// Opens "Export code…" for `target`.
-pub fn open(target: Target, window: &mut Window, cx: &mut App) {
+/// Opens the dialog; the view, so a caller can open its template editor.
+pub fn open(target: Target, window: &mut Window, cx: &mut App) -> Entity<ExportView> {
     let title = match &target {
         Target::Register { value, .. } => format!("Export code for “{}”", if value.name.is_empty() { "value" } else { &value.name }),
         Target::Peripheral { peripheral, .. } => format!("Export code for peripheral “{}”", peripheral.name),
@@ -371,7 +372,9 @@ pub fn open(target: Target, window: &mut Window, cx: &mut App) {
         view.current = list.iter().find(|t| t.id == last).unwrap_or(&list[0]).id.clone();
         view
     });
+    let shown = view.clone();
     window.open_dialog(cx, move |dialog, _, _| {
+        let view = shown.clone();
         let (save, copy) = (view.clone(), view.clone());
         modal::frame(dialog, "file-code-corner", title.clone(), true).w(px(1040.0)).child(view.clone()).footer(
             modal::footer()
@@ -390,6 +393,7 @@ pub fn open(target: Target, window: &mut Window, cx: &mut App) {
                 .child(Btn::new("export-close", Look::Outline).label("Close").on_click(|_, window, cx| window.close_dialog(cx))),
         )
     });
+    view
 }
 
 // ------------------------------------------------------------ the template editor

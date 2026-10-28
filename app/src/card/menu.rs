@@ -152,7 +152,11 @@ impl CardView {
                 .item(
                     entry(&card, "Save fields as template…", Some("bookmark-plus"), |c, w, cx| c.save_template_prompt(w, cx)).disabled(value.fields.is_empty()),
                 )
-                .item(entry(&card, "Export code…", Some("file-code-corner"), |c, w, cx| c.workspace_do_in(w, cx, |ws, id, w, cx| ws.export_value(id, w, cx))))
+                .item(entry(&card, "Export code…", Some("file-code-corner"), |c, w, cx| {
+                    c.workspace_do_in(w, cx, |ws, id, w, cx| {
+                        ws.export_value(id, w, cx);
+                    })
+                }))
                 .separator()
                 .item(entry(&card, "Paste bytes…", Some("clipboard-paste"), |c, w, cx| c.paste_bytes_prompt(w, cx)))
                 .submenu_with_icon(Some(ico("copy")), "Copy as bytes", window, cx, move |mut menu, _, _| {

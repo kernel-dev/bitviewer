@@ -1,0 +1,182 @@
+{
+  "app": "bitviewer",
+  "version": 1,
+  "values": [
+    {
+      "name": "CONFIG",
+      "width": 32,
+      "value": "0x2303",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {
+        "0": "0x2343"
+      },
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 0,
+          "name": "EN",
+          "color": "#f59f00",
+          "base": 2,
+          "description": "Turns the UART on",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 1,
+          "hi": 3,
+          "name": "MODE",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Operating mode",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "Asynchronous"
+            },
+            {
+              "value": "2",
+              "label": "Synchronous"
+            },
+            {
+              "value": "3",
+              "label": "IrDA"
+            }
+          ]
+        },
+        {
+          "lo": 4,
+          "hi": 5,
+          "name": "PARITY",
+          "color": "#ae3ec9",
+          "base": 16,
+          "description": "Parity bit",
+          "named": [
+            {
+              "value": "0",
+              "label": "None"
+            },
+            {
+              "value": "1",
+              "label": "Even"
+            },
+            {
+              "value": "2",
+              "label": "Odd"
+            }
+          ]
+        },
+        {
+          "lo": 6,
+          "hi": 6,
+          "name": "STOP",
+          "color": "#15aabf",
+          "base": 2,
+          "description": "Stop bits",
+          "named": [
+            {
+              "value": "0",
+              "label": "1 bit"
+            },
+            {
+              "value": "1",
+              "label": "2 bits"
+            }
+          ]
+        },
+        {
+          "lo": 8,
+          "hi": 8,
+          "name": "TXIE",
+          "color": "#4c6ef5",
+          "base": 2,
+          "description": "Interrupt when the transmit buffer empties",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 9,
+          "hi": 9,
+          "name": "RXIE",
+          "color": "#82c91e",
+          "base": 2,
+          "description": "Interrupt when a byte arrives",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 12,
+          "hi": 13,
+          "name": "FIFO",
+          "color": "#f76707",
+          "base": 16,
+          "description": "Receive FIFO trigger level",
+          "named": [
+            {
+              "value": "0",
+              "label": "1 byte"
+            },
+            {
+              "value": "1",
+              "label": "4 bytes"
+            },
+            {
+              "value": "2",
+              "label": "8 bytes"
+            },
+            {
+              "value": "3",
+              "label": "14 bytes"
+            }
+          ]
+        },
+        {
+          "lo": 16,
+          "hi": 19,
+          "name": "STATUS",
+          "color": "#e64980",
+          "base": 16,
+          "description": "Line status (read-only)",
+          "access": "ro"
+        }
+      ],
+      "description": "A UART configuration, compared with another"
+    }
+  ],
+  "peripherals": []
+}

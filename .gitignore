@@ -6,6 +6,7 @@ target/
 *.bitview.json
 # ...except the tests' own
 !core/tests/fixtures/*.bitview
+!docs/guide/shots/*.bitview
 
 # local data for optional tests
 test-data/

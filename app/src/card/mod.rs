@@ -446,7 +446,7 @@ impl CardView {
         });
     }
 
-    fn flip(&mut self, bit: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn flip(&mut self, bit: usize, window: &mut Window, cx: &mut Context<Self>) {
         let next = self.value.value ^ (Bits::from(1u8) << bit);
         self.set_value_guarded(next, None, None, window, cx);
         let sound = if self.value.bit(bit) { crate::sound::Sound::BitOn } else { crate::sound::Sound::BitOff };
@@ -636,6 +636,16 @@ impl CardView {
         let show = self.value.show_bases;
         self.commit(None, window, cx, move |v| Ok(v.set_show_bases(!show)));
         crate::sound::play(crate::sound::Sound::Toggle, cx);
+    }
+
+    /// Opens the expression bar with `text` in it, as if typed (--shot).
+    pub(crate) fn type_expression(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.expr_open {
+            self.toggle_expr(window, cx);
+        }
+        let input = self.input(Slot::Expr, window, cx);
+        input.update(cx, |state, cx| state.set_value(text.to_string(), window, cx));
+        self.typed(Slot::Expr, text, window, cx);
     }
 
     pub(crate) fn toggle_expr(&mut self, window: &mut Window, cx: &mut Context<Self>) {

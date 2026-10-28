@@ -6,6 +6,7 @@
 //!             for trying large workspaces
 //!   --bench   scroll, jump, click and undo by itself, print frame timings, quit
 //!   --bench-json  also write the results as JSON (implies --bench)
+//!   --shot SCENE  set up one of the guide's screenshots (workspace_view/shots.rs)
 
 // no console window next to the app in release builds on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -66,16 +67,19 @@ struct Args {
     bench_json: Option<PathBuf>,
     /// Imports every register of this SVD at start (for measuring).
     import_svd: Option<PathBuf>,
+    /// Stages one of the guide's screenshots (workspace_view/shots.rs).
+    shot: Option<String>,
 }
 
 fn parse_args() -> Args {
-    let mut args = Args { file: None, count: None, bench: false, bench_json: None, import_svd: None };
+    let mut args = Args { file: None, count: None, bench: false, bench_json: None, import_svd: None, shot: None };
     let mut rest = std::env::args().skip(1);
     while let Some(arg) = rest.next() {
         match arg.as_str() {
             "--count" => args.count = rest.next().and_then(|n| n.parse().ok()),
             "--bench" => args.bench = true,
             "--import-svd" => args.import_svd = rest.next().map(PathBuf::from),
+            "--shot" => args.shot = rest.next(),
             "--bench-json" => {
                 args.bench = true;
                 args.bench_json = rest.next().map(PathBuf::from);
@@ -147,7 +151,7 @@ fn main() {
         let bench = workspace_view::BenchOptions { text, json: args.bench_json.clone() };
         let state = repeated(WorkspaceState::default(), 1);
         let opened = session::Restored { state, path: None, file_name: "bench.bitview".into(), dirty: false };
-        return run(Start::Opened(opened), Some(bench), None);
+        return run(Start::Opened(opened), Some(bench), None, None);
     }
 
     // a file given at start, else what the last session left open, else a
@@ -190,7 +194,13 @@ fn main() {
     if let Start::Opened(opened) = &start {
         println!("opened {} values in {} ms", opened.state.len(), started.elapsed().as_millis());
     }
-    run(start, None, svd_start);
+    if let Some(scene) = &args.shot
+        && !workspace_view::shots::SCENES.contains(&scene.as_str())
+    {
+        eprintln!("--shot: no scene {scene:?}; the scenes are {}", workspace_view::shots::SCENES.join(", "));
+        std::process::exit(1);
+    }
+    run(start, None, svd_start, args.shot);
 }
 
 /// An SVD to import once the window is up.
@@ -207,9 +217,10 @@ enum Start {
     Fresh,
 }
 
-fn run(start: Start, bench: Option<workspace_view::BenchOptions>, import_svd: Option<SvdStart>) {
+fn run(start: Start, bench: Option<workspace_view::BenchOptions>, import_svd: Option<SvdStart>, shot: Option<String>) {
     crate::kit::application().with_assets(assets::Assets).run(move |cx| {
-        workspace_view::init(None, cx);
+        // a guide screenshot uses fixed settings, and saves nothing
+        workspace_view::init(shot.as_deref().map(workspace_view::shots::settings), cx);
         let opened = match start {
             Start::Opened(opened) => opened,
             Start::Fresh => {
@@ -232,7 +243,10 @@ fn run(start: Start, bench: Option<workspace_view::BenchOptions>, import_svd: Op
             let view = cx.new(|cx| WorkspaceView::new(state, name.clone(), bench, window, cx));
             view.update(cx, |view, cx| {
                 view.set_origin(path, name, dirty, window, cx);
-                view.startup_checks(window, cx);
+                match shot {
+                    Some(scene) => view.stage_shot(scene, window, cx),
+                    None => view.startup_checks(window, cx),
+                }
                 if let Some(svd) = import_svd {
                     // once the window is up (dialogs and messages need it)
                     cx.spawn_in(window, async move |view, cx| {

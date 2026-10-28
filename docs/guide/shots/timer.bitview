@@ -1,0 +1,107 @@
+{
+  "app": "bitviewer",
+  "version": 1,
+  "values": [
+    {
+      "name": "TIMER.CFG",
+      "width": 64,
+      "value": "0x2100003E800F43",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 0,
+          "name": "ENABLE",
+          "color": "#f59f00",
+          "base": 2,
+          "description": "Starts the timer",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 1,
+          "hi": 2,
+          "name": "MODE",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Counting mode",
+          "named": [
+            {
+              "value": "0",
+              "label": "Up"
+            },
+            {
+              "value": "1",
+              "label": "Down"
+            },
+            {
+              "value": "2",
+              "label": "Up and down"
+            }
+          ]
+        },
+        {
+          "lo": 4,
+          "hi": 15,
+          "name": "PRESCALE",
+          "color": "#ae3ec9",
+          "base": 16,
+          "description": "Clock divider, minus one"
+        },
+        {
+          "lo": 16,
+          "hi": 47,
+          "name": "RELOAD",
+          "color": "#15aabf",
+          "base": 16,
+          "description": "Count to reload when the timer wraps"
+        },
+        {
+          "lo": 48,
+          "hi": 48,
+          "name": "IRQ_EN",
+          "color": "#4c6ef5",
+          "base": 2,
+          "description": "Interrupt on wrap",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 52,
+          "hi": 55,
+          "name": "CHANNEL",
+          "color": "#82c91e",
+          "base": 16,
+          "description": "Output channel"
+        }
+      ],
+      "description": "Timer configuration"
+    }
+  ],
+  "peripherals": []
+}

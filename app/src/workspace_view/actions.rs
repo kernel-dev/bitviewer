@@ -51,17 +51,22 @@ impl WorkspaceView {
     }
 
     /// "Export code…" for one value.
-    pub fn export_value(&mut self, id: bitviewer_core::value::ValueId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(value) = self.state.values.iter().find(|value| value.id == id).cloned() else { return };
+    pub fn export_value(
+        &mut self,
+        id: bitviewer_core::value::ValueId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Entity<crate::export_dialog::ExportView>> {
+        let value = self.state.values.iter().find(|value| value.id == id).cloned()?;
         let peripheral = self.state.peripherals.get(&value.block).map(|p| (**p).clone());
-        crate::export_dialog::open(crate::export_dialog::Target::Register { value, peripheral }, window, cx);
+        Some(crate::export_dialog::open(crate::export_dialog::Target::Register { value, peripheral }, window, cx))
     }
 
     /// "Export code…" for a whole peripheral.
     pub fn export_peripheral(&mut self, block: &std::sync::Arc<str>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(peripheral) = self.state.peripherals.get(block).map(|p| (**p).clone()) else { return };
         let values = self.state.values.iter().filter(|value| value.block == *block).cloned().collect();
-        crate::export_dialog::open(crate::export_dialog::Target::Peripheral { peripheral, values }, window, cx);
+        let _ = crate::export_dialog::open(crate::export_dialog::Target::Peripheral { peripheral, values }, window, cx);
     }
 
     /// A value computed by "New value from expression…".

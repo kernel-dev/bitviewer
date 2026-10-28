@@ -1,0 +1,49 @@
+{
+  "app": "bitviewer",
+  "version": 1,
+  "values": [
+    {
+      "name": "PI",
+      "width": 32,
+      "value": "0x40490FDB",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 22,
+          "name": "FRACTION",
+          "color": "#f59f00",
+          "base": 16,
+          "description": "Fraction (mantissa without its leading 1)"
+        },
+        {
+          "lo": 23,
+          "hi": 30,
+          "name": "EXPONENT",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Exponent, biased by 127"
+        },
+        {
+          "lo": 31,
+          "hi": 31,
+          "name": "SIGN",
+          "color": "#ae3ec9",
+          "base": 2,
+          "description": "Sign: 1 is negative"
+        }
+      ],
+      "description": "π as an IEEE-754 float32"
+    }
+  ],
+  "peripherals": []
+}

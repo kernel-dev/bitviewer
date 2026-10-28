@@ -1,0 +1,1075 @@
+{
+  "app": "bitviewer",
+  "version": 1,
+  "values": [
+    {
+      "name": "UART0.CTRL",
+      "width": 32,
+      "value": "0x2303",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 0,
+          "name": "EN",
+          "color": "#f59f00",
+          "base": 2,
+          "description": "Turns the UART on",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 1,
+          "hi": 3,
+          "name": "MODE",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Operating mode",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "Asynchronous"
+            },
+            {
+              "value": "2",
+              "label": "Synchronous"
+            },
+            {
+              "value": "3",
+              "label": "IrDA"
+            }
+          ]
+        },
+        {
+          "lo": 4,
+          "hi": 5,
+          "name": "PARITY",
+          "color": "#ae3ec9",
+          "base": 16,
+          "description": "Parity bit",
+          "named": [
+            {
+              "value": "0",
+              "label": "None"
+            },
+            {
+              "value": "1",
+              "label": "Even"
+            },
+            {
+              "value": "2",
+              "label": "Odd"
+            }
+          ]
+        },
+        {
+          "lo": 6,
+          "hi": 6,
+          "name": "STOP",
+          "color": "#15aabf",
+          "base": 2,
+          "description": "Stop bits",
+          "named": [
+            {
+              "value": "0",
+              "label": "1 bit"
+            },
+            {
+              "value": "1",
+              "label": "2 bits"
+            }
+          ]
+        },
+        {
+          "lo": 8,
+          "hi": 8,
+          "name": "TXIE",
+          "color": "#4c6ef5",
+          "base": 2,
+          "description": "Interrupt when the transmit buffer empties",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 9,
+          "hi": 9,
+          "name": "RXIE",
+          "color": "#82c91e",
+          "base": 2,
+          "description": "Interrupt when a byte arrives",
+          "named": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "On"
+            }
+          ]
+        },
+        {
+          "lo": 12,
+          "hi": 13,
+          "name": "FIFO",
+          "color": "#f76707",
+          "base": 16,
+          "description": "Receive FIFO trigger level",
+          "named": [
+            {
+              "value": "0",
+              "label": "1 byte"
+            },
+            {
+              "value": "1",
+              "label": "4 bytes"
+            },
+            {
+              "value": "2",
+              "label": "8 bytes"
+            },
+            {
+              "value": "3",
+              "label": "14 bytes"
+            }
+          ]
+        },
+        {
+          "lo": 16,
+          "hi": 19,
+          "name": "STATUS",
+          "color": "#e64980",
+          "base": 16,
+          "description": "Line status (read-only)",
+          "access": "ro"
+        }
+      ],
+      "block": "UART0",
+      "offset": "0x0",
+      "description": "Control register"
+    },
+    {
+      "name": "UART0.BAUD",
+      "width": 32,
+      "value": "0x683",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 3,
+          "name": "DIV_FRACTION",
+          "color": "#f59f00",
+          "base": 16,
+          "description": "Fraction of the divider, in sixteenths"
+        },
+        {
+          "lo": 4,
+          "hi": 15,
+          "name": "DIV_MANTISSA",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Integer part of the divider"
+        }
+      ],
+      "block": "UART0",
+      "offset": "0x4",
+      "description": "Baud rate divider"
+    },
+    {
+      "name": "UART0.DATA",
+      "width": 32,
+      "value": "0x41",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 7,
+          "name": "DATA",
+          "color": "#f59f00",
+          "base": 16,
+          "description": "The byte to send, or the last one received"
+        }
+      ],
+      "block": "UART0",
+      "offset": "0x8",
+      "description": "Data register"
+    },
+    {
+      "name": "UART0.STATUS",
+      "width": 32,
+      "value": "0xC0",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 0,
+          "hi": 0,
+          "name": "PE",
+          "color": "#f59f00",
+          "base": 2,
+          "description": "Parity error",
+          "access": "ro"
+        },
+        {
+          "lo": 1,
+          "hi": 1,
+          "name": "FE",
+          "color": "#2fb344",
+          "base": 2,
+          "description": "Framing error",
+          "access": "ro"
+        },
+        {
+          "lo": 3,
+          "hi": 3,
+          "name": "ORE",
+          "color": "#ae3ec9",
+          "base": 2,
+          "description": "Overrun: a byte arrived before the last one was read",
+          "access": "ro"
+        },
+        {
+          "lo": 5,
+          "hi": 5,
+          "name": "RXNE",
+          "color": "#15aabf",
+          "base": 2,
+          "description": "A byte is waiting in DATA",
+          "access": "ro"
+        },
+        {
+          "lo": 6,
+          "hi": 6,
+          "name": "TC",
+          "color": "#4c6ef5",
+          "base": 2,
+          "description": "Transmission complete",
+          "access": "ro"
+        },
+        {
+          "lo": 7,
+          "hi": 7,
+          "name": "TXE",
+          "color": "#82c91e",
+          "base": 2,
+          "description": "DATA can take the next byte",
+          "access": "ro"
+        }
+      ],
+      "block": "UART0",
+      "offset": "0xC",
+      "description": "Status register"
+    },
+    {
+      "name": "GPIOA.MODER",
+      "width": 32,
+      "value": "0xA8000400",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 30,
+          "hi": 31,
+          "name": "MODER15",
+          "color": "#f59f00",
+          "base": 16,
+          "description": "Mode of pin PA15",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 28,
+          "hi": 29,
+          "name": "MODER14",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Mode of pin PA14",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 26,
+          "hi": 27,
+          "name": "MODER13",
+          "color": "#ae3ec9",
+          "base": 16,
+          "description": "Mode of pin PA13",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 24,
+          "hi": 25,
+          "name": "MODER12",
+          "color": "#15aabf",
+          "base": 16,
+          "description": "Mode of pin PA12",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 22,
+          "hi": 23,
+          "name": "MODER11",
+          "color": "#4c6ef5",
+          "base": 16,
+          "description": "Mode of pin PA11",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 20,
+          "hi": 21,
+          "name": "MODER10",
+          "color": "#82c91e",
+          "base": 16,
+          "description": "Mode of pin PA10",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 18,
+          "hi": 19,
+          "name": "MODER9",
+          "color": "#f76707",
+          "base": 16,
+          "description": "Mode of pin PA9",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 16,
+          "hi": 17,
+          "name": "MODER8",
+          "color": "#e64980",
+          "base": 16,
+          "description": "Mode of pin PA8",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 14,
+          "hi": 15,
+          "name": "MODER7",
+          "color": "#f59f00",
+          "base": 16,
+          "description": "Mode of pin PA7",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 12,
+          "hi": 13,
+          "name": "MODER6",
+          "color": "#2fb344",
+          "base": 16,
+          "description": "Mode of pin PA6",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 10,
+          "hi": 11,
+          "name": "MODER5",
+          "color": "#ae3ec9",
+          "base": 16,
+          "description": "Mode of pin PA5",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 8,
+          "hi": 9,
+          "name": "MODER4",
+          "color": "#15aabf",
+          "base": 16,
+          "description": "Mode of pin PA4",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 6,
+          "hi": 7,
+          "name": "MODER3",
+          "color": "#4c6ef5",
+          "base": 16,
+          "description": "Mode of pin PA3",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 4,
+          "hi": 5,
+          "name": "MODER2",
+          "color": "#82c91e",
+          "base": 16,
+          "description": "Mode of pin PA2",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 2,
+          "hi": 3,
+          "name": "MODER1",
+          "color": "#f76707",
+          "base": 16,
+          "description": "Mode of pin PA1",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        },
+        {
+          "lo": 0,
+          "hi": 1,
+          "name": "MODER0",
+          "color": "#e64980",
+          "base": 16,
+          "description": "Mode of pin PA0",
+          "named": [
+            {
+              "value": "0",
+              "label": "Input"
+            },
+            {
+              "value": "1",
+              "label": "Output"
+            },
+            {
+              "value": "2",
+              "label": "Alternate"
+            },
+            {
+              "value": "3",
+              "label": "Analog"
+            }
+          ]
+        }
+      ],
+      "block": "GPIOA",
+      "offset": "0x0",
+      "description": "Port mode register"
+    },
+    {
+      "name": "GPIOA.ODR",
+      "width": 32,
+      "value": "0x20",
+      "view": "line",
+      "msb_first": true,
+      "full_base": 16,
+      "default_row_base": 16,
+      "show_bases": false,
+      "collapsed": false,
+      "snapshots": [],
+      "row_bases": {},
+      "compares": {},
+      "hidden_compares": {},
+      "groups": [
+        {
+          "lo": 15,
+          "hi": 15,
+          "name": "ODR15",
+          "color": "#f59f00",
+          "base": 2,
+          "description": "Output level of pin PA15",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 14,
+          "hi": 14,
+          "name": "ODR14",
+          "color": "#2fb344",
+          "base": 2,
+          "description": "Output level of pin PA14",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 13,
+          "hi": 13,
+          "name": "ODR13",
+          "color": "#ae3ec9",
+          "base": 2,
+          "description": "Output level of pin PA13",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 12,
+          "hi": 12,
+          "name": "ODR12",
+          "color": "#15aabf",
+          "base": 2,
+          "description": "Output level of pin PA12",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 11,
+          "hi": 11,
+          "name": "ODR11",
+          "color": "#4c6ef5",
+          "base": 2,
+          "description": "Output level of pin PA11",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 10,
+          "hi": 10,
+          "name": "ODR10",
+          "color": "#82c91e",
+          "base": 2,
+          "description": "Output level of pin PA10",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 9,
+          "hi": 9,
+          "name": "ODR9",
+          "color": "#f76707",
+          "base": 2,
+          "description": "Output level of pin PA9",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 8,
+          "hi": 8,
+          "name": "ODR8",
+          "color": "#e64980",
+          "base": 2,
+          "description": "Output level of pin PA8",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 7,
+          "hi": 7,
+          "name": "ODR7",
+          "color": "#f59f00",
+          "base": 2,
+          "description": "Output level of pin PA7",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 6,
+          "hi": 6,
+          "name": "ODR6",
+          "color": "#2fb344",
+          "base": 2,
+          "description": "Output level of pin PA6",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 5,
+          "hi": 5,
+          "name": "ODR5",
+          "color": "#ae3ec9",
+          "base": 2,
+          "description": "Output level of pin PA5",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 4,
+          "hi": 4,
+          "name": "ODR4",
+          "color": "#15aabf",
+          "base": 2,
+          "description": "Output level of pin PA4",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 3,
+          "hi": 3,
+          "name": "ODR3",
+          "color": "#4c6ef5",
+          "base": 2,
+          "description": "Output level of pin PA3",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 2,
+          "hi": 2,
+          "name": "ODR2",
+          "color": "#82c91e",
+          "base": 2,
+          "description": "Output level of pin PA2",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 1,
+          "hi": 1,
+          "name": "ODR1",
+          "color": "#f76707",
+          "base": 2,
+          "description": "Output level of pin PA1",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        },
+        {
+          "lo": 0,
+          "hi": 0,
+          "name": "ODR0",
+          "color": "#e64980",
+          "base": 2,
+          "description": "Output level of pin PA0",
+          "named": [
+            {
+              "value": "0",
+              "label": "Low"
+            },
+            {
+              "value": "1",
+              "label": "High"
+            }
+          ]
+        }
+      ],
+      "block": "GPIOA",
+      "offset": "0x14",
+      "description": "Output data register"
+    }
+  ],
+  "peripherals": [
+    {
+      "name": "UART0",
+      "base": "0x40011000",
+      "description": "Universal asynchronous receiver-transmitter"
+    },
+    {
+      "name": "GPIOA",
+      "base": "0x40020000",
+      "description": "General-purpose I/O, port A"
+    }
+  ]
+}

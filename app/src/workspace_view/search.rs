@@ -186,6 +186,16 @@ impl WorkspaceView {
         cx.notify();
     }
 
+    /// Opens the bar with `text` in it and searches (--shot).
+    pub(super) fn search_for(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_search(window, cx);
+        if let Some(search) = &self.search {
+            let input = search.input.clone();
+            input.update(cx, |input, cx| input.set_value(text.to_string(), window, cx));
+        }
+        self.run_search(cx);
+    }
+
     /// Hides the bar. The results stay until they are cleared.
     pub(super) fn close_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(search) = &self.search else { return };

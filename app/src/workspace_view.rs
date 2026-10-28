@@ -33,6 +33,7 @@ mod onboarding;
 mod peripherals;
 mod rows;
 mod search;
+pub mod shots;
 mod svd_import;
 
 use crate::card::CardView;
@@ -166,8 +167,7 @@ impl WorkspaceView {
         &self.state
     }
 
-    /// The card of the value at `index`, if it is on screen (for tests).
-    #[cfg(all(test, not(target_os = "macos")))]
+    /// The card of the value at `index`, if it has been drawn (tests, --shot).
     pub fn card_at(&self, index: usize) -> Option<Entity<CardView>> {
         let id = self.state.values.get(index)?.id;
         self.cards.get(&id).map(|(card, _)| card.clone())

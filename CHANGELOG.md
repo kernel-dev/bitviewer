@@ -17,6 +17,7 @@ Add each change under **Unreleased** as you make it. When a version is released,
 - Dragging across bits to select them played its sound on every mouse movement, even over bits already selected. It now plays only when a bit joins or leaves the selection.
 
 ### Changed
+- The guide (Help › Guide) shows the native app in new screenshots, has a new page on finding your way (the sidebar, search and regular expressions, the command palette), and explains the bit table, reserved bits and field details more fully.
 - Built on [GPUI CE](https://gpui-ce.github.io/), the community edition of GPUI, and its component library, instead of Zed's GPUI with GPUI Kit. The app looks and works the same.
 
 ## [3.0.0] - 2026-10-28

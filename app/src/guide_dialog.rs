@@ -16,7 +16,7 @@ macro_rules! pages {
     };
 }
 
-const PAGES: [(&str, &str); 9] = pages!(
+const PAGES: [(&str, &str); 10] = pages!(
     "01-bits-and-values.md",
     "02-expressions.md",
     "03-register-fields.md",
@@ -26,6 +26,7 @@ const PAGES: [(&str, &str); 9] = pages!(
     "07-export-templates.md",
     "08-importing-svd.md",
     "09-peripherals.md",
+    "10-finding-your-way.md",
 );
 
 macro_rules! images {
@@ -34,7 +35,7 @@ macro_rules! images {
     };
 }
 
-const IMAGES: [(&str, &[u8]); 12] = images!(
+const IMAGES: [(&str, &[u8]); 13] = images!(
     "bits-selection.png",
     "compare.png",
     "export-code.png",
@@ -42,9 +43,10 @@ const IMAGES: [(&str, &[u8]); 12] = images!(
     "export-struct.png",
     "expr-bar.png",
     "fields.png",
-    "operations.png",
+    "locked-bits.png",
     "peripheral.png",
-    "resize-field.png",
+    "search.png",
+    "settings.png",
     "svd-import.png",
     "template.png",
 );

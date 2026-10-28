@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A small device for the guide's SVD screenshot (docs/guide/img/svd-import.png). -->
+<device schemaVersion="1.3">
+  <name>DEMO-M4</name>
+  <description>Demo microcontroller</description>
+  <size>32</size>
+  <access>read-write</access>
+  <resetValue>0x00000000</resetValue>
+  <resetMask>0xFFFFFFFF</resetMask>
+  <peripherals>
+    <peripheral>
+      <name>RCC</name>
+      <description>Reset and clock control</description>
+      <baseAddress>0x40023800</baseAddress>
+      <registers>
+        <register><name>CR</name><description>Clock control</description><addressOffset>0x0</addressOffset><resetValue>0x00000083</resetValue>
+          <fields>
+            <field><name>HSION</name><description>Internal oscillator on</description><bitOffset>0</bitOffset><bitWidth>1</bitWidth></field>
+            <field><name>HSIRDY</name><description>Internal oscillator ready</description><bitOffset>1</bitOffset><bitWidth>1</bitWidth><access>read-only</access></field>
+            <field><name>HSEON</name><description>External oscillator on</description><bitOffset>16</bitOffset><bitWidth>1</bitWidth></field>
+            <field><name>PLLON</name><description>PLL on</description><bitOffset>24</bitOffset><bitWidth>1</bitWidth></field>
+          </fields>
+        </register>
+        <register><name>AHB1ENR</name><description>AHB1 clock enable</description><addressOffset>0x30</addressOffset>
+          <fields>
+            <field><name>GPIOAEN</name><description>Clock for port A</description><bitOffset>0</bitOffset><bitWidth>1</bitWidth></field>
+            <field><name>GPIOBEN</name><description>Clock for port B</description><bitOffset>1</bitOffset><bitWidth>1</bitWidth></field>
+            <field><name>DMA1EN</name><description>Clock for DMA 1</description><bitOffset>21</bitOffset><bitWidth>1</bitWidth></field>
+          </fields>
+        </register>
+      </registers>
+    </peripheral>
+    <peripheral>
+      <name>GPIOA</name>
+      <description>General-purpose I/O, port A</description>
+      <groupName>GPIO</groupName>
+      <baseAddress>0x40020000</baseAddress>
+      <registers>
+        <register><name>MODER</name><description>Port mode</description><addressOffset>0x0</addressOffset><resetValue>0xA8000000</resetValue>
+          <fields>
+            <field><name>MODER0</name><description>Mode of pin 0</description><bitOffset>0</bitOffset><bitWidth>2</bitWidth>
+              <enumeratedValues>
+                <enumeratedValue><name>Input</name><value>0</value></enumeratedValue>
+                <enumeratedValue><name>Output</name><value>1</value></enumeratedValue>
+                <enumeratedValue><name>Alternate</name><value>2</value></enumeratedValue>
+                <enumeratedValue><name>Analog</name><value>3</value></enumeratedValue>
+              </enumeratedValues>
+            </field>
+            <field><name>MODER1</name><description>Mode of pin 1</description><bitOffset>2</bitOffset><bitWidth>2</bitWidth></field>
+          </fields>
+        </register>
+        <register><name>IDR</name><description>Input data</description><addressOffset>0x10</addressOffset><access>read-only</access>
+          <fields><field><name>IDR</name><description>Pin levels</description><bitOffset>0</bitOffset><bitWidth>16</bitWidth></field></fields>
+        </register>
+        <register><name>ODR</name><description>Output data</description><addressOffset>0x14</addressOffset>
+          <fields><field><name>ODR</name><description>Output levels</description><bitOffset>0</bitOffset><bitWidth>16</bitWidth></field></fields>
+        </register>
+      </registers>
+    </peripheral>
+    <peripheral derivedFrom="GPIOA">
+      <name>GPIOB</name>
+      <baseAddress>0x40020400</baseAddress>
+    </peripheral>
+    <peripheral>
+      <name>USART2</name>
+      <description>Universal synchronous/asynchronous receiver-transmitter</description>
+      <baseAddress>0x40004400</baseAddress>
+      <registers>
+        <register><name>SR</name><description>Status</description><addressOffset>0x0</addressOffset><resetValue>0x000000C0</resetValue>
+          <fields>
+            <field><name>RXNE</name><description>Byte received</description><bitOffset>5</bitOffset><bitWidth>1</bitWidth></field>
+            <field><name>TC</name><description>Transmission complete</description><bitOffset>6</bitOffset><bitWidth>1</bitWidth></field>
+            <field><name>TXE</name><description>Transmit buffer empty</description><bitOffset>7</bitOffset><bitWidth>1</bitWidth><access>read-only</access></field>
+          </fields>
+        </register>
+        <register><name>DR</name><description>Data</description><addressOffset>0x4</addressOffset>
+          <fields><field><name>DR</name><description>Data byte</description><bitOffset>0</bitOffset><bitWidth>9</bitWidth></field></fields>
+        </register>
+        <register><name>BRR</name><description>Baud rate</description><addressOffset>0x8</addressOffset>
+          <fields>
+            <field><name>DIV_FRACTION</name><description>Fraction of the divider</description><bitOffset>0</bitOffset><bitWidth>4</bitWidth></field>
+            <field><name>DIV_MANTISSA</name><description>Integer part of the divider</description><bitOffset>4</bitOffset><bitWidth>12</bitWidth></field>
+          </fields>
+        </register>
+      </registers>
+    </peripheral>
+  </peripherals>
+</device>

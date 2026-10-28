@@ -34,7 +34,10 @@ const TOPICS: [(&str, &str); 13] = [
         "CMSIS-SVD import",
         "File › Import CMSIS-SVD… (or drop a .svd file) adds a chip's registers as values, with fields, reset values and named values, or saves them as templates.",
     ),
-    ("Workspace", "Ctrl+Z / Ctrl+Y undo and redo, work is auto-saved, Ctrl+F searches (type, then press Enter), Ctrl+K opens the command palette."),
+    (
+        "Workspace",
+        "Ctrl+Z / Ctrl+Y undo and redo, work is auto-saved, Ctrl+F searches every register as you type (.* for regular expressions), Ctrl+K opens the command palette.",
+    ),
 ];
 
 /// The guide page each topic links to (as TOPICS).
@@ -51,7 +54,7 @@ const GUIDE_PAGES: [&str; 13] = [
     "05-templates-and-workspace.md",
     "09-peripherals.md",
     "08-importing-svd.md",
-    "05-templates-and-workspace.md",
+    "10-finding-your-way.md",
 ];
 
 /// "Ctrl+Shift+S" as key caps.
