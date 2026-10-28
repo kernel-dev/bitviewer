@@ -1039,6 +1039,7 @@ dependencies = [
  "num-bigint 0.5.1",
  "num-traits",
  "rayon",
+ "regex",
  "rodio",
  "rust-embed",
  "serde_json",

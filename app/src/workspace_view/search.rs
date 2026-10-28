@@ -3,7 +3,7 @@
 //! digits. It searches as you type (a moment after the last key, on every
 //! core) and always over the whole workspace, unless "Only in" limits it to
 //! the open peripheral. Hiding the bar (Esc) keeps the results; "Clear"
-//! discards them.
+//! discards them. With ".*" on (Alt+R) the text is a regular expression.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -14,8 +14,8 @@ use bitviewer_core::integers::{Base, format_int};
 use bitviewer_core::value::Value;
 
 use super::WorkspaceView;
-use crate::theme;
 use crate::widgets::{Btn, Look, icon, r};
+use crate::{app_state, theme};
 
 /// Whether `text` contains `needle` (already lower case), ignoring case,
 /// without copying `text` (ASCII, the usual case for register names).
@@ -34,41 +34,76 @@ fn contains(text: &str, needle: &str) -> bool {
     text.to_lowercase().contains(needle)
 }
 
-/// Does a value match the (lower-case) query? Matching field names too.
-pub fn match_value(value: &Value, query: &str) -> (bool, HashSet<String>) {
+/// What a search looks for: text in any case, or a regular expression
+/// (also case-insensitive unless it starts with `(?-i)`).
+pub enum Matcher {
+    /// Lower case; "" matches everything.
+    Text(String),
+    Regex(regex::Regex),
+}
+
+impl Matcher {
+    /// The matcher for `query`, or why the pattern isn't valid.
+    pub fn new(query: &str, regex: bool) -> Result<Matcher, String> {
+        if !regex {
+            return Ok(Matcher::Text(query.to_lowercase()));
+        }
+        regex::RegexBuilder::new(query).case_insensitive(true).size_limit(1 << 20).build().map(Matcher::Regex).map_err(|error| {
+            // the last line says what is wrong ("unclosed character class")
+            let text = error.to_string();
+            let last = text.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or(&text);
+            last.trim().trim_start_matches("error: ").to_string()
+        })
+    }
+
+    fn finds(&self, text: &str) -> bool {
+        match self {
+            Matcher::Text(needle) => contains(text, needle),
+            Matcher::Regex(regex) => regex.is_match(text),
+        }
+    }
+}
+
+/// Does a value match? Matching field names too.
+pub fn match_value(value: &Value, matcher: &Matcher) -> (bool, HashSet<String>) {
     let mut fields = HashSet::new();
-    if query.is_empty() {
+    if matches!(matcher, Matcher::Text(needle) if needle.is_empty()) {
         return (true, fields);
     }
     for field in &value.fields {
-        if contains(&field.name, query) || contains(&field.details.description, query) || field.details.named.iter().any(|named| contains(&named.label, query))
-        {
+        if matcher.finds(&field.name) || matcher.finds(&field.details.description) || field.details.named.iter().any(|named| matcher.finds(&named.label)) {
             fields.insert(field.name.to_string());
         }
     }
-    let hit = contains(&value.name, query)
-        || contains(&value.block, query)
-        || contains(&value.description, query)
+    let hit = matcher.finds(&value.name)
+        || matcher.finds(&value.block)
+        || matcher.finds(&value.description)
         || !fields.is_empty()
-        || value.snapshots.iter().any(|snapshot| contains(&snapshot.name, query))
-        || hex_match(value, query);
+        || value.snapshots.iter().any(|snapshot| matcher.finds(&snapshot.name))
+        || hex_match(value, matcher);
     (hit, fields)
 }
 
-/// Whether the query is hex digits found in the value (written in hex).
-fn hex_match(value: &Value, query: &str) -> bool {
-    let digits: String = query.strip_prefix("0x").unwrap_or(query).replace('_', "");
-    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return false; // only a hex number can be in the value's hex digits
+/// Whether the value's hex digits match: text that is a hex number found
+/// in them, or a pattern (`^DEAD`, `00$`) that matches them.
+fn hex_match(value: &Value, matcher: &Matcher) -> bool {
+    match matcher {
+        Matcher::Text(query) => {
+            let digits: String = query.strip_prefix("0x").unwrap_or(query).replace('_', "");
+            if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return false; // only a hex number can be in the value's hex digits
+            }
+            format_int(value.value, Base::Hex, value.width, false, false).to_lowercase().contains(&digits)
+        }
+        Matcher::Regex(regex) => regex.is_match(&format_int(value.value, Base::Hex, value.width, false, false)),
     }
-    format_int(value.value, Base::Hex, value.width, false, false).to_lowercase().contains(&digits)
 }
 
 /// Which values match, on every core (one flag per value, in order).
-fn matches<'a>(values: impl Iterator<Item = &'a Arc<Value>>, query: &str) -> Vec<bool> {
+fn matches<'a>(values: impl Iterator<Item = &'a Arc<Value>>, matcher: &Matcher) -> Vec<bool> {
     use rayon::prelude::*;
     let all: Vec<&Arc<Value>> = values.collect();
-    all.par_iter().map(|value| match_value(value, query).0).collect()
+    all.par_iter().map(|value| match_value(value, matcher).0).collect()
 }
 
 /// How long typing must pause before the search runs.
@@ -76,8 +111,15 @@ const SEARCH_PAUSE_MS: u64 = 120;
 
 pub(super) struct Search {
     input: Entity<InputState>,
-    /// The query the workspace is filtered by (lower case; "" shows everything).
+    /// The query the workspace is filtered by ("" shows everything), and
+    /// what it matches with.
     query: String,
+    matcher: Option<Arc<Matcher>>,
+    /// The text and mode last searched for (it may not have been valid).
+    ran: (String, bool),
+    /// Why the text last searched for isn't a valid pattern (the results
+    /// of the last valid one stay).
+    error: Option<String>,
     /// Which values match the query (by position), when there is one.
     pub hits: Option<Arc<Vec<bool>>>,
     count: usize,
@@ -129,6 +171,9 @@ impl WorkspaceView {
         self.search = Some(Search {
             input,
             query: String::new(),
+            matcher: None,
+            ran: (String::new(), false),
+            error: None,
             hits: None,
             count: 0,
             current: None,
@@ -145,7 +190,7 @@ impl WorkspaceView {
     pub(super) fn close_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(search) = &self.search else { return };
         // what was typed last counts, even if its search hadn't run yet
-        if self.typed(cx) != search.query {
+        if self.wanted(cx) != search.ran {
             self.run_search(cx);
         }
         let Some(search) = &mut self.search else { return };
@@ -168,22 +213,56 @@ impl WorkspaceView {
         }
     }
 
+    /// What is typed, as typed (a pattern's `\D` isn't `\d`).
     fn typed(&self, cx: &App) -> String {
-        self.search.as_ref().map(|search| search.input.read(cx).value().trim().to_lowercase()).unwrap_or_default()
+        self.search.as_ref().map(|search| search.input.read(cx).value().trim().to_string()).unwrap_or_default()
+    }
+
+    /// What should be searched for now: the text and whether it's a pattern.
+    fn wanted(&self, cx: &App) -> (String, bool) {
+        (self.typed(cx), app_state::settings(cx).search_regex)
     }
 
     /// Filters the workspace for what is typed.
     fn run_search(&mut self, cx: &mut Context<Self>) {
-        let query = self.typed(cx);
-        let hits = (!query.is_empty()).then(|| Arc::new(matches(self.state.values.iter(), &query)));
+        let (query, regex) = self.wanted(cx);
+        let matcher = if query.is_empty() { Ok(None) } else { Matcher::new(&query, regex).map(|matcher| Some(Arc::new(matcher))) };
+        let matcher = match matcher {
+            Ok(matcher) => matcher,
+            Err(error) => {
+                // keep showing the last valid search's results
+                if let Some(search) = &mut self.search {
+                    search.pending = None;
+                    search.error = Some(error);
+                    search.ran = (query, regex);
+                }
+                cx.notify();
+                return;
+            }
+        };
+        let hits = matcher.as_ref().map(|matcher| Arc::new(matches(self.state.values.iter(), matcher)));
         let Some(search) = &mut self.search else { return };
         search.pending = None;
+        search.error = None;
         search.hits = hits;
+        search.matcher = matcher;
+        search.ran = (query.clone(), regex);
         search.query = query;
         search.current = None;
         self.count_matches();
         self.refilter(false);
         cx.notify();
+    }
+
+    /// Turns regular expressions on or off (".*", Alt+R) and searches again.
+    fn toggle_regex(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        app_state::update(cx, |settings| settings.search_regex = !settings.search_regex);
+        self.run_search(cx);
+        // typing goes on in the box
+        if let Some(search) = &self.search {
+            let input = search.input.clone();
+            input.update(cx, |input, cx| input.focus(window, cx));
+        }
     }
 
     /// The scope of the search: the open page when "Only in" is on.
@@ -220,9 +299,8 @@ impl WorkspaceView {
 
     /// The query matches again after a change (call when values change).
     pub(super) fn refresh_search(&mut self, cx: &mut Context<Self>) {
-        if self.search.as_ref().is_some_and(|search| !search.query.is_empty()) {
-            let query = self.search.as_ref().unwrap().query.clone();
-            let hits = Arc::new(matches(self.state.values.iter(), &query));
+        if let Some(matcher) = self.search.as_ref().and_then(|search| search.matcher.clone()) {
+            let hits = Arc::new(matches(self.state.values.iter(), &matcher));
             let search = self.search.as_mut().unwrap();
             search.hits = Some(hits);
             self.count_matches();
@@ -232,9 +310,9 @@ impl WorkspaceView {
 
     /// Enter / the arrows: search for new text, else go to the next or previous match.
     fn go(&mut self, direction: isize, cx: &mut Context<Self>) {
-        let typed = self.typed(cx);
+        let wanted = self.wanted(cx);
         let Some(search) = &self.search else { return };
-        if typed != search.query {
+        if wanted != search.ran {
             self.run_search(cx);
             return;
         }
@@ -267,6 +345,9 @@ impl WorkspaceView {
         if let Some(search) = &mut self.search {
             search.hits = None;
             search.query.clear();
+            search.matcher = None;
+            search.ran = (String::new(), false);
+            search.error = None;
             search.count = 0;
             search.current = None;
         }
@@ -282,11 +363,11 @@ impl WorkspaceView {
         }
     }
 
-    /// The query and the flash for the value at `index`.
-    pub(super) fn highlight_for(&self, index: usize) -> (Option<String>, Option<std::time::Instant>) {
+    /// What the search matches with, and the flash, for the value at `index`.
+    pub(super) fn highlight_for(&self, index: usize) -> (Option<Arc<Matcher>>, Option<std::time::Instant>) {
         let Some(search) = &self.search else { return (None, None) };
         let flash = search.stepped.filter(|(at, _)| *at == index).map(|(_, when)| when);
-        ((!search.query.is_empty()).then(|| search.query.clone()), flash)
+        (search.matcher.clone(), flash)
     }
 
     /// A search is filtering the values (collapsed peripherals open while it does).
@@ -300,11 +381,13 @@ impl WorkspaceView {
         if !search.open {
             return Some(self.render_results_bar(cx));
         }
-        let typed = search.input.read(cx).value().trim().to_lowercase();
-        let pending = typed != search.query;
+        let regex = app_state::settings(cx).search_regex;
+        let pending = (search.input.read(cx).value().trim().to_string(), regex) != search.ran;
         let total = self.state.len();
         let count = if pending {
             "Searching…".to_string()
+        } else if let Some(error) = &search.error {
+            format!("Invalid pattern: {error}")
         } else if search.query.is_empty() {
             String::new()
         } else if search.count > 0 {
@@ -335,7 +418,13 @@ impl WorkspaceView {
                     }
                 }))
         });
-        let invalid = !pending && !search.query.is_empty() && search.count == 0;
+        let invalid = !pending && (search.error.is_some() || (!search.query.is_empty() && search.count == 0));
+        let regex_toggle = Btn::new("search-regex", if regex { Look::On } else { Look::Ghost })
+            .small()
+            .label(".*")
+            .tip("Regular expression (Alt+R): ^ and $ anchor a name, | means or, \\d is a digit… Ignores case unless the pattern starts with (?-i)")
+            .test_label("search-regex")
+            .on_click(cx.listener(|this, _, window, cx| this.toggle_regex(window, cx)));
         let input = div()
             .flex()
             .items_center()
@@ -367,12 +456,24 @@ impl WorkspaceView {
                         this.close_search(window, cx);
                         cx.stop_propagation();
                     }
+                    "r" if event.keystroke.modifiers.alt => {
+                        this.toggle_regex(window, cx);
+                        cx.stop_propagation();
+                    }
                     _ => {}
                 }))
                 .child(icon("search", 15.0).text_color(palette.muted))
                 .child(input)
+                .child(regex_toggle)
                 .children(scope_toggle)
-                .child(div().min_w(r(9.0 * 7.2)).whitespace_nowrap().text_size(r(12.0)).text_color(palette.muted).child(count))
+                .child(
+                    div()
+                        .min_w(r(9.0 * 7.2))
+                        .whitespace_nowrap()
+                        .text_size(r(12.0))
+                        .text_color(if search.error.is_some() && !pending { palette.error } else { palette.muted })
+                        .child(count),
+                )
                 .child(
                     Btn::new("search-prev", Look::Ghost)
                         .small()
@@ -416,10 +517,14 @@ impl WorkspaceView {
             Some(page) => format!(" in {page}"),
             None => String::new(),
         };
+        let what = match search.matcher.as_deref() {
+            Some(Matcher::Regex(_)) => format!("the pattern /{}/", search.query),
+            _ => format!("“{}”", search.query),
+        };
         let text = match search.count {
-            0 => format!("No values match “{}”{place}", search.query),
-            1 => format!("1 value matches “{}”{place}", search.query),
-            count => format!("{count} values match “{}”{place}", search.query),
+            0 => format!("No values match {what}{place}"),
+            1 => format!("1 value matches {what}{place}"),
+            count => format!("{count} values match {what}{place}"),
         };
         div()
             .flex()
@@ -488,8 +593,51 @@ mod speed {
             .collect();
         for query in ["reg299", "channel 7", "zzz", "a8"] {
             let started = std::time::Instant::now();
-            let hits = super::matches(values.iter(), query).into_iter().filter(|hit| *hit).count();
+            let hits = super::matches(values.iter(), &super::Matcher::new(query, false).unwrap()).into_iter().filter(|hit| *hit).count();
             println!("{query:>10}: {hits} hits in {:?}", started.elapsed());
         }
+    }
+}
+
+#[cfg(test)]
+mod matcher_tests {
+    use super::{Matcher, match_value};
+    use bitviewer_core::integers::{Base, Bits};
+    use bitviewer_core::rows::View;
+    use bitviewer_core::value::Value;
+
+    fn register(name: &str, bits: u64) -> Value {
+        let mut value = Value::new(32, Bits::from(bits), name, View::Line, Base::Hex).unwrap();
+        value.add_field(13, 13, Some("UE"), None, None).unwrap();
+        value
+    }
+
+    #[test]
+    fn text_and_patterns_match_names_fields_and_hex() {
+        let cr1 = register("USART1.CR1", 0xDEAD_0000);
+        let text = |query: &str| match_value(&cr1, &Matcher::new(query, false).unwrap()).0;
+        let pattern = |query: &str| match_value(&cr1, &Matcher::new(query, true).unwrap()).0;
+        // plain text: any case, anywhere
+        assert!(text("usart1") && text("cr1") && text("dead") && !text("cr2"));
+        // a pattern anchors, alternates, classes; also any case
+        assert!(pattern(r"^usart\d\.cr1$"));
+        assert!(!pattern(r"^cr1"));
+        assert!(pattern("CR2|CR1"));
+        // fields match by name (and are the ones highlighted)
+        let (hit, fields) = match_value(&cr1, &Matcher::new("^ue$", true).unwrap());
+        assert!(hit && fields.contains("UE"));
+        // hex digits: the value is DEAD0000
+        assert!(pattern("^DEAD") && pattern("0000$") && !pattern("^0000"));
+        // (?-i) makes it case-sensitive
+        assert!(!pattern("(?-i)usart"));
+    }
+
+    #[test]
+    fn a_bad_pattern_says_what_is_wrong() {
+        let error = Matcher::new("usart[", true).err().unwrap();
+        assert!(error.contains("unclosed"), "{error}");
+        assert!(!error.contains('\n'));
+        // as text, the same characters are fine
+        assert!(Matcher::new("usart[", false).is_ok());
     }
 }

@@ -54,6 +54,8 @@ pub struct Settings {
     pub fonts: String,
     pub tour_done: bool,
     pub check_updates: bool,
+    /// Search (Ctrl+F) takes regular expressions.
+    pub search_regex: bool,
     /// App version whose changes were last shown ("" = never).
     pub last_seen_version: String,
 }
@@ -90,6 +92,7 @@ impl Default for Settings {
             fonts: FONT_SETS[0].into(),
             tour_done: false,
             check_updates: true,
+            search_regex: false,
             last_seen_version: String::new(),
         }
     }
@@ -138,6 +141,7 @@ impl Settings {
             ("compact", &mut self.compact),
             ("tour_done", &mut self.tour_done),
             ("check_updates", &mut self.check_updates),
+            ("search_regex", &mut self.search_regex),
         ] {
             if let Some(v) = get(key).and_then(Json::as_bool) {
                 *target = v;
@@ -238,6 +242,7 @@ impl Settings {
             "fonts": self.fonts,
             "tour_done": self.tour_done,
             "check_updates": self.check_updates,
+            "search_regex": self.search_regex,
             "last_seen_version": self.last_seen_version,
         });
         serde_json::to_string_pretty(&value).expect("settings serialize")

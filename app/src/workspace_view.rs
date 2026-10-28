@@ -42,7 +42,7 @@ use bench::Bench;
 pub use bench::BenchOptions;
 pub use chrome::logo;
 pub use document::install_menus;
-pub use search::match_value;
+pub use search::{Matcher, match_value};
 
 /// Sets up what every window needs: the component library, the bundled
 /// fonts, the settings (theme, accent) and the shortcuts. Tests pass their

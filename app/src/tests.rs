@@ -765,3 +765,36 @@ fn dragging_back_to_the_first_bit_selects_just_it(cx: &mut TestAppContext) {
     click(cx, "prompt-ok");
     assert_eq!((first(&view, cx).fields[0].lo, first(&view, cx).fields[0].hi), (5, 5));
 }
+
+#[gpui::test]
+fn search_takes_regular_expressions(cx: &mut TestAppContext) {
+    let named = |name: &str, bits: u64| {
+        let mut value = value(16, bits);
+        value.name = name.into();
+        value
+    };
+    let (view, cx) = open(cx, vec![named("UART_CR1", 1), named("UART_SR", 2), named("GPIO_ODR", 3)]);
+    let shown = |view: &Entity<WorkspaceView>, cx: &mut VisualTestContext| view.read_with(cx, |view, _| view.shown_values());
+    cx.simulate_keystrokes("ctrl-f");
+    draw(cx);
+    click(cx, "search-regex");
+    cx.simulate_input("^uart_(cr1|sr)$");
+    cx.simulate_keystrokes("enter");
+    draw(cx);
+    assert_eq!(shown(&view, cx), 2);
+
+    // an unfinished pattern: says so, and the last results stay
+    cx.simulate_input("[");
+    cx.simulate_keystrokes("enter");
+    draw(cx);
+    assert_eq!(shown(&view, cx), 2);
+
+    // Alt+R turns patterns off: the same characters are plain text again (no match)
+    cx.simulate_keystrokes(SELECT_ALL);
+    cx.simulate_input("gpio");
+    cx.simulate_keystrokes("alt-r");
+    draw(cx);
+    pause(cx);
+    assert_eq!(shown(&view, cx), 1);
+    assert!(!cx.update(|_, cx| crate::app_state::settings(cx).search_regex));
+}

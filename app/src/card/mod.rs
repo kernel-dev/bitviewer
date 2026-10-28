@@ -185,10 +185,10 @@ impl CardView {
     /// The value to show (from the workspace, each frame).
     /// What the search highlights: matching fields, and a flash when the
     /// search has just stepped to this value.
-    pub fn highlight(&mut self, query: Option<&str>, flash: Option<std::time::Instant>) {
-        self.matches = match query {
-            Some(query) if !query.is_empty() => crate::workspace_view::match_value(&self.value, query).1,
-            _ => Default::default(),
+    pub fn highlight(&mut self, matcher: Option<&crate::workspace_view::Matcher>, flash: Option<std::time::Instant>) {
+        self.matches = match matcher {
+            Some(matcher) => crate::workspace_view::match_value(&self.value, matcher).1,
+            None => Default::default(),
         };
         self.flash = flash;
     }

@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 rayon = "1"
+# regular expressions in search (linear time: no pattern can hang the app)
+regex = "1"
 bitviewer-core = { path = "../core" }
 # GPUI CE (the community edition of GPUI) with its GPUI Component library
 # (inputs, menus, dialogs, notifications, themes); see src/kit.rs

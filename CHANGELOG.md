@@ -7,6 +7,7 @@ Add each change under **Unreleased** as you make it. When a version is released,
 ## [Unreleased]
 
 ### Added
+- Search (Ctrl+F) takes regular expressions: turn on **.*** in the search bar (or press Alt+R). Patterns ignore case unless they start with `(?-i)`, also match a value's hex digits (`^DEAD`, `00$`), and an unfinished pattern is shown in red while the last results stay. The setting is remembered.
 - A single bit can be selected (and made a field): click its number above the bit table, or Shift+click the bit. Dragging along the numbers selects a range, as dragging across the bits does, and Shift+click on a number extends the selection.
 
 ### Fixed
