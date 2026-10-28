@@ -107,7 +107,7 @@ impl WorkspaceView {
     }
 
     /// The list as it used to be, a row per value (to time against).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "macos")))]
     pub fn unfilter_rows_for_test(&mut self) {
         self.rows = None;
         self.list.reset(self.state.len());

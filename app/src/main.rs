@@ -39,7 +39,12 @@ mod value_dialogs;
 mod widgets;
 mod workspace_view;
 
-#[cfg(test)]
+// The interface tests drive windows on GPUI CE's test platform. On macOS its
+// test windows panic when asked for a native window handle (they should
+// return an error), and the component library asks for one there (text
+// inputs, native menus, accessibility). Real windows have one, so the app
+// is unaffected; these tests run on Windows and Linux.
+#[cfg(all(test, not(target_os = "macos")))]
 mod tests;
 
 use std::path::PathBuf;

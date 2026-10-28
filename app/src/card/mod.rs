@@ -754,7 +754,7 @@ impl CardView {
     }
 
     /// What the value's text field holds (for tests).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "macos")))]
     pub fn value_field_text(&self, cx: &App) -> String {
         self.inputs.get(&Slot::Value).map(|input| input.read(cx).value().to_string()).unwrap_or_default()
     }

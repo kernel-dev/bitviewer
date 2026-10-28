@@ -167,19 +167,19 @@ impl WorkspaceView {
     }
 
     /// The card of the value at `index`, if it is on screen (for tests).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "macos")))]
     pub fn card_at(&self, index: usize) -> Option<Entity<CardView>> {
         let id = self.state.values.get(index)?.id;
         self.cards.get(&id).map(|(card, _)| card.clone())
     }
 
     /// How many rows the list has (for tests).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "macos")))]
     pub fn list_rows(&self) -> usize {
         self.row_count()
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "macos")))]
     pub fn shown_values(&self) -> usize {
         (0..self.state.len()).filter(|index| self.shown(*index)).count()
     }

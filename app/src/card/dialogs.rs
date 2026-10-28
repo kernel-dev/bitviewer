@@ -342,7 +342,7 @@ impl CardView {
     }
 
     /// The amount of a shift or rotate (with its kind), or the mask of AND / OR / XOR.
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "macos")))]
     pub(crate) fn operand_prompt(&mut self, op: Op, window: &mut Window, cx: &mut Context<Self>) {
         self.operand_prompt_on(None, op, window, cx)
     }

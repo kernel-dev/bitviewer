@@ -6,6 +6,8 @@ Add each change under **Unreleased** as you make it. When a version is released,
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-28
+
 ### Added
 - Search (Ctrl+F) takes regular expressions: turn on **.*** in the search bar (or press Alt+R). Patterns ignore case unless they start with `(?-i)`, also match a value's hex digits (`^DEAD`, `00$`), and an unfinished pattern is shown in red while the last results stay. The setting is remembered.
 - A single bit can be selected (and made a field): click its number above the bit table, or Shift+click the bit. Dragging along the numbers selects a range, as dragging across the bits does, and Shift+click on a number extends the selection.
@@ -13,8 +15,6 @@ Add each change under **Unreleased** as you make it. When a version is released,
 ### Fixed
 - Dragging across bits and back to the first one now selects just that bit, instead of keeping the range.
 - Dragging across bits to select them played its sound on every mouse movement, even over bits already selected. It now plays only when a bit joins or leaves the selection.
-
-## [3.0.1] - 2026-10-28
 
 ### Changed
 - Built on [GPUI CE](https://gpui-ce.github.io/), the community edition of GPUI, and its component library, instead of Zed's GPUI with GPUI Kit. The app looks and works the same.
