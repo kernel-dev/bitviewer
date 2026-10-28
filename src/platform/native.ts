@@ -228,8 +228,11 @@ export async function writeAppFile(
     return;
   }
 
+  // sent as raw bytes: a large session isn't escaped into JSON on the way
   const { invoke } = await loadCoreApi();
-  await invoke("write_app_file", { directory: appDirectory, name, contents });
+  await invoke("write_app_file", new TextEncoder().encode(contents), {
+    headers: { directory: appDirectory, name },
+  });
 }
 
 export async function deleteAppFile(

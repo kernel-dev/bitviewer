@@ -4,6 +4,18 @@ All notable changes to Bit Viewer are recorded here. The format follows [Keep a 
 
 Add each change under **Unreleased** as you make it. When a version is released, rename that section to `## [x.y.z] - YYYY-MM-DD` and start a new empty **Unreleased** above it. Keep that exact heading format: the release script and workflow use the section as the release notes, and the app shows it in its "What's new" dialog.
 
+## [Unreleased]
+
+### Changed
+- CMSIS-SVD import: register arrays (`dim`) of any size now work. They used to be cut off after 1,024 copies. An array is one row in the picker, such as `CCR[0-3]`: tick it for every copy, open it to tick single copies, or type which copies you want (`0-7, 12`). Only the copies you pick are made, so even an array of millions opens instantly, including arrays nested in clusters and peripherals. Importing more than 50 registers asks first, for templates too.
+- The app opens files up to 512 MB (was 64 MB).
+- Large workspaces use far less memory and respond faster. With about 90,000 values the app used to grow by around 100 MB with every edit (each undo step kept a full copy of the workspace) and could pass 6 GB; it now stays near 1.2 GB however much you edit. Undo steps share everything that didn't change, and undo history is also capped at about 256 MB. Values that are off screen no longer hold their elements: before, every value kept a hidden set of readout chips (4.4 million page elements for 90,000 values), and values you had scrolled past kept all of theirs. An edit takes a few milliseconds instead of about half a second, an undo well under a second instead of 4–5 seconds, and opening is about twice as fast.
+- When the open workspace is saved and unchanged, the auto-saved session only remembers the file instead of a full copy of it, and the session is written without being copied and escaped on the way.
+- CMSIS-SVD import: the file's text is let go as soon as it is read, instead of staying in memory while you pick registers.
+
+### Fixed
+- CMSIS-SVD import: a `dimIndex` letter range with more copies than letters (such as `A-Z` for 30 copies) made names with symbols after `Z`. Those copies are now numbered from 0, with a note. A `dimIndex` that doesn't match the dim is noted too.
+
 ## [2.1.3] - 2026-10-26
 
 ### Added

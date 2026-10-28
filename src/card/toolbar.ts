@@ -59,8 +59,8 @@ const OPS_UI: { value: Op; label?: string; icon?: IconNode; tip: string }[] = [
 export class CardToolbar {
   /** The selected range and an editor for just those bits. Kept across rebuilds. */
   private selBar: SelectionBar;
-  private groupBtn!: HTMLButtonElement;
-  private clearSelBtn!: HTMLButtonElement;
+  private groupBtn: HTMLButtonElement | null = null;
+  private clearSelBtn: HTMLButtonElement | null = null;
 
   constructor(private card: ValueCard) {
     this.selBar = new SelectionBar(card.model, (lo, width, value, input) => {
@@ -162,7 +162,14 @@ export class CardToolbar {
   /** Shows the selection (or that there is none). */
   update(selection: [number, number] | null) {
     this.selBar.update(selection);
-    this.groupBtn.disabled = !selection;
-    this.clearSelBtn.hidden = !selection;
+    if (this.groupBtn) this.groupBtn.disabled = !selection;
+    if (this.clearSelBtn) this.clearSelBtn.hidden = !selection;
+  }
+
+  /** Lets go of the last build's elements (the card was emptied). */
+  release() {
+    this.selBar.release();
+    this.groupBtn = null;
+    this.clearSelBtn = null;
   }
 }

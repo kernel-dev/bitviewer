@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { ValueModel } from "../../src/core/model";
 import {
+  IndexSet,
+  inFileOrder,
   parseSvd,
   parseSvdNumber,
+  pickedRegisters,
   registerTemplate,
+  type SvdDevice,
   SvdError,
+  type SvdRegister,
 } from "../../src/core/svd";
 import { parseXml, XmlError } from "../../src/core/svd/xml";
 
@@ -48,6 +53,14 @@ describe("svd numbers", () => {
     expect(parseSvdNumber("nope")).toBeNull();
   });
 });
+
+/** Every copy of every register, as an import of everything would make them. */
+const everyRegister = (device: SvdDevice): SvdRegister[] =>
+  device.peripherals.flatMap((peripheral) =>
+    peripheral.registers.flatMap((array) =>
+      Array.from({ length: array.count }, (_, position) => array.at(position)),
+    ),
+  );
 
 const SVD = `<?xml version="1.0" encoding="utf-8"?>
 <device schemaVersion="1.3" xmlns:xs="http://www.w3.org/2001/XMLSchema-instance">
@@ -170,9 +183,7 @@ describe("svd", () => {
   const device = parseSvd(SVD);
   const uart0 = device.peripherals.find((item) => item.name === "UART0")!;
   const register = (path: string) =>
-    device.peripherals
-      .flatMap((item) => item.registers)
-      .find((item) => item.path === path)!;
+    everyRegister(device).find((item) => item.path === path)!;
 
   it("reads the device and its peripherals", () => {
     expect(device.name).toBe("DEMO");
@@ -268,5 +279,159 @@ describe("svd", () => {
 
   it("rejects files that aren't SVD", () => {
     expect(() => parseSvd("<workspace/>")).toThrow(SvdError);
+  });
+});
+
+/** A device with one peripheral around `registers`. */
+const deviceWith = (registers: string, peripheral = "<name>P</name>") =>
+  parseSvd(`<device><name>D</name><peripherals><peripheral>
+    ${peripheral}<baseAddress>0x40000000</baseAddress>
+    <registers>${registers}</registers>
+  </peripheral></peripherals></device>`);
+
+describe("svd arrays", () => {
+  it("keeps each array as one entry", () => {
+    const uart0 = parseSvd(SVD).peripherals[0];
+    expect(uart0.registers.map((array) => [array.label, array.count])).toEqual([
+      ["CTRL", 1],
+      ["DATA[0-1]", 2],
+      ["BUF[A-C]", 3],
+      ["CTRL2", 1],
+      ["CH[0-1].CFG", 2],
+    ]);
+  });
+
+  it("reads arrays of any size, nested in peripherals and clusters", () => {
+    const device = deviceWith(
+      `<cluster>
+         <name>CH%s</name><dim>1000</dim><dimIncrement>0x100</dimIncrement>
+         <addressOffset>0x1000</addressOffset>
+         <register><name>R%s</name><dim>64</dim><dimIncrement>4</dimIncrement><addressOffset>0</addressOffset></register>
+       </cluster>
+       <register><name>BIG%s</name><dim>4G</dim><dimIncrement>4</dimIncrement><addressOffset>0</addressOffset></register>`,
+      `<name>TIM%s</name><dim>2</dim><dimIncrement>0x100000</dimIncrement><dimIndex>2-3</dimIndex>`,
+    );
+    const [timers] = device.peripherals;
+    expect([timers.name, timers.count]).toEqual(["TIM[2-3]", 2]);
+
+    const [channels, big] = timers.registers;
+    expect([channels.label, channels.count]).toEqual([
+      "CH[0-999].R[0-63]",
+      128_000,
+    ]);
+    expect(channels.at(64).path).toBe("TIM2.CH1.R0");
+    const last = channels.at(channels.count - 1);
+    expect(last.path).toBe("TIM3.CH999.R63");
+    expect(last.peripheral).toBe("TIM3");
+    expect(last.peripheralBase).toBe(0x40100000n);
+    expect(last.address).toBe(0x40100000n + 0x1000n + 999n * 0x100n + 63n * 4n);
+
+    expect(big.count).toBe(2 * 4 * 1024 ** 3);
+    expect(big.at(big.count - 1).path).toBe("TIM3.BIG4294967295");
+    expect(() => big.at(big.count)).toThrow(RangeError);
+  });
+
+  it("skips arrays too large to count", () => {
+    const device = deviceWith(
+      `<register><name>A%s</name><dim>99999999999999999999</dim><addressOffset>0</addressOffset></register>
+       <cluster><name>C%s</name><dim>1T</dim><addressOffset>0</addressOffset>
+         <register><name>B%s</name><dim>1T</dim><addressOffset>0</addressOffset></register>
+       </cluster>`,
+    );
+    expect(device.peripherals[0].registers).toEqual([]);
+    expect(device.warnings).toEqual([
+      "P.A%s: dim 99999999999999999999 is too large to count; skipped",
+      `P.C[0-1099511627775].B[0-1099511627775]: ${1024n ** 8n} copies are too many to count; skipped`,
+    ]);
+  });
+
+  it("only makes the field copies that fit in the register", () => {
+    const [array] = deviceWith(
+      `<register><name>R</name><addressOffset>0</addressOffset><size>32</size><fields>
+         <field><name>B%s</name><dim>1000000</dim><dimIncrement>1</dimIncrement><bitOffset>0</bitOffset><bitWidth>1</bitWidth></field>
+       </fields></register>
+       <register><name>S</name><addressOffset>4</addressOffset><fields>
+         <field><name>F%s</name><dim>5</dim><dimIncrement>0</dimIncrement><bitOffset>0</bitOffset><bitWidth>1</bitWidth></field>
+       </fields></register>`,
+    ).peripherals[0].registers;
+    expect(array.fields.map((field) => field.name)).toEqual(
+      Array.from({ length: 32 }, (_, index) => `B${index}`),
+    );
+    expect(array.warnings).toEqual([
+      "B[0-999999]: 999968 more copies would be outside the 32-bit register, so they were left out",
+    ]);
+  });
+
+  it("numbers copies when dimIndex doesn't fit the dim", () => {
+    const device = deviceWith(
+      `<register><name>L%s</name><dim>30</dim><dimIndex>A-Z</dimIndex><addressOffset>0</addressOffset></register>
+       <register><name>N%s</name><dim>3</dim><dimIndex>0-7</dimIndex><addressOffset>0</addressOffset></register>
+       <register><name>W%s</name><dim>3</dim><dimIndex>a,b</dimIndex><addressOffset>0</addressOffset></register>
+       <register><name>OK%s</name><dim>3</dim><dimIndex>x, y ,z</dimIndex><addressOffset>0</addressOffset></register>`,
+    );
+    const [letters, numbers, short, list] = device.peripherals[0].registers;
+    expect(letters.label).toBe("L[0-29]");
+    expect(letters.at(29).name).toBe("L29");
+    expect(numbers.label).toBe("N[0-2]");
+    expect(short.at(2).name).toBe("W2");
+    expect(list.label).toBe("OK[x,y,z]");
+    expect(list.at(1).name).toBe("OKy");
+    expect(device.warnings).toEqual([
+      "P.L%s: dimIndex A-Z runs out of letters for dim 30; numbered 0-29",
+      "P.N%s: dimIndex 0-7 doesn't match dim 3; numbered from 0",
+      "P.W%s: dimIndex lists 2 names for dim 3; numbered 0-2",
+    ]);
+  });
+
+  it("puts picked copies back in file order", () => {
+    const [cfg, stat] = deviceWith(
+      `<cluster><name>CH%s</name><dim>2</dim><dimIncrement>8</dimIncrement><addressOffset>0</addressOffset>
+         <register><name>CFG</name><addressOffset>0</addressOffset></register>
+         <register><name>STAT</name><addressOffset>4</addressOffset></register>
+       </cluster>`,
+    ).peripherals[0].registers;
+    const picks = [
+      { array: cfg, positions: IndexSet.all(2) },
+      { array: stat, positions: IndexSet.all(2) },
+    ];
+    expect(pickedRegisters(picks).map((register) => register.path)).toEqual([
+      "P.CH0.CFG",
+      "P.CH0.STAT",
+      "P.CH1.CFG",
+      "P.CH1.STAT",
+    ]);
+    expect(
+      inFileOrder([stat.at(0), cfg.at(1)]).map((item) => item.path),
+    ).toEqual(["P.CH0.STAT", "P.CH1.CFG"]);
+  });
+});
+
+describe("index sets", () => {
+  it("reads, merges and writes positions", () => {
+    const set = IndexSet.parse("8, 0-3 2 - 5", 10) as IndexSet;
+    expect(set.toString()).toBe("0-5, 8");
+    expect(set.size).toBe(7);
+    expect([...set]).toEqual([0, 1, 2, 3, 4, 5, 8]);
+    set.set(3, false);
+    set.set(9, true);
+    expect(set.toString()).toBe("0-2, 4-5, 8-9");
+    expect(set.has(4)).toBe(true);
+    expect(set.has(3)).toBe(false);
+    set.fill(false);
+    expect(set.size).toBe(0);
+    expect((IndexSet.parse("", 4) as IndexSet).size).toBe(0);
+  });
+
+  it("explains positions it can't take", () => {
+    expect(IndexSet.parse("4", 4)).toBe("4 is past the last copy (3)");
+    expect(IndexSet.parse("3-1", 4)).toBe("3-1 runs backwards");
+    expect(IndexSet.parse("x", 4)).toMatch(/not a position/);
+  });
+
+  it("holds billions of positions as one range", () => {
+    const set = IndexSet.all(2 ** 40);
+    set.set(5, false);
+    expect(set.size).toBe(2 ** 40 - 1);
+    expect(set.toString()).toBe(`0-4, 6-${2 ** 40 - 1}`);
   });
 });

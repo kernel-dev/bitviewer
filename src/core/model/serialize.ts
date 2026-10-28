@@ -7,6 +7,43 @@ import { assignDetails, detailsFromJSON } from "./group";
 import { bitPosition, checkBase, ModelError, toBig } from "./validate";
 import { ValueModel } from "./value-model";
 
+/** Each value's JSON text and the revision it was made for. */
+const texts = new WeakMap<ValueModel, { revision: number; text: string }>();
+let textMade = 0;
+
+/** The value's JSON text. Made again only after the value changed, so an
+ *  unchanged value gives the very same string each time (undo steps and the
+ *  auto-saved session share it instead of holding copies). */
+export function valueText(model: ValueModel): string {
+  const cached = texts.get(model);
+  if (cached?.revision === model.revision) return cached.text;
+  const text = JSON.stringify(valueToJSON(model));
+  textMade += text.length;
+  texts.set(model, { revision: model.revision, text });
+  return text;
+}
+
+/** Records `text` as the value's JSON text when it was just read from that
+ *  text (an undo step), so the step's string is reused rather than remade. */
+export function rememberValueText(model: ValueModel, text: string): void {
+  texts.set(model, { revision: model.revision, text });
+}
+
+/** Characters of value JSON text made so far, for estimating what undo holds. */
+export const valueTextMade = () => textMade;
+
+/** Gives back the first copy of each text seen, so repeated texts (field
+ *  names, descriptions, colours…) are stored once. Share one across a load. */
+export type TextPool = Map<string, string>;
+
+const pooled = (pool: TextPool | undefined, text: string): string => {
+  if (!pool) return text;
+  const found = pool.get(text);
+  if (found !== undefined) return found;
+  pool.set(text, text);
+  return text;
+};
+
 /** The workspace JSON of a value. */
 export function valueToJSON(model: ValueModel) {
   const hex = (value: bigint) => `0x${value.toString(16).toUpperCase()}`;
@@ -53,8 +90,9 @@ export function valueToJSON(model: ValueModel) {
   };
 }
 
-/** Reads a value from its workspace JSON. Throws ModelError when it is unusable. */
-export function valueFromJSON(json: any): ValueModel {
+/** Reads a value from its workspace JSON. Throws ModelError when it is unusable.
+ *  Values read with the same `pool` share their repeated texts. */
+export function valueFromJSON(json: any, pool?: TextPool): ValueModel {
   if (!json || typeof json !== "object")
     throw new ModelError("Invalid value entry");
 
@@ -81,7 +119,7 @@ export function valueFromJSON(json: any): ValueModel {
   }
 
   if (typeof json.description === "string")
-    model.description = json.description;
+    model.description = pooled(pool, json.description);
 
   for (const snapshotJson of Array.isArray(json.snapshots)
     ? json.snapshots
@@ -127,11 +165,20 @@ export function valueFromJSON(json: any): ValueModel {
     const group = model.addGroup(
       bitPosition(groupJson.lo),
       bitPosition(groupJson.hi),
-      String(groupJson.name ?? ""),
-      groupJson.color,
+      pooled(pool, String(groupJson.name ?? "")),
+      typeof groupJson.color === "string"
+        ? pooled(pool, groupJson.color)
+        : groupJson.color,
       checkBase(Number(groupJson.base ?? 16)),
     );
     assignDetails(group, detailsFromJSON(groupJson));
+
+    if (pool) {
+      group.description = pooled(pool, group.description);
+      group.unit = pooled(pool, group.unit);
+      group.formula = pooled(pool, group.formula);
+      for (const named of group.named) named.label = pooled(pool, named.label);
+    }
   }
 
   return model;

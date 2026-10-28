@@ -5,6 +5,7 @@ import { deleteAppFile, readAppFile, writeAppFile } from "./native";
 const FILE = "session.json";
 const DELAY_MS = 1000;
 
+/** The session as read back. */
 export interface Session {
   version: 1;
   path: string | null; // workspace file, if it was saved or opened
@@ -13,6 +14,18 @@ export interface Session {
   values: unknown[] | null; // workspace contents; null = reopen `path` from disk
   peripherals?: unknown[] | null; // peripheral blocks of those values
   savedAt: number;
+}
+
+/** The session to write. The values come as their JSON texts, the same
+ *  strings undo holds, so writing one makes no copy of each value. */
+export interface SessionState {
+  path: string | null;
+  fileName: string;
+  dirty: boolean;
+  /** null when `path` holds everything (saved, no changes since). */
+  valueTexts: readonly string[] | null;
+  /** The peripherals as JSON text. */
+  peripheralsText: string;
 }
 
 export async function loadSession(): Promise<Session | null> {
@@ -38,11 +51,25 @@ export async function loadSession(): Promise<Session | null> {
   }
 }
 
+/** The session file's text, put together from the ready-made value texts. */
+export function sessionText(state: SessionState, savedAt = Date.now()): string {
+  const head = JSON.stringify({
+    version: 1,
+    path: state.path,
+    fileName: state.fileName,
+    dirty: state.dirty,
+    savedAt,
+  });
+  const values = state.valueTexts ? `[${state.valueTexts.join(",")}]` : "null";
+  const peripherals = state.valueTexts ? state.peripheralsText : "null";
+  return `${head.slice(0, -1)},"values":${values},"peripherals":${peripherals}}`;
+}
+
 let timer = 0;
-let latest: (() => Session) | null = null;
+let latest: (() => SessionState) | null = null;
 
 /** Writes the session a moment after the last change. */
-export function saveSessionSoon(get: () => Session) {
+export function saveSessionSoon(get: () => SessionState) {
   latest = get;
   clearTimeout(timer);
 
@@ -53,10 +80,10 @@ export function saveSessionSoon(get: () => Session) {
 }
 
 /** Writes now (on save, open, close). A pending delayed write is replaced. */
-export async function saveSessionNow(session?: Session): Promise<void> {
+export async function saveSessionNow(state?: SessionState): Promise<void> {
   clearTimeout(timer);
   timer = 0;
-  const data = session ?? latest?.();
+  const data = state ?? latest?.();
   if (data) await writeSession(data);
 }
 
@@ -66,9 +93,9 @@ export async function clearSession(): Promise<void> {
   await deleteAppFile("data", FILE).catch(() => {});
 }
 
-async function writeSession(session: Session) {
+async function writeSession(state: SessionState) {
   try {
-    await writeAppFile("data", FILE, JSON.stringify(session));
+    await writeAppFile("data", FILE, sessionText(state));
   } catch {
     /* best effort: auto-save must never interrupt work */
   }

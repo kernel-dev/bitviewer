@@ -4,7 +4,14 @@
 
 import { Plus, Ruler } from "lucide";
 import { ValueCard } from "../../card/card";
-import { ValueModel, valueFromJSON, valueToJSON } from "../../core/model";
+import {
+  rememberValueText,
+  type TextPool,
+  ValueModel,
+  valueFromJSON,
+  valueText,
+  valueToJSON,
+} from "../../core/model";
 import {
   groupOrder,
   moveItem,
@@ -12,6 +19,11 @@ import {
   peripheralsFromJSON,
   peripheralToJSON,
 } from "../../core/workspace";
+import {
+  makeSnapshot,
+  snapshotTexts,
+  type WorkspaceSnapshot,
+} from "../../core/workspace-snapshot";
 import { appSettings } from "../../platform/settings";
 import { ask, button, html } from "../../ui/kit";
 import { logoSvg } from "../../ui/logo";
@@ -115,37 +127,67 @@ export class Workspace {
     };
   }
 
-  /** The workspace as one string, for undo steps. */
-  snapshot(): string {
-    return JSON.stringify(this.toJSON());
+  /** Each value's JSON text, in order. Unchanged values give the same
+   *  strings as last time (see valueText). */
+  valueTexts(): string[] {
+    return this.cards.map((card) => valueText(card.model));
+  }
+
+  /** The peripherals as JSON text. */
+  peripheralsText(): string {
+    return JSON.stringify(this.usedPeripherals().map(peripheralToJSON));
+  }
+
+  /** The workspace for an undo step, sharing what didn't change with `previous`. */
+  snapshot(previous: WorkspaceSnapshot | null = null): WorkspaceSnapshot {
+    return makeSnapshot(this.valueTexts(), this.peripheralsText(), previous);
   }
 
   /** Puts the workspace back to a snapshot (undo / redo), keeping the scroll
    *  position. Cards whose value is the same in the snapshot are kept, so an
    *  undo only rebuilds what it changes, and those cards keep their selection,
    *  cursor and expression bar. */
-  restore(snapshotJson: string) {
+  restore(snapshot: WorkspaceSnapshot) {
     const scroll = this.element.scrollTop;
-    const data = JSON.parse(snapshotJson);
-    const peripherals = peripheralsFromJSON(data.peripherals);
-    const reusable = new Map<string, ValueCard[]>();
-
-    for (const card of this.cards) {
-      const key = JSON.stringify(valueToJSON(card.model));
-      reusable.set(key, [...(reusable.get(key) ?? []), card]);
-    }
-
+    const texts = snapshotTexts(snapshot);
+    const peripherals = peripheralsFromJSON(JSON.parse(snapshot.peripherals));
+    const current = this.valueTexts();
+    const next: (ValueCard | undefined)[] = new Array(texts.length);
     const kept = new Set<ValueCard>();
 
-    const next = (data.values as unknown[]).map((serialized) => {
-      const card = reusable.get(JSON.stringify(serialized))?.shift();
+    // most undo steps change a few values in place: those keep their position
+    for (let index = 0; index < texts.length; index++) {
+      if (index < current.length && texts[index] === current[index]) {
+        next[index] = this.cards[index];
+        kept.add(this.cards[index]);
+      }
+    }
+
+    // the rest (moved, added, removed, changed) are matched by their text
+    const reusable = new Map<string, ValueCard[]>();
+    for (const [index, card] of this.cards.entries()) {
+      if (kept.has(card)) continue;
+      const list = reusable.get(current[index]);
+      if (list) list.push(card);
+      else reusable.set(current[index], [card]);
+    }
+
+    const pool: TextPool = new Map();
+
+    for (let index = 0; index < texts.length; index++) {
+      if (next[index]) continue;
+      const card = reusable.get(texts[index])?.shift();
       if (card) {
         kept.add(card);
-        return card;
+        next[index] = card;
+        continue;
       }
 
-      return this.createCard(valueFromJSON(serialized));
-    });
+      const model = valueFromJSON(JSON.parse(texts[index]), pool);
+      // the step's own string stands for this value, so later steps share it
+      rememberValueText(model, texts[index]);
+      next[index] = this.createCard(model);
+    }
 
     // a kept register shows its peripheral's base address: redraw it when that changed
     const describe = (map: Map<string, Peripheral>, name: string) => {
@@ -163,7 +205,7 @@ export class Workspace {
     this.batch(() => {
       for (const card of [...this.cards]) if (!kept.has(card)) this.drop(card);
       this.peripherals = peripherals;
-      this.cards = next;
+      this.cards = next as ValueCard[];
 
       for (const card of kept)
         if (changedBlocks.has(card.model.block)) card.rebuildWhenShown();
@@ -176,7 +218,8 @@ export class Workspace {
 
   /** Replaces every value and peripheral (validated JSON). */
   replace(values: unknown[], peripherals: unknown) {
-    const models = values.map((serialized) => valueFromJSON(serialized));
+    const pool: TextPool = new Map();
+    const models = values.map((serialized) => valueFromJSON(serialized, pool));
     const blocks = peripheralsFromJSON(peripherals);
 
     this.batch(() => {
@@ -204,14 +247,14 @@ export class Workspace {
 
   /** Peripherals that have registers, in workspace order. */
   usedPeripherals(): Peripheral[] {
-    const out: Peripheral[] = [];
+    const out = new Set<Peripheral>();
 
     for (const card of this.cards) {
       const peripheral = this.peripherals.get(card.model.block);
-      if (peripheral && !out.includes(peripheral)) out.push(peripheral);
+      if (peripheral) out.add(peripheral);
     }
 
-    return out;
+    return [...out];
   }
 
   // ================================================================ values
@@ -379,7 +422,7 @@ export class Workspace {
     // what goes where: loose cards and peripheral blocks in the workspace,
     // each peripheral's cards in its block (they are next to each other)
     const children: HTMLElement[] = [];
-    const blocks: { name: string; cards: HTMLElement[] }[] = [];
+    const blocks: { name: string; cards: HTMLElement[]; slot: number }[] = [];
 
     for (const card of this.cards) {
       const block = card.model.block;
@@ -387,15 +430,16 @@ export class Workspace {
       else if (blocks.at(-1)?.name === block)
         blocks.at(-1)!.cards.push(card.root);
       else {
-        blocks.push({ name: block, cards: [card.root] });
-        children.push(card.root); // stands for the block until it exists
+        // the block's place among the children, filled in below
+        blocks.push({ name: block, cards: [card.root], slot: children.length });
+        children.push(card.root);
       }
     }
 
-    for (const { name, cards } of blocks) {
+    for (const { name, cards, slot } of blocks) {
       const section = this.app.peripherals.section(name, cards.length);
       setChildren(section.body, cards);
-      children[children.indexOf(cards[0])] = section.element;
+      children[slot] = section.element;
     }
 
     this.app.peripherals.keepSections(new Set(blocks.map(({ name }) => name)));
@@ -442,9 +486,9 @@ export class Workspace {
       }
     }
 
+    const used = new Set(this.cards.map((card) => card.model.block));
     for (const name of [...this.peripherals.keys()])
-      if (!this.cards.some((card) => card.model.block === name))
-        this.peripherals.delete(name);
+      if (!used.has(name)) this.peripherals.delete(name);
 
     this.cards = groupOrder(this.cards, this.blockOf);
   }

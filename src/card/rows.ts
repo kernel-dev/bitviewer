@@ -87,6 +87,7 @@ export class RowsView {
     this.cmpEdits.clear();
     this.cmpReadouts.clear();
     this.cmpBases.clear();
+    this.element = null; // or the whole old bit grid stays alive
   }
 
   /** Redraws the bit cells only (selection or cursor moved). */

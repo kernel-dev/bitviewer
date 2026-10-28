@@ -5,7 +5,7 @@ Chip vendors describe every register of an Arm Cortex-M microcontroller in a **C
 ## Importing
 
 1. **File › Import CMSIS-SVD…** (or drop a `.svd` file on the window).
-2. Pick the registers. Everything starts selected; **Unselect all** / **Select all** toggles every register at once. Tick a peripheral to take all of its registers, or open it with the arrow and tick single registers. The filter matches peripheral and register names and descriptions, and while it is in use the toggle only acts on what it shows (**Select all matching**).
+2. Pick the registers. Everything starts selected; **Unselect all** / **Select all** toggles every register at once. Tick a peripheral to take all of its registers, or open it with the arrow and tick single registers. The filter matches peripheral and register names and descriptions, and while it is in use the toggle only acts on what it shows (**Select all matching**). A register array (from `dim`) is one row, such as `CCR[0-3]`: tick it to take every copy, open it with its arrow to tick single copies, or type the copies you want in its box, counted from 0 (`0-7, 12`).
 3. **Add values** adds each register as a value, or **Save as templates** keeps the layouts for later.
 
 ![Picking UART0's CTRL and BAUD registers from a device description](img/svd-import.png)
@@ -31,11 +31,11 @@ One **Ctrl+Z** removes everything an import added.
 |---|---|
 | `size`, `access`, `resetValue`, `resetMask` | inherited from the device, peripheral and cluster as the spec says |
 | `derivedFrom` | peripherals, clusters, registers, fields and enumerated values copy what they don't override |
-| `dim`, `dimIncrement`, `dimIndex` | arrays are expanded: `CCR[%s]` with dim 4 becomes `CCR0` … `CCR3` |
+| `dim`, `dimIncrement`, `dimIndex` | arrays of any size, also on clusters and peripherals: `CCR[%s]` with dim 4 gives `CCR0` … `CCR3`. Only the copies you pick are made. A `dimIndex` that doesn't fit the dim (such as `A-Z` for 30 copies) is numbered from 0 instead |
 | clusters | flattened into the name: `TIM1.CH0.CCR` |
 | field bits | `bitOffset` + `bitWidth`, `lsb` + `msb`, or `bitRange` `[7:4]` |
 | enumerated values | `#1x0` style values with don't-care bits become one named value per match |
 
-Some files describe the same bits twice (for example alternative meanings of one field). Fields can't overlap in Bit Viewer, so the later one is left out; a ⚠ after a register's field count says so, and hovering shows which. Registers wider than 512 bits are skipped.
+Some files describe the same bits twice (for example alternative meanings of one field). Fields can't overlap in Bit Viewer, so the later one is left out; a ⚠ after a register's field count says so, and hovering shows which. Registers wider than 512 bits are skipped, and a field array keeps only the copies that fit in its register.
 
 The format is described in the [CMSIS-SVD specification](https://open-cmsis-pack.github.io/svd-spec/main/).

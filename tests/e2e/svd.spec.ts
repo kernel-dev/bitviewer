@@ -144,3 +144,73 @@ test("select / unselect all, for everything or for what the filter shows", async
     dialog.getByRole("button", { name: "Add value" }),
   ).toBeDisabled();
 });
+
+const ARRAY_SVD = `<?xml version="1.0" encoding="utf-8"?>
+<device>
+  <name>BIG</name>
+  <peripherals>
+    <peripheral>
+      <name>UART0</name>
+      <baseAddress>0x40001000</baseAddress>
+      <registers>
+        <register><name>CTRL</name><addressOffset>0x0</addressOffset></register>
+        <register>
+          <name>BUF%s</name><dim>100000</dim><dimIncrement>4</dimIncrement>
+          <addressOffset>0x10</addressOffset><resetValue>0x7</resetValue>
+        </register>
+      </registers>
+    </peripheral>
+  </peripherals>
+</device>`;
+
+test("a large register array is one row; its copies are picked by position", async ({
+  app,
+  page,
+}) => {
+  const chooser = page.waitForEvent("filechooser");
+  await app.run("window.__app.commands.run('file.importSvd')");
+  await (await chooser).setFiles({
+    name: "big.svd",
+    mimeType: "application/xml",
+    buffer: Buffer.from(ARRAY_SVD),
+  });
+  const dialog = page.locator(".modal", { hasText: "Import from BIG" });
+  const count = dialog.locator(".svd-count");
+  await expect(count).toHaveText("100,001 registers selected");
+  await dialog.locator(".svd-all").click();
+  await expect(count).toHaveText("1 peripherals · 100,001 registers");
+
+  await dialog.locator(".svd-periph").click();
+  const array = dialog.locator(".svd-array");
+  await expect(array).toContainText("BUF[0-99999]");
+  await expect(array).toContainText("100,000 copies");
+
+  // a bad position is marked and not applied
+  const positions = array.locator(".svd-positions");
+  await positions.fill("5-1");
+  await expect(positions).toHaveClass(/invalid/);
+  await positions.fill("1-2");
+  await positions.press("Enter");
+  await expect(count).toHaveText("2 registers selected");
+
+  // opening the array lists its first copies, ticked as picked
+  await dialog.locator(".svd-array b").click();
+  await expect(dialog.locator(".svd-copy")).toHaveCount(398);
+  await expect(
+    dialog.getByRole("checkbox", { name: "Select UART0.BUF1", exact: true }),
+  ).toBeChecked();
+  await expect(
+    dialog.getByRole("checkbox", { name: "Select UART0.BUF3", exact: true }),
+  ).not.toBeChecked();
+  await expect(dialog.locator(".svd-more")).toContainText(
+    "99,602 more copies aren't listed",
+  );
+
+  await dialog.getByRole("button", { name: "Add 2 values" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".card")).toHaveCount(3);
+  expect(
+    await app.run("window.__app.cards.slice(1).map(c => c.model.name).join()"),
+  ).toBe("UART0.BUF1,UART0.BUF2");
+  expect(await app.value(2)).toBe("7");
+});

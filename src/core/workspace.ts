@@ -104,15 +104,27 @@ export function addressOf(
 /** Puts each peripheral's items together at the place of its first item;
  *  everything else keeps its order. */
 export function groupOrder<T>(items: T[], blockOf: BlockOf<T>): T[] {
+  // one pass to collect each peripheral's items, one to place them
+  const members = new Map<string, T[]>();
+
+  for (const item of items) {
+    const block = blockOf(item);
+    if (!block) continue;
+    const list = members.get(block);
+    if (list) list.push(item);
+    else members.set(block, [item]);
+  }
+
   const out: T[] = [];
-  const placed = new Set<string>();
 
   for (const item of items) {
     const block = blockOf(item);
     if (!block) out.push(item);
-    else if (!placed.has(block)) {
-      placed.add(block);
-      out.push(...items.filter((other) => blockOf(other) === block));
+    else {
+      const list = members.get(block);
+      if (!list) continue; // already placed
+      for (const member of list) out.push(member);
+      members.delete(block);
     }
   }
 

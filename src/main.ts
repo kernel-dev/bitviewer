@@ -47,4 +47,6 @@ appSettings
     );
   });
 
-if (import.meta.env.DEV) (window as any).__app = app; // for scripted UI checks
+// for scripted UI checks, and for the benchmark (bench/) against the production build
+if (import.meta.env.DEV || new URLSearchParams(location.search).has("bench"))
+  (window as any).__app = app;

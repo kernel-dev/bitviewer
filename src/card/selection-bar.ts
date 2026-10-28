@@ -8,7 +8,7 @@ import { html, NumberInput, segmented } from "../ui/kit";
 const BASES: Base[] = [16, 10, 2];
 
 export class SelectionBar {
-  readonly element: HTMLElement;
+  private el: HTMLElement | null = null;
   private input: NumberInput | null = null;
   private key = "";
   private base: Base = 16;
@@ -22,9 +22,24 @@ export class SelectionBar {
       value: bigint,
       input: HTMLElement,
     ) => void,
-  ) {
+  ) {}
+
+  /** Made when the card is first built, so a large workspace doesn't hold
+   *  one for every value. */
+  get element(): HTMLElement {
     // clicking in here must not count as "clicking elsewhere" and drop the selection
-    this.element = html("div", { class: "sel-bar", "data-keep-sel": "" });
+    this.el ??= html("div", { class: "sel-bar", "data-keep-sel": "" });
+    return this.el;
+  }
+
+  /** Lets go of the last selection's elements (the card was emptied). The
+   *  chosen base stays. */
+  release() {
+    // out of the old toolbar too: through its parent it would keep all of it
+    this.el?.remove();
+    this.el = null;
+    this.input = null;
+    this.key = "";
   }
 
   update(selection: [number, number] | null) {

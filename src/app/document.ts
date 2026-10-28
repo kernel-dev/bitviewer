@@ -8,8 +8,16 @@ import {
   parseWorkspaceFile,
   workspaceFileText,
 } from "../core/workspace-file";
+import {
+  sameSnapshot,
+  type WorkspaceSnapshot,
+} from "../core/workspace-snapshot";
 import * as P from "../platform/native";
-import { loadSession, type Session, saveSessionNow } from "../platform/session";
+import {
+  loadSession,
+  type SessionState,
+  saveSessionNow,
+} from "../platform/session";
 import { appSettings } from "../platform/settings";
 import { ask, html, icon, type MenuItem, toast } from "../ui/kit";
 import type { App } from "./app";
@@ -47,12 +55,12 @@ export class WorkspaceDocument {
   private path: string | null = null;
   private fileName = UNTITLED;
   /** Snapshot of the workspace as last saved/opened; null = never saved. */
-  private savedSnapshot: string | null = null;
+  private savedSnapshot: WorkspaceSnapshot | null = null;
 
   constructor(private app: App) {}
 
   get dirty(): boolean {
-    return this.app.history.snapshot !== this.savedSnapshot;
+    return !sameSnapshot(this.app.history.snapshot, this.savedSnapshot);
   }
 
   /** Marks the current state as the saved one. */
@@ -291,15 +299,17 @@ export class WorkspaceDocument {
   }
 
   // ================================================================ session
-  /** What the auto-saved session holds. */
-  sessionData(): Session {
+  /** What the auto-saved session holds. When everything is saved in a file,
+   *  only its path: the restore reopens it from disk. */
+  sessionData(): SessionState {
+    const dirty = this.dirty;
+    const keepValues = dirty || !this.path;
     return {
-      version: 1,
       path: this.path,
       fileName: this.fileName,
-      dirty: this.dirty,
-      ...this.app.workspace.toJSON(),
-      savedAt: Date.now(),
+      dirty,
+      valueTexts: keepValues ? this.app.workspace.valueTexts() : null,
+      peripheralsText: keepValues ? this.app.workspace.peripheralsText() : "",
     };
   }
 
@@ -344,10 +354,11 @@ export class WorkspaceDocument {
     if (!(await this.maybeSave())) return false;
     // "Don't save" means the changes are discarded, so don't bring them back next time
     const discarded = dirtyBefore && this.dirty;
+    const state = this.sessionData();
     await saveSessionNow({
-      ...this.sessionData(),
+      ...state,
       dirty: false,
-      values: discarded ? null : this.sessionData().values,
+      valueTexts: discarded ? null : state.valueTexts,
     });
     await appSettings.flush();
     return true;

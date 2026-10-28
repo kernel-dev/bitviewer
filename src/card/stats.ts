@@ -132,7 +132,7 @@ export const CHIPS: ChipDef[] = [
 ];
 
 export class StatsBar {
-  readonly element: HTMLElement;
+  private el: HTMLElement | null = null;
   private valueElements = new Map<string, HTMLElement>();
 
   private floats = new Map<
@@ -146,9 +146,22 @@ export class StatsBar {
   constructor(
     private model: ValueModel,
     private write: (value: bigint) => Promise<boolean>,
-  ) {
-    this.element = html("div", { class: "stats" });
-    this.build();
+  ) {}
+
+  /** Made when the card is first built, so a large workspace doesn't hold
+   *  one for every value. */
+  get element(): HTMLElement {
+    this.el ??= html("div", { class: "stats" });
+    return this.el;
+  }
+
+  /** Lets go of the chips (the card was emptied). */
+  clear() {
+    this.el?.remove();
+    this.el = null;
+    this.valueElements.clear();
+    this.floats.clear();
+    this.editing = null;
   }
 
   build() {
@@ -284,7 +297,7 @@ export class StatsBar {
   }
 
   update() {
-    if (this.element.hidden) return;
+    if (!this.el || this.el.hidden) return;
     const { value, width } = this.model;
 
     for (const chip of CHIPS) {

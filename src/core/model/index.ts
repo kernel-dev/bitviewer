@@ -13,7 +13,14 @@ export {
 
 export { applyOp, type Op } from "./ops";
 export { VIEWS, type View } from "./rows";
-export { valueFromJSON, valueToJSON } from "./serialize";
+export {
+  rememberValueText,
+  type TextPool,
+  valueFromJSON,
+  valueText,
+  valueTextMade,
+  valueToJSON,
+} from "./serialize";
 export { MAX_WIDTH, MIN_WIDTH, ModelError } from "./validate";
 
 export {

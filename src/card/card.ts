@@ -136,6 +136,12 @@ export class ValueCard implements StripHost {
   private unbuild() {
     this.rows.destroy();
     this.fields.clear();
+    // the parts keep references into their last elements, which would keep
+    // the whole old tree alive: let go of those too
+    this.header = new CardHeader(this);
+    this.toolbar.release();
+    this.bases = new BasesPanel(this);
+    this.statsBar.clear();
     this.root.replaceChildren();
     this.reserveSpace();
     this.built = false;

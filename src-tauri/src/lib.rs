@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Largest file `read_text` will load. Workspaces are a few kilobytes; big
 /// CMSIS-SVD files reach tens of megabytes.
-const MAX_READ_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_READ_BYTES: u64 = 512 * 1024 * 1024;
 
 /// Extensions `read_text` opens: workspaces and SVD register descriptions.
 const READABLE: &[&str] = &["bitview", "json", "svd", "xml"];
@@ -32,7 +32,7 @@ fn require_absolute(path: &Path) -> Result<(), String> {
 }
 
 /// Writes `contents` atomically: write a temp file next to the target, then rename.
-fn write_atomic(target: &Path, contents: &str) -> Result<(), String> {
+fn write_atomic(target: &Path, contents: &[u8]) -> Result<(), String> {
     let mut temporary_path = target.as_os_str().to_owned();
     temporary_path.push(".tmp");
     let temporary_path = PathBuf::from(temporary_path);
@@ -83,7 +83,7 @@ fn write_text(path: String, contents: String) -> Result<(), String> {
     if path.is_dir() {
         return Err(format!("{} is a folder", path.display()));
     }
-    write_atomic(path, &contents)
+    write_atomic(path, contents.as_bytes())
 }
 
 /// First existing file among command-line arguments (skipping the program).
@@ -168,14 +168,26 @@ fn read_app_file(
     }
 }
 
+/// Writes an app file. The contents come as the raw request body (UTF-8
+/// bytes) and the folder and name as headers, so a large session isn't
+/// escaped into JSON and copied again on the way.
 #[tauri::command]
-fn write_app_file(
-    app: AppHandle,
-    directory: String,
-    name: String,
-    contents: String,
-) -> Result<(), String> {
-    write_atomic(&app_file(&app, &directory, &name)?, &contents)
+fn write_app_file(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let header = |key: &str| {
+        request
+            .headers()
+            .get(key)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| format!("missing {key}"))
+    };
+    let tauri::ipc::InvokeBody::Raw(contents) = request.body() else {
+        return Err("expected the file contents as bytes".into());
+    };
+    std::str::from_utf8(contents).map_err(|error| error.to_string())?;
+    write_atomic(
+        &app_file(&app, header("directory")?, header("name")?)?,
+        contents,
+    )
 }
 
 #[tauri::command]

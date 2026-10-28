@@ -78,6 +78,9 @@ export class ValueModel {
   compares = new Map<number, bigint>();
   /** Values of closed compare rows, restored when the row is opened again. */
   hiddenCompares = new Map<number, bigint>();
+  /** Goes up with every change, so work done for one state (such as its
+   *  JSON text for undo) can tell when it is out of date. */
+  revision = 0;
   private listeners: Listener[] = [];
 
   constructor(
@@ -114,6 +117,7 @@ export class ValueModel {
   }
 
   private emit(kind: ChangeKind): void {
+    this.revision++;
     for (const callback of [...this.listeners]) callback(kind);
   }
 

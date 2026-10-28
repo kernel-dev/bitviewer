@@ -3,7 +3,6 @@
 
 import { childText, type XmlElement } from "./xml";
 
-const MAX_DIM = 1024; // per array, so a typo can't ask for millions of registers
 const MAX_DONT_CARE = 8; // enumerated values like #1xxx expand to at most 256 values
 
 /** A number as SVD writes them: 0x1F, 0X1F, #11111 (binary) or 31. Optional
@@ -53,50 +52,126 @@ export function enumValues(text: string): bigint[] | null {
   return values;
 }
 
-/** dimIndex as a list: "0-7", "A-D" or "a,b,c". Defaults to 0 … dim-1. */
-function dimIndices(dim: number, indexText: string | undefined): string[] {
-  if (indexText) {
-    const range = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(indexText);
-    if (range) {
-      const first = Number(range[1]);
-      return Array.from({ length: dim }, (_, index) => String(first + index));
-    }
-
-    const letters = /^\s*([A-Z])\s*-\s*([A-Z])\s*$/.exec(indexText);
-    if (letters) {
-      const first = letters[1].charCodeAt(0);
-      return Array.from({ length: dim }, (_, index) =>
-        String.fromCharCode(first + index),
-      );
-    }
-
-    const list = indexText.split(",").map((part) => part.trim());
-    if (list.length === dim) return list;
-  }
-
-  return Array.from({ length: dim }, (_, index) => String(index));
+/** A dim array, described rather than expanded: copies are named on demand,
+ *  so an array of any size costs the same to read. */
+export interface Dim {
+  /** Number of copies (1 when the element has no dim). */
+  count: number;
+  /** dimIncrement: bytes between copies (bits, for fields). */
+  step: bigint;
+  /** The text that replaces %s in copy `position` (0 … count-1). */
+  index(position: number): string;
+  /** Every index in short: "0-4095", "A-C" or "a,b,c". */
+  range: string;
 }
 
-/** One element, or its copies when it is a dim array: [name, offset step index]. */
-export function expandDim(
+/** An element without dim: one copy, and %s stands for nothing. */
+const SINGLE: Dim = { count: 1, step: 0n, index: () => "", range: "" };
+
+/** Numbered copies: first, first + 1, … */
+function numbered(count: number, first = 0n): Pick<Dim, "index" | "range"> {
+  return {
+    index: (position) => String(first + BigInt(position)),
+    range:
+      count === 1 ? String(first) : `${first}-${first + BigInt(count - 1)}`,
+  };
+}
+
+/** dimIndex: "0-7", "A-D" or "a,b,c". Defaults to 0 … count-1. When it
+ *  doesn't fit the dim, says so and falls back to numbers. */
+function dimIndex(
+  count: number,
+  text: string | undefined,
+  name: string,
+  warnings: string[],
+): Pick<Dim, "index" | "range"> {
+  if (!text) return numbered(count);
+
+  const range = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(text);
+  if (range) {
+    const first = BigInt(range[1]);
+    if (BigInt(range[2]) - first + 1n !== BigInt(count))
+      warnings.push(
+        `${name}: dimIndex ${text.trim()} doesn't match dim ${count}; numbered from ${first}`,
+      );
+    return numbered(count, first);
+  }
+
+  const letters =
+    /^\s*([A-Z])\s*-\s*([A-Z])\s*$/.exec(text) ??
+    /^\s*([a-z])\s*-\s*([a-z])\s*$/.exec(text);
+  if (letters) {
+    const first = letters[1].charCodeAt(0);
+    const last = first + count - 1;
+    const end = (letters[1] <= "Z" ? "Z" : "z").charCodeAt(0);
+
+    // past Z there are no more letters, so the copies are numbered instead
+    if (last > end) {
+      warnings.push(
+        `${name}: dimIndex ${text.trim()} runs out of letters for dim ${count}; numbered 0-${count - 1}`,
+      );
+      return numbered(count);
+    }
+
+    if (last !== letters[2].charCodeAt(0))
+      warnings.push(
+        `${name}: dimIndex ${text.trim()} doesn't match dim ${count}; lettered from ${letters[1]}`,
+      );
+
+    return {
+      index: (position) => String.fromCharCode(first + position),
+      range:
+        count === 1 ? letters[1] : `${letters[1]}-${String.fromCharCode(last)}`,
+    };
+  }
+
+  const list = text.split(",").map((part) => part.trim());
+  if (list.length !== count) {
+    warnings.push(
+      `${name}: dimIndex lists ${list.length} name${list.length === 1 ? "" : "s"} for dim ${count}; numbered 0-${count - 1}`,
+    );
+    return numbered(count);
+  }
+
+  return {
+    index: (position) => list[position],
+    range: count <= 4 ? list.join(",") : `${list[0]},…,${list[count - 1]}`,
+  };
+}
+
+/** The element's dim array (SINGLE when it has none), or null when the dim
+ *  is too large to count, which the warning explains. */
+export function readDim(
   element: XmlElement,
   name: string,
   warnings: string[],
-): { name: string; index: number }[] {
-  const dim = Number(parseSvdNumber(childText(element, "dim")) ?? 0n);
-  if (!dim) return [{ name: name.replace(/\[%s\]|%s/g, ""), index: 0 }];
+): Dim | null {
+  const dim = parseSvdNumber(childText(element, "dim")) ?? 0n;
+  if (!dim) return SINGLE;
 
-  if (dim > MAX_DIM) {
-    warnings.push(
-      `${name}: dim ${dim} is more than ${MAX_DIM}; only the first ${MAX_DIM} are read`,
-    );
+  if (dim > BigInt(Number.MAX_SAFE_INTEGER)) {
+    warnings.push(`${name}: dim ${dim} is too large to count; skipped`);
+    return null;
   }
 
-  const count = Math.min(dim, MAX_DIM);
-  const indices = dimIndices(count, childText(element, "dimIndex"));
-  return indices.map((index, position) => ({
-    // "[%s]" marks a C array (CCR[4]); as separate values it becomes CCR0 … CCR3
-    name: name.replace(/\[%s\]/g, index).replace(/%s/g, index),
-    index: position,
-  }));
+  const count = Number(dim);
+  return {
+    count,
+    step: parseSvdNumber(childText(element, "dimIncrement")) ?? 0n,
+    ...dimIndex(count, childText(element, "dimIndex"), name, warnings),
+  };
+}
+
+/** The name of one copy: "[%s]" marks a C array (CCR[4]); as separate values
+ *  it becomes CCR0 … CCR3. Without a dim, %s stands for nothing. */
+export const copyName = (name: string, index: string) =>
+  name.replace(/\[%s\]/g, index).replace(/%s/g, index);
+
+/** The name of the whole array, with its indices: "CCR[0-3]". */
+export function arrayName(name: string, dim: Dim): string {
+  if (dim.count === 1) return copyName(name, dim.index(0));
+  const indices = `[${dim.range}]`;
+  return /%s/.test(name)
+    ? name.replace(/\[%s\]|%s/g, indices)
+    : `${name}${indices}`;
 }

@@ -150,6 +150,10 @@ kbd {
 .svd-periph { position: sticky; top: 0; z-index: 1; background: var(--surface-2); }
 .svd-periph:hover, .svd-reg:hover { background: var(--surface-3); }
 .svd-reg { padding-left: 38px; background: var(--surface); }
+/* an array row brings its own arrow, so its checkbox lines up with the rest */
+.svd-reg.svd-array { padding-left: 15px; }
+.svd-reg.svd-copy { padding-left: 61px; }
+.svd-positions { flex: 0 1 150px; min-width: 70px; height: 26px; padding: 0 8px; }
 .svd-check { accent-color: var(--accent); margin: 0; flex: none; }
 .svd-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .svd-more { margin: 0; padding: 10px 12px; }

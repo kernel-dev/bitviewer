@@ -35,8 +35,8 @@ export class App {
   readonly commands = new CommandRegistry();
 
   readonly history = new History(
-    () => this.workspace.snapshot(),
-    (text) => this.workspace.restore(text),
+    (previous) => this.workspace.snapshot(previous),
+    (snapshot) => this.workspace.restore(snapshot),
     () => this.onHistoryChange(),
   );
 
