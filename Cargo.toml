@@ -1,0 +1,15 @@
+# Bit Viewer: a native (GPUI) app for viewing and editing the bits of registers.
+#   core  the data model, files, undo, expressions, SVD (no UI; fast tests)
+#   app   the GPUI user interface
+[workspace]
+members = ["core", "app"]
+resolver = "3"
+
+[workspace.package]
+version = "3.0.0"
+edition = "2024"
+publish = false
+
+[profile.dev.package."*"]
+# GPUI is slow unoptimized; optimize dependencies even in debug builds
+opt-level = 2

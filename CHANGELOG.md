@@ -6,15 +6,25 @@ Add each change under **Unreleased** as you make it. When a version is released,
 
 ## [Unreleased]
 
-### Changed
-- CMSIS-SVD import: register arrays (`dim`) of any size now work. They used to be cut off after 1,024 copies. An array is one row in the picker, such as `CCR[0-3]`: tick it for every copy, open it to tick single copies, or type which copies you want (`0-7, 12`). Only the copies you pick are made, so even an array of millions opens instantly, including arrays nested in clusters and peripherals. Importing more than 50 registers asks first, for templates too.
-- The app opens files up to 512 MB (was 64 MB).
-- Large workspaces use far less memory and respond faster. With about 90,000 values the app used to grow by around 100 MB with every edit (each undo step kept a full copy of the workspace) and could pass 6 GB; it now stays near 1.2 GB however much you edit. Undo steps share everything that didn't change, and undo history is also capped at about 256 MB. Values that are off screen no longer hold their elements: before, every value kept a hidden set of readout chips (4.4 million page elements for 90,000 values), and values you had scrolled past kept all of theirs. An edit takes a few milliseconds instead of about half a second, an undo well under a second instead of 4–5 seconds, and opening is about twice as fast.
-- When the open workspace is saved and unchanged, the auto-saved session only remembers the file instead of a full copy of it, and the session is written without being copied and escaped on the way.
-- CMSIS-SVD import: the file's text is let go as soon as it is read, instead of staying in memory while you pick registers.
+## [3.0.0] - 2026-10-28
 
-### Fixed
-- CMSIS-SVD import: a `dimIndex` letter range with more copies than letters (such as `A-Z` for 30 copies) made names with symbols after `Z`. Those copies are now numbered from 0, with a note. A `dimIndex` that doesn't match the dim is noted too.
+### Changed
+- Bit Viewer is now a native app. It was rebuilt in Rust with [GPUI](https://www.gpui.rs) instead of running in a web view (Tauri), and does everything 2.1.3 did. Your workspaces open unchanged.
+- Faster and lighter, most of all in big workspaces. With about 89,000 registers open the app stays near 300 MB of memory, and scrolling, editing and searching keep up.
+- A new look: a lilac page with each register on a rounded card, bits drawn as rounded pills, and register tables 16 bits wide like a datasheet. Peripherals and their registers are listed in a sidebar; click a register to jump to it.
+- Search (Ctrl+F) runs as you type and always covers every peripheral; **Search within … only** keeps it to the open one. Hiding the search bar (Esc) keeps the results until you press **Clear results**.
+- Bits that belong to no field are reserved and locked, like reserved fields: striped, struck through, and they ask before they change (**Always allow these bits** unlocks them for the session).
+- Long register and field names shrink to fit their space, and only end in "…" when even the smallest size doesn't fit. They follow the window as you resize it.
+
+### Added
+- Seven colour schemes and seven font pairings in Settings. Lavender with Outfit and Geist Mono is the default.
+
+### Migrating from 2.x
+- The first time it starts, Bit Viewer 3 takes over the settings and the auto-saved session of 2.x, so you carry on where you were. The 2.x files are only read.
+- On Windows, installing 3.0.0 (or letting 2.x update itself) replaces 2.x in place: same folder, shortcut and `.bitview` association.
+
+### Removed
+- The web-based (Tauri/TypeScript) app. Its last version is tagged `tauri-final` in the repository.
 
 ## [2.1.3] - 2026-10-26
 
@@ -118,7 +128,9 @@ Add each change under **Unreleased** as you make it. When a version is released,
 ### Added
 - Tauri app baseline: inspect and edit values of 1 to 512 bits, bit by bit.
 
-[Unreleased]: https://github.com/kernel-dev/bitviewer/compare/v2.1.2...HEAD
+[Unreleased]: https://github.com/kernel-dev/bitviewer/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/kernel-dev/bitviewer/releases/tag/v3.0.0
+[2.1.3]: https://github.com/kernel-dev/bitviewer/releases/tag/v2.1.3
 [2.1.2]: https://github.com/kernel-dev/bitviewer/releases/tag/v2.1.2
 [2.1.1]: https://github.com/kernel-dev/bitviewer/releases/tag/v2.1.1
 [2.1.0]: https://github.com/kernel-dev/bitviewer/releases/tag/v2.1.0

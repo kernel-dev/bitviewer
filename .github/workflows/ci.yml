@@ -1,6 +1,7 @@
-# Checks every push to main and every pull request: types, lint, unit tests,
-# Rust formatting, clippy and Rust tests (npm run check), then the
-# end-to-end tests in Playwright's Chromium.
+# Checks every push to main and every pull request on Windows, macOS and
+# Linux: formatting, clippy (warnings fail the build) and every test (the
+# core library's and the app's, which drive real windows on GPUI's test
+# platform).
 #
 # Releases are built by release.yml when a version tag is pushed.
 
@@ -17,31 +18,37 @@ concurrency:
 
 jobs:
   check:
-    name: Check and test
-    runs-on: ubuntu-22.04
+    name: Check and test (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+          - name: Linux
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+          sudo apt-get install -y libasound2-dev libfontconfig-dev libwayland-dev libx11-xcb-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libvulkan-dev libzstd-dev clang
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
       - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
-      - run: npm ci
-      - run: npm run build # creates dist/, which the Rust crate embeds
-      - run: npm run check
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --check
+
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace

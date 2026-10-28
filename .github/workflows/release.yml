@@ -1,11 +1,19 @@
 # Builds Bit Viewer for Windows, macOS and Linux and publishes a GitHub release.
 #
-# Trigger: push a tag that matches the app version, e.g.
-#   git tag v2.1.0 && git push origin v2.1.0
+# Trigger: push a tag that matches the version in Cargo.toml, e.g.
+#   git tag v3.0.0 && git push origin v3.0.0
 #
-# Needs the repository secret TAURI_SIGNING_PRIVATE_KEY (the contents of
-# ~/.tauri/bitviewer.key). It signs the update files the in-app updater checks.
-# Add TAURI_SIGNING_PRIVATE_KEY_PASSWORD only if the key has a password.
+# Needs the repository secret TAURI_SIGNING_PRIVATE_KEY (the minisign key the
+# 2.x app's updater already trusts; ~/.tauri/bitviewer.key). It signs the
+# Windows installer that the in-app updater downloads. Add
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD only if the key has a password.
+#
+# What gets published:
+#   Bit.Viewer_<v>_x64-setup.exe        Windows installer (also the in-app update)
+#   Bit.Viewer_<v>_x64-portable.zip     Windows, no install
+#   Bit.Viewer_<v>_aarch64.dmg / _x64.dmg   macOS (Apple Silicon / Intel)
+#   bitviewer_<v>_linux_x64.tar.gz      Linux
+#   latest.json                         the updater feed
 
 name: Release
 
@@ -19,110 +27,49 @@ concurrency:
 
 jobs:
   check:
-    name: Check version and tests
+    name: Check version and notes
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Tag matches the app version
+      - name: Tag matches the version in Cargo.toml
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          conf=$(jq -r .version src-tauri/tauri.conf.json)
-          pkg=$(jq -r .version package.json)
-          cargo=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
-          echo "tag=$tag tauri.conf.json=$conf package.json=$pkg Cargo.toml=$cargo"
-          if [ "$tag" != "$conf" ] || [ "$tag" != "$pkg" ] || [ "$tag" != "$cargo" ]; then
-            echo "::error::Tag v$tag doesn't match the version in tauri.conf.json, package.json and Cargo.toml"
+          cargo=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          echo "tag=$tag Cargo.toml=$cargo"
+          if [ "$tag" != "$cargo" ]; then
+            echo "::error::Tag v$tag doesn't match the version in Cargo.toml ($cargo)"
             exit 1
           fi
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: CHANGELOG.md has notes for this version
         run: node scripts/changelog.mjs "${GITHUB_REF_NAME#v}"
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - run: npm ci
-      - run: npm run build # creates dist/, which the Rust crate embeds
-      - run: npm run check
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-
-  create-release:
-    name: Create draft release
-    needs: check
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      id: ${{ steps.create.outputs.result }}
-      notes: ${{ steps.create.outputs.notes }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      # The release notes (also shown by the in-app updater) are this version's
-      # section of CHANGELOG.md.
-      - name: Read the release notes from CHANGELOG.md
-        run: node scripts/changelog.mjs "${GITHUB_REF_NAME#v}" > release-notes.md
-
-      - id: create
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const notes = require("fs").readFileSync("release-notes.md", "utf8").trim();
-            core.setOutput("notes", notes);
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: context.ref.replace("refs/tags/", ""),
-              name: `Bit Viewer ${context.ref.replace("refs/tags/v", "")}`,
-              body: notes,
-              draft: true,
-            });
-            return data.id;
-
   build:
     name: Build (${{ matrix.name }})
-    needs: create-release
-    permissions:
-      contents: write
+    needs: check
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: Windows x64
             os: windows-latest
-            args: ""
+            target: x86_64-pc-windows-msvc
           - name: macOS Apple Silicon
             os: macos-latest
-            args: --target aarch64-apple-darwin
-            rust-targets: aarch64-apple-darwin
+            target: aarch64-apple-darwin
+            arch: aarch64
           - name: macOS Intel
             os: macos-latest
-            args: --target x86_64-apple-darwin
-            rust-targets: x86_64-apple-darwin
+            target: x86_64-apple-darwin
+            arch: x64
           - name: Linux x64
             os: ubuntu-22.04 # older glibc, so the build runs on more distributions
-            args: ""
+            target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -131,50 +78,109 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+          sudo apt-get install -y libasound2-dev libfontconfig-dev libwayland-dev libx11-xcb-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libvulkan-dev libzstd-dev clang
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.rust-targets }}
+          targets: ${{ matrix.target }}
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
-          key: ${{ matrix.args }}
+          key: ${{ matrix.target }}
 
-      - run: npm ci
+      - run: cargo build --release -p bitviewer --target ${{ matrix.target }}
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $v = "$env:GITHUB_REF_NAME".TrimStart('v')
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis -y --no-progress
+            $env:PATH += ";C:\Program Files (x86)\NSIS"
+          }
+          $out = New-Item -ItemType Directory -Force release-files
+          $exe = (Resolve-Path "target/${{ matrix.target }}/release/bitviewer.exe").Path
+          makensis "/DVERSION=$v" "/DEXE=$exe" "/DOUT=$out\Bit.Viewer_${v}_x64-setup.exe" packaging/windows/installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $portable = New-Item -ItemType Directory -Force portable
+          Copy-Item $exe "$portable\BitViewer.exe"
+          Copy-Item LICENSE "$portable\LICENSE.txt"
+          Compress-Archive -Path "$portable\*" -DestinationPath "$out\Bit.Viewer_${v}_x64-portable.zip"
+
+      - name: Sign the installer for the updater
+        if: runner.os == 'Windows'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx --yes @tauri-apps/cli@2 signer sign release-files/*-setup.exe
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          mkdir -p release-files
+          app="Bit Viewer.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp "target/${{ matrix.target }}/release/bitviewer" "$app/Contents/MacOS/BitViewer"
+          cp app/assets/app-icon/icon.icns "$app/Contents/Resources/icon.icns"
+          sed "s/VERSION/$v/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
+          codesign --force --deep --sign - "$app"
+          hdiutil create -volname "Bit Viewer" -srcfolder "$app" -ov -format UDZO "release-files/Bit.Viewer_${v}_${{ matrix.arch }}.dmg"
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          dir="bitviewer-$v"
+          mkdir -p release-files "$dir"
+          cp "target/${{ matrix.target }}/release/bitviewer" "$dir/"
+          cp packaging/linux/bitviewer.desktop "$dir/"
+          cp app/assets/app-icon/128x128.png "$dir/bitviewer.png"
+          cp LICENSE "$dir/"
+          tar -czf "release-files/bitviewer_${v}_linux_x64.tar.gz" "$dir"
+
+      - uses: actions/upload-artifact@v4
         with:
-          releaseId: ${{ needs.create-release.outputs.id }}
-          # notes for latest.json, which the in-app updater shows
-          releaseBody: ${{ needs.create-release.outputs.notes }}
-          # also build the signed update files and latest.json for the in-app updater
-          args: ${{ matrix.args }} --config src-tauri/tauri.updater.conf.json
-          updaterJsonPreferNsis: true
+          name: release-${{ matrix.target }}
+          path: release-files/*
+          if-no-files-found: error
 
   publish:
     name: Publish release
-    needs: [create-release, build]
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          script: |
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: Number("${{ needs.create-release.outputs.id }}"),
-              draft: false,
-            });
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+
+      # The release notes (also shown by the in-app updater) are this version's
+      # section of CHANGELOG.md.
+      - name: Release notes and the updater feed
+        run: |
+          node scripts/changelog.mjs "${GITHUB_REF_NAME#v}" > release-notes.md
+          node scripts/latest-json.mjs "$GITHUB_REF_NAME" release-files > release-files/latest.json
+          rm release-files/*.sig
+          cat release-files/latest.json
+          ls -l release-files
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-files/* \
+            --title "Bit Viewer ${GITHUB_REF_NAME#v}" \
+            --notes-file release-notes.md \
+            --verify-tag

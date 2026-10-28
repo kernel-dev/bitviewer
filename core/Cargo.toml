@@ -1,0 +1,20 @@
+[package]
+name = "bitviewer-core"
+description = "Bit Viewer's data model: values, fields, files, undo, expressions"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# values are up to 512 bits: a fixed-size integer, no heap per value
+ruint = "1.21"
+# expressions and file numbers can be any size before they are checked
+num-bigint = "0.5"
+num-traits = "0.2"
+# persistent vectors: undo steps share everything that didn't change
+imbl = "7"
+serde = { version = "1", features = ["derive"] }
+# preserve_order: files keep their keys in the order the app writes them
+serde_json = { version = "1", features = ["preserve_order", "raw_value"] }
+# big files: their values are read on every core
+rayon = "1"

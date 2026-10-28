@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bit Viewer
+Comment=Inspect and edit values of 1 to 512 bits, bit by bit
+Exec=bitviewer %f
+Icon=bitviewer
+Terminal=false
+Categories=Development;
+MimeType=application/x-bitviewer-workspace;

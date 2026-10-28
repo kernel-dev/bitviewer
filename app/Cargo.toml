@@ -1,0 +1,37 @@
+[package]
+name = "bitviewer"
+description = "Bit Viewer: the GPUI user interface"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "bitviewer"
+path = "src/main.rs"
+
+[dependencies]
+rayon = "1"
+bitviewer-core = { path = "../core" }
+# GPUI with the GPUI Component library (inputs, lists, menus, dialogs, themes)
+gpui-kit = "0.8.1"
+num-bigint = "0.5"
+num-traits = "0.2"
+serde_json = "1"
+futures = "0.3"
+rust-embed = "8"
+# updates: the release feed over HTTPS, and its minisign signatures
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+minisign-verify = "0.2"
+base64 = "0.22"
+# interface sounds: tones synthesized at run time (no audio files)
+rodio = { version = "0.19", default-features = false }
+# local time for snapshot dates
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+# the Windows exe's icon and version details (build.rs)
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[dev-dependencies]
+# GPUI's test platform: windows with simulated input, for the interface tests
+gpui = { package = "gpui-pre", version = "=0.3.10", features = ["test-support"] }

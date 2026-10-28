@@ -1,0 +1,1557 @@
+{
+ "name": "DEMO",
+ "description": "Demo chip & friends",
+ "warnings": [
+  "WIDE.HUGE: 1024 bits is outside 1–512; skipped"
+ ],
+ "peripherals": [
+  {
+   "name": "UART0",
+   "description": "",
+   "groupName": "UART",
+   "baseAddress": "0x40001000",
+   "count": 1,
+   "registers": [
+    {
+     "label": "CTRL",
+     "description": "Control register",
+     "size": 32,
+     "count": 1,
+     "copies": [
+      {
+       "path": "UART0.CTRL",
+       "name": "CTRL",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001000",
+       "access": "read-write",
+       "resetValue": "0x301",
+       "warnings": [
+        "CLASH overlaps MODE, so it was left out",
+        "OUTSIDE [40:40] is outside the 32-bit register"
+       ],
+       "order": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "fields": [
+        {
+         "name": "EN",
+         "description": "Enable",
+         "lsb": 0,
+         "msb": 0,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "MODE",
+         "description": "",
+         "lsb": 8,
+         "msb": 9,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        },
+        {
+         "name": "STATUS",
+         "description": "",
+         "lsb": 16,
+         "msb": 19,
+         "access": "read-only",
+         "enums": []
+        },
+        {
+         "name": "RESERVED",
+         "description": "",
+         "lsb": 28,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.CTRL",
+        "width": 32,
+        "description": "0x40001000 · Control register · reset 0x301",
+        "fields": [
+         {
+          "lo": 28,
+          "hi": 31,
+          "name": "RESERVED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "reserved",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 19,
+          "name": "STATUS",
+          "color": "#2fb344",
+          "description": "",
+          "access": "ro",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 9,
+          "name": "MODE",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         },
+         {
+          "lo": 0,
+          "hi": 0,
+          "name": "EN",
+          "color": "#15aabf",
+          "description": "Enable",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "label": "DATA[0-1]",
+     "description": "",
+     "size": 16,
+     "count": 2,
+     "copies": [
+      {
+       "path": "UART0.DATA0",
+       "name": "DATA0",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001010",
+       "access": "read-only",
+       "resetValue": "0xff",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        1,
+        0
+       ],
+       "fields": [],
+       "template": {
+        "name": "DEMO UART0.DATA0",
+        "width": 16,
+        "description": "0x40001010 · reset 0xFF",
+        "fields": []
+       }
+      },
+      {
+       "path": "UART0.DATA1",
+       "name": "DATA1",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001014",
+       "access": "read-only",
+       "resetValue": "0xff",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        1,
+        1
+       ],
+       "fields": [],
+       "template": {
+        "name": "DEMO UART0.DATA1",
+        "width": 16,
+        "description": "0x40001014 · reset 0xFF",
+        "fields": []
+       }
+      }
+     ]
+    },
+    {
+     "label": "BUF[A-C]",
+     "description": "",
+     "size": 32,
+     "count": 3,
+     "copies": [
+      {
+       "path": "UART0.BUFA",
+       "name": "BUFA",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001020",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        2,
+        0
+       ],
+       "fields": [
+        {
+         "name": "BYTE0",
+         "description": "",
+         "lsb": 0,
+         "msb": 7,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE1",
+         "description": "",
+         "lsb": 8,
+         "msb": 15,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE2",
+         "description": "",
+         "lsb": 16,
+         "msb": 23,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE3",
+         "description": "",
+         "lsb": 24,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.BUFA",
+        "width": 32,
+        "description": "0x40001020 · reset 0x0",
+        "fields": [
+         {
+          "lo": 24,
+          "hi": 31,
+          "name": "BYTE3",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 23,
+          "name": "BYTE2",
+          "color": "#2fb344",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 15,
+          "name": "BYTE1",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 0,
+          "hi": 7,
+          "name": "BYTE0",
+          "color": "#15aabf",
+          "description": "",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      },
+      {
+       "path": "UART0.BUFB",
+       "name": "BUFB",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001024",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        2,
+        1
+       ],
+       "fields": [
+        {
+         "name": "BYTE0",
+         "description": "",
+         "lsb": 0,
+         "msb": 7,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE1",
+         "description": "",
+         "lsb": 8,
+         "msb": 15,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE2",
+         "description": "",
+         "lsb": 16,
+         "msb": 23,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE3",
+         "description": "",
+         "lsb": 24,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.BUFB",
+        "width": 32,
+        "description": "0x40001024 · reset 0x0",
+        "fields": [
+         {
+          "lo": 24,
+          "hi": 31,
+          "name": "BYTE3",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 23,
+          "name": "BYTE2",
+          "color": "#2fb344",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 15,
+          "name": "BYTE1",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 0,
+          "hi": 7,
+          "name": "BYTE0",
+          "color": "#15aabf",
+          "description": "",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      },
+      {
+       "path": "UART0.BUFC",
+       "name": "BUFC",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001028",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        2,
+        2
+       ],
+       "fields": [
+        {
+         "name": "BYTE0",
+         "description": "",
+         "lsb": 0,
+         "msb": 7,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE1",
+         "description": "",
+         "lsb": 8,
+         "msb": 15,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE2",
+         "description": "",
+         "lsb": 16,
+         "msb": 23,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE3",
+         "description": "",
+         "lsb": 24,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.BUFC",
+        "width": 32,
+        "description": "0x40001028 · reset 0x0",
+        "fields": [
+         {
+          "lo": 24,
+          "hi": 31,
+          "name": "BYTE3",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 23,
+          "name": "BYTE2",
+          "color": "#2fb344",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 15,
+          "name": "BYTE1",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 0,
+          "hi": 7,
+          "name": "BYTE0",
+          "color": "#15aabf",
+          "description": "",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "label": "CTRL2",
+     "description": "Control register",
+     "size": 32,
+     "count": 1,
+     "copies": [
+      {
+       "path": "UART0.CTRL2",
+       "name": "CTRL2",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001040",
+       "access": "read-write",
+       "resetValue": "0x301",
+       "warnings": [
+        "CLASH overlaps MODE, so it was left out",
+        "OUTSIDE [40:40] is outside the 32-bit register"
+       ],
+       "order": [
+        0,
+        0,
+        3,
+        0
+       ],
+       "fields": [
+        {
+         "name": "EN",
+         "description": "Enable",
+         "lsb": 0,
+         "msb": 0,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "MODE",
+         "description": "",
+         "lsb": 8,
+         "msb": 9,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        },
+        {
+         "name": "STATUS",
+         "description": "",
+         "lsb": 16,
+         "msb": 19,
+         "access": "read-only",
+         "enums": []
+        },
+        {
+         "name": "RESERVED",
+         "description": "",
+         "lsb": 28,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.CTRL2",
+        "width": 32,
+        "description": "0x40001040 · Control register · reset 0x301",
+        "fields": [
+         {
+          "lo": 28,
+          "hi": 31,
+          "name": "RESERVED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "reserved",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 19,
+          "name": "STATUS",
+          "color": "#2fb344",
+          "description": "",
+          "access": "ro",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 9,
+          "name": "MODE",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         },
+         {
+          "lo": 0,
+          "hi": 0,
+          "name": "EN",
+          "color": "#15aabf",
+          "description": "Enable",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "label": "CH[0-1].CFG",
+     "description": "",
+     "size": 32,
+     "count": 2,
+     "copies": [
+      {
+       "path": "UART0.CH0.CFG",
+       "name": "CFG",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001104",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        4,
+        0,
+        0,
+        0
+       ],
+       "fields": [
+        {
+         "name": "SPEED",
+         "description": "",
+         "lsb": 0,
+         "msb": 1,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.CH0.CFG",
+        "width": 32,
+        "description": "0x40001104 · reset 0x0",
+        "fields": [
+         {
+          "lo": 0,
+          "hi": 1,
+          "name": "SPEED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "path": "UART0.CH1.CFG",
+       "name": "CFG",
+       "peripheral": "UART0",
+       "peripheralBase": "0x40001000",
+       "address": "0x40001114",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        0,
+        0,
+        4,
+        1,
+        0,
+        0
+       ],
+       "fields": [
+        {
+         "name": "SPEED",
+         "description": "",
+         "lsb": 0,
+         "msb": 1,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        }
+       ],
+       "template": {
+        "name": "DEMO UART0.CH1.CFG",
+        "width": 32,
+        "description": "0x40001114 · reset 0x0",
+        "fields": [
+         {
+          "lo": 0,
+          "hi": 1,
+          "name": "SPEED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "UART1",
+   "description": "",
+   "groupName": "UART",
+   "baseAddress": "0x40002000",
+   "count": 1,
+   "registers": [
+    {
+     "label": "CTRL",
+     "description": "Control register",
+     "size": 32,
+     "count": 1,
+     "copies": [
+      {
+       "path": "UART1.CTRL",
+       "name": "CTRL",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002000",
+       "access": "read-write",
+       "resetValue": "0x301",
+       "warnings": [
+        "CLASH overlaps MODE, so it was left out",
+        "OUTSIDE [40:40] is outside the 32-bit register"
+       ],
+       "order": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "fields": [
+        {
+         "name": "EN",
+         "description": "Enable",
+         "lsb": 0,
+         "msb": 0,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "MODE",
+         "description": "",
+         "lsb": 8,
+         "msb": 9,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        },
+        {
+         "name": "STATUS",
+         "description": "",
+         "lsb": 16,
+         "msb": 19,
+         "access": "read-only",
+         "enums": []
+        },
+        {
+         "name": "RESERVED",
+         "description": "",
+         "lsb": 28,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.CTRL",
+        "width": 32,
+        "description": "0x40002000 · Control register · reset 0x301",
+        "fields": [
+         {
+          "lo": 28,
+          "hi": 31,
+          "name": "RESERVED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "reserved",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 19,
+          "name": "STATUS",
+          "color": "#2fb344",
+          "description": "",
+          "access": "ro",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 9,
+          "name": "MODE",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         },
+         {
+          "lo": 0,
+          "hi": 0,
+          "name": "EN",
+          "color": "#15aabf",
+          "description": "Enable",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "label": "DATA[0-1]",
+     "description": "",
+     "size": 16,
+     "count": 2,
+     "copies": [
+      {
+       "path": "UART1.DATA0",
+       "name": "DATA0",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002010",
+       "access": "read-only",
+       "resetValue": "0xff",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        1,
+        0
+       ],
+       "fields": [],
+       "template": {
+        "name": "DEMO UART1.DATA0",
+        "width": 16,
+        "description": "0x40002010 · reset 0xFF",
+        "fields": []
+       }
+      },
+      {
+       "path": "UART1.DATA1",
+       "name": "DATA1",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002014",
+       "access": "read-only",
+       "resetValue": "0xff",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        1,
+        1
+       ],
+       "fields": [],
+       "template": {
+        "name": "DEMO UART1.DATA1",
+        "width": 16,
+        "description": "0x40002014 · reset 0xFF",
+        "fields": []
+       }
+      }
+     ]
+    },
+    {
+     "label": "BUF[A-C]",
+     "description": "",
+     "size": 32,
+     "count": 3,
+     "copies": [
+      {
+       "path": "UART1.BUFA",
+       "name": "BUFA",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002020",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        2,
+        0
+       ],
+       "fields": [
+        {
+         "name": "BYTE0",
+         "description": "",
+         "lsb": 0,
+         "msb": 7,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE1",
+         "description": "",
+         "lsb": 8,
+         "msb": 15,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE2",
+         "description": "",
+         "lsb": 16,
+         "msb": 23,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE3",
+         "description": "",
+         "lsb": 24,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.BUFA",
+        "width": 32,
+        "description": "0x40002020 · reset 0x0",
+        "fields": [
+         {
+          "lo": 24,
+          "hi": 31,
+          "name": "BYTE3",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 23,
+          "name": "BYTE2",
+          "color": "#2fb344",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 15,
+          "name": "BYTE1",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 0,
+          "hi": 7,
+          "name": "BYTE0",
+          "color": "#15aabf",
+          "description": "",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      },
+      {
+       "path": "UART1.BUFB",
+       "name": "BUFB",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002024",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        2,
+        1
+       ],
+       "fields": [
+        {
+         "name": "BYTE0",
+         "description": "",
+         "lsb": 0,
+         "msb": 7,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE1",
+         "description": "",
+         "lsb": 8,
+         "msb": 15,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE2",
+         "description": "",
+         "lsb": 16,
+         "msb": 23,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE3",
+         "description": "",
+         "lsb": 24,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.BUFB",
+        "width": 32,
+        "description": "0x40002024 · reset 0x0",
+        "fields": [
+         {
+          "lo": 24,
+          "hi": 31,
+          "name": "BYTE3",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 23,
+          "name": "BYTE2",
+          "color": "#2fb344",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 15,
+          "name": "BYTE1",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 0,
+          "hi": 7,
+          "name": "BYTE0",
+          "color": "#15aabf",
+          "description": "",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      },
+      {
+       "path": "UART1.BUFC",
+       "name": "BUFC",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002028",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        2,
+        2
+       ],
+       "fields": [
+        {
+         "name": "BYTE0",
+         "description": "",
+         "lsb": 0,
+         "msb": 7,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE1",
+         "description": "",
+         "lsb": 8,
+         "msb": 15,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE2",
+         "description": "",
+         "lsb": 16,
+         "msb": 23,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "BYTE3",
+         "description": "",
+         "lsb": 24,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.BUFC",
+        "width": 32,
+        "description": "0x40002028 · reset 0x0",
+        "fields": [
+         {
+          "lo": 24,
+          "hi": 31,
+          "name": "BYTE3",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 23,
+          "name": "BYTE2",
+          "color": "#2fb344",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 15,
+          "name": "BYTE1",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": []
+         },
+         {
+          "lo": 0,
+          "hi": 7,
+          "name": "BYTE0",
+          "color": "#15aabf",
+          "description": "",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "label": "CTRL2",
+     "description": "Control register",
+     "size": 32,
+     "count": 1,
+     "copies": [
+      {
+       "path": "UART1.CTRL2",
+       "name": "CTRL2",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002040",
+       "access": "read-write",
+       "resetValue": "0x301",
+       "warnings": [
+        "CLASH overlaps MODE, so it was left out",
+        "OUTSIDE [40:40] is outside the 32-bit register"
+       ],
+       "order": [
+        1,
+        0,
+        3,
+        0
+       ],
+       "fields": [
+        {
+         "name": "EN",
+         "description": "Enable",
+         "lsb": 0,
+         "msb": 0,
+         "access": "read-write",
+         "enums": []
+        },
+        {
+         "name": "MODE",
+         "description": "",
+         "lsb": 8,
+         "msb": 9,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        },
+        {
+         "name": "STATUS",
+         "description": "",
+         "lsb": 16,
+         "msb": 19,
+         "access": "read-only",
+         "enums": []
+        },
+        {
+         "name": "RESERVED",
+         "description": "",
+         "lsb": 28,
+         "msb": 31,
+         "access": "read-write",
+         "enums": []
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.CTRL2",
+        "width": 32,
+        "description": "0x40002040 · Control register · reset 0x301",
+        "fields": [
+         {
+          "lo": 28,
+          "hi": 31,
+          "name": "RESERVED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "reserved",
+          "named": []
+         },
+         {
+          "lo": 16,
+          "hi": 19,
+          "name": "STATUS",
+          "color": "#2fb344",
+          "description": "",
+          "access": "ro",
+          "named": []
+         },
+         {
+          "lo": 8,
+          "hi": 9,
+          "name": "MODE",
+          "color": "#ae3ec9",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         },
+         {
+          "lo": 0,
+          "hi": 0,
+          "name": "EN",
+          "color": "#15aabf",
+          "description": "Enable",
+          "access": "rw",
+          "named": []
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "label": "CH[0-1].CFG",
+     "description": "",
+     "size": 32,
+     "count": 2,
+     "copies": [
+      {
+       "path": "UART1.CH0.CFG",
+       "name": "CFG",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002104",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        4,
+        0,
+        0,
+        0
+       ],
+       "fields": [
+        {
+         "name": "SPEED",
+         "description": "",
+         "lsb": 0,
+         "msb": 1,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.CH0.CFG",
+        "width": 32,
+        "description": "0x40002104 · reset 0x0",
+        "fields": [
+         {
+          "lo": 0,
+          "hi": 1,
+          "name": "SPEED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "path": "UART1.CH1.CFG",
+       "name": "CFG",
+       "peripheral": "UART1",
+       "peripheralBase": "0x40002000",
+       "address": "0x40002114",
+       "access": "read-write",
+       "resetValue": "0x0",
+       "warnings": [],
+       "order": [
+        1,
+        0,
+        4,
+        1,
+        0,
+        0
+       ],
+       "fields": [
+        {
+         "name": "SPEED",
+         "description": "",
+         "lsb": 0,
+         "msb": 1,
+         "access": "read-write",
+         "enums": [
+          [
+           "0x0",
+           "Off",
+           ""
+          ],
+          [
+           "0x2",
+           "Auto",
+           ""
+          ],
+          [
+           "0x3",
+           "Auto",
+           ""
+          ]
+         ]
+        }
+       ],
+       "template": {
+        "name": "DEMO UART1.CH1.CFG",
+        "width": 32,
+        "description": "0x40002114 · reset 0x0",
+        "fields": [
+         {
+          "lo": 0,
+          "hi": 1,
+          "name": "SPEED",
+          "color": "#f59f00",
+          "description": "",
+          "access": "rw",
+          "named": [
+           [
+            "0",
+            "Off"
+           ],
+           [
+            "2",
+            "Auto"
+           ],
+           [
+            "3",
+            "Auto"
+           ]
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "WIDE",
+   "description": "",
+   "groupName": "",
+   "baseAddress": "0x50000000",
+   "count": 1,
+   "registers": []
+  }
+ ]
+}

@@ -20,17 +20,16 @@
 
 ## How to test
 
-<!-- Steps a reviewer can follow in the app (`npm run tauri dev`). -->
+<!-- Steps a reviewer can follow in the app (`cargo run --release`). -->
 
 1.
 
 ## Checks
 
-- [ ] `npm run check` passes (types, lint, unit tests, Rust format, clippy and tests)
-- [ ] `npm run test:e2e` passes
+- [ ] `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass
 - [ ] CHANGELOG.md has an entry under **Unreleased** (or the release section)
-- [ ] Guide pages updated if the UI changed, screenshots too (`npm run docs:shots`)
-- [ ] For a release: version bumped in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`
+- [ ] Guide pages updated if the UI changed, screenshots too
+- [ ] For a release: version bumped in the root `Cargo.toml`
 
 ## Notes for reviewers
 

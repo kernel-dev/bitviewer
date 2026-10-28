@@ -1,15 +1,20 @@
-node_modules/
-dist/
-src-tauri/target/
-src-tauri/gen/
-*.tmp
+# Rust build output
+target/
 
 # user workspaces are data, not source
+*.bitview
 *.bitview.json
 
-# workspaces saved with the newer extension
-*.bitview
-
-# end-to-end test output
+# left over from the Tauri app (removed in 3.0.0); safe to delete
+node_modules/
+dist/
+src-tauri/
 test-results/
 playwright-report/
+native/
+
+# local benchmarks and notes
+bench/
+pr/
+
+*.tmp
