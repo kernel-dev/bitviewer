@@ -558,9 +558,11 @@ impl CardView {
         self.cursor = Some(bit);
         self.anchor = None;
         match (shift, self.selection) {
+            // extends the selection; no press, so neither letting go (a
+            // flip) nor moving within the bit (a drag) undoes it
             (true, Some((lo, hi))) => {
                 self.selection = Some((lo.min(bit), hi.max(bit)));
-                self.press = Some((bit, true)); // not a click
+                self.press = None;
             }
             // Shift+click with nothing selected: just this bit (a field can be one bit)
             (true, None) => {

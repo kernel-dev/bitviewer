@@ -392,7 +392,9 @@ impl WorkspaceView {
             return Some(self.render_results_bar(cx));
         }
         let regex = app_state::settings(cx).search_regex;
-        let pending = (search.input.read(cx).value().trim().to_string(), regex) != search.ran;
+        // an empty bar has nothing to search, whichever mode it is in
+        let text = search.input.read(cx).value().trim().to_string();
+        let pending = !text.is_empty() && (text, regex) != search.ran;
         let total = self.state.len();
         let count = if pending {
             "Searching…".to_string()

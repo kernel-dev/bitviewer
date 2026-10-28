@@ -189,6 +189,8 @@ fn main() {
             file_name: "Untitled".into(),
             dirty: false,
         }),
+        // a guide screenshot never shows the last session (it may be private)
+        None if args.shot.is_some() => Start::Fresh,
         None => session::restore().map_or(Start::Fresh, Start::Opened),
     };
     if let Start::Opened(opened) = &start {

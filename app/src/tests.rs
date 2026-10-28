@@ -736,6 +736,24 @@ fn a_single_bit_can_be_selected_and_made_a_field(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn shift_click_extends_the_selection_even_if_the_pointer_moves(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx, vec![value(8, 0)]);
+    drag(cx, "v0-bit-1", "v0-bit-3");
+    // Shift+click bit 6, with the pointer moving a little inside it
+    let at = center(cx, "v0-bit-6");
+    let nudged = gpui::point(at.x + gpui::px(1.0), at.y);
+    cx.simulate_mouse_down(at, MouseButton::Left, Modifiers::shift());
+    cx.simulate_mouse_move(nudged, MouseButton::Left, Modifiers::shift());
+    cx.simulate_mouse_up(nudged, MouseButton::Left, Modifiers::shift());
+    draw(cx);
+    click(cx, "v0-make-field");
+    click(cx, "prompt-ok");
+    let made = first(&view, cx);
+    assert_eq!((made.fields[0].lo, made.fields[0].hi), (1, 6));
+    assert_eq!(made.value, Bits::ZERO);
+}
+
+#[gpui::test]
 fn dragging_along_the_bit_numbers_selects_a_range(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(8, 0)]);
     // along the numbers

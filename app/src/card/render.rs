@@ -492,7 +492,9 @@ impl CardView {
         let font = if text_width + 30.0 > room { (26.0 * (room - 30.0) / text_width).max(12.0) } else { 26.0 };
         // even the smallest font can be too wide (64-bit binary in a narrow
         // window): then the box ends at the card's edge, cutting the number
-        let value_width = (text_width * font / 26.0 + 30.0).min(room);
+        // (at a high zoom in a narrow window the card can be narrower still;
+        // the box keeps a usable width then and the card clips it)
+        let value_width = (text_width * font / 26.0 + 30.0).min(room).max(150.0);
         // the grip, chevron, name, address and width badge, with their gaps
         let name_line = 8.0 + 36.0 + natural + address_width + 8.0 + 72.0;
         let beside = name_line + 16.0 + value_width + 90.0 <= content;
