@@ -6,6 +6,8 @@ Add each change under **Unreleased** as you make it. When a version is released,
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-28
+
 ### Changed
 - Built on [GPUI CE](https://gpui-ce.github.io/), the community edition of GPUI, and its component library, instead of Zed's GPUI with GPUI Kit. The app looks and works the same.
 
@@ -131,7 +133,8 @@ Add each change under **Unreleased** as you make it. When a version is released,
 ### Added
 - Tauri app baseline: inspect and edit values of 1 to 512 bits, bit by bit.
 
-[Unreleased]: https://github.com/kernel-dev/bitviewer/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/kernel-dev/bitviewer/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/kernel-dev/bitviewer/releases/tag/v3.0.1
 [3.0.0]: https://github.com/kernel-dev/bitviewer/releases/tag/v3.0.0
 [2.1.3]: https://github.com/kernel-dev/bitviewer/releases/tag/v2.1.3
 [2.1.2]: https://github.com/kernel-dev/bitviewer/releases/tag/v2.1.2
