@@ -23,6 +23,22 @@ Each peripheral also gets an entry in the sidebar. Click it to show only its reg
 - **Ungroup** keeps the values but forgets the peripheral; **Remove peripheral** deletes it with its registers. Both can be undone.
 - A value's ⋯ › **Add description…** notes what it is for. It shows under the name, cut to one line; click it to read all of it. SVD imports fill it in.
 
+## Reading values from a memory dump
+
+**File › Import memory dump…** fills registers from a block of memory read from the chip, so you don't copy them one by one. It takes:
+
+- text a debugger printed, pasted in: GDB's `x/16xw 0x40011000`, OpenOCD's `mdw 0x40011000 16`, or any `ADDR: WORD WORD …` lines (a board can print these over its serial port too). Each number is as wide as its digits: 2 digits is a byte, 8 a 32-bit word;
+- an Intel HEX or Motorola S-record file, which carries its own addresses;
+- a binary file, with the address it starts at.
+
+Dropping a `.bin`, `.hex` or `.srec` file on the window opens the same dialog.
+
+Registers are found by their address: the peripheral's base address plus the register's offset, so they need both. The preview lists every register in the dump with its value now and in the dump; nothing changes until you press **Update**. Registers only partly in the dump are listed and left alone. **Keep the old values as a snapshot** keeps each peripheral as it was, so **Compare with…** (below) shows what the dump changed. One **Ctrl+Z** undoes the whole import.
+
+Most Arm chips store words least significant byte first (**Little-endian**, the default). The byte order matters for binary files and for byte-by-byte dumps.
+
+![GDB output pasted in: two of UART0's four registers change](img/dump-import.png)
+
 ## Snapshots and comparing
 
 When a peripheral stops working after a change, the question is usually "what is different from when it worked?" across all of its registers.

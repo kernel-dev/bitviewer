@@ -373,6 +373,35 @@ fn a_peripheral_snapshot_finds_and_restores_changed_registers(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn a_pasted_memory_dump_fills_registers_by_address(cx: &mut TestAppContext) {
+    let mut sr = value(32, 0);
+    sr.name = "USART2.SR".into();
+    sr.set_peripheral("USART2", Some(0));
+    let mut brr = value(32, 0);
+    brr.name = "USART2.BRR".into();
+    brr.set_peripheral("USART2", Some(8));
+    let (view, cx) = open(cx, vec![sr, brr]);
+    view.update(cx, |view, _| {
+        let peripheral = bitviewer_core::workspace::Peripheral { base: Some(0x4000_4400), ..bitviewer_core::workspace::Peripheral::named("USART2".into()) };
+        view.state_mut_for_test().peripherals.insert("USART2".into(), Arc::new(peripheral));
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.import_dump(None, window, cx)));
+    draw(cx);
+    click(cx, "dump-paste");
+    cx.simulate_input("0x40004400: 0x000000c0 0x00000041 0x00000683");
+    draw(cx);
+    click(cx, "dump-apply");
+    let state = view.read_with(cx, |view, _| view.state().clone());
+    assert_eq!(state.values[0].value, Bits::from(0xC0u32));
+    assert_eq!(state.values[1].value, Bits::from(0x683u32));
+    // the old values are kept, and one undo puts everything back
+    assert_eq!(state.peripherals[&Arc::<str>::from("USART2")].snapshots[0].value_of("USART2.BRR"), Some(Bits::ZERO));
+    cx.simulate_keystrokes("ctrl-z");
+    draw(cx);
+    assert_eq!(view.read_with(cx, |view, _| view.state().values[1].value), Bits::ZERO);
+}
+
+#[gpui::test]
 fn menu_operations_take_any_expression(cx: &mut TestAppContext) {
     let (view, cx) = open(cx, vec![value(8, 0b0011_0110)]);
     menu_action(&view, cx, |card, window, cx| card.operand_prompt(bitviewer_core::ops::Op::And, window, cx));

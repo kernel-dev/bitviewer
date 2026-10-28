@@ -128,6 +128,8 @@ impl WorkspaceView {
         // an SVD adds values to the workspace; anything else replaces it
         if crate::svd_dialog::is_svd(&path) {
             self.import_svd(Some(path), window, cx);
+        } else if super::dump_dialog::is_dump(&path) {
+            let _ = self.import_dump(Some(path), window, cx);
         } else {
             self.open_dropped(path, window, cx);
         }

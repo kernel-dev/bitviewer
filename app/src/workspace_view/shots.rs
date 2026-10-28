@@ -28,6 +28,7 @@ pub const SCENES: &[&str] = &[
     "locked-bits",
     "settings",
     "peripheral-diff",
+    "dump-import",
 ];
 
 /// The settings every shot is taken with.
@@ -120,6 +121,13 @@ impl WorkspaceView {
                 }
             }
             "peripheral-diff" => self.compare_peripheral(&"UART0".into(), window, cx),
+            "dump-import" => {
+                let dump = self.import_dump(None, window, cx);
+                let text = "(gdb) x/4xw 0x40011000
+0x40011000 <UART0>:	0x00002303	0x00000341	0x00000041	0x000000e0
+";
+                dump.update(cx, |dump, cx| dump.paste(text, window, cx));
+            }
             "export-code" | "export-struct" | "export-editor" => {
                 let name = if scene == "export-struct" { "TIMER.CFG" } else { "UART0.CTRL" };
                 if let Some(id) = self.state.values.iter().find(|value| &*value.name == name).map(|value| value.id) {

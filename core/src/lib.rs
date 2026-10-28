@@ -4,6 +4,7 @@
 
 pub mod changelog;
 pub mod diff;
+pub mod dump;
 pub mod export;
 pub mod expr;
 pub mod field;

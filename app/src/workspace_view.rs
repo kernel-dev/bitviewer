@@ -30,6 +30,7 @@ mod chrome;
 mod diff_dialog;
 mod document;
 mod drag;
+mod dump_dialog;
 mod onboarding;
 mod peripherals;
 mod rows;
@@ -166,6 +167,12 @@ impl WorkspaceView {
     #[cfg_attr(not(test), allow(dead_code))] // read by the interface tests
     pub fn state(&self) -> &WorkspaceState {
         &self.state
+    }
+
+    /// The state, to set up a test.
+    #[cfg(all(test, not(target_os = "macos")))]
+    pub fn state_mut_for_test(&mut self) -> &mut WorkspaceState {
+        &mut self.state
     }
 
     /// The card of the value at `index`, if it has been drawn (tests, --shot).

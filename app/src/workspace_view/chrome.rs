@@ -143,6 +143,7 @@ impl WorkspaceView {
                 .menu("From a template…", Box::new(crate::commands::AddFromTemplate))
                 .separator()
                 .menu("Import CMSIS-SVD…", Box::new(crate::commands::ImportSvd))
+                .menu("Import memory dump…", Box::new(crate::commands::ImportDump))
         });
 
         div()

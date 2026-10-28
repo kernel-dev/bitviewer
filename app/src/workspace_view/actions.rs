@@ -159,6 +159,9 @@ impl WorkspaceView {
             .on_action(cx.listener(|this, _: &Palette, window, cx| this.open_palette(window, cx)))
             .on_action(cx.listener(|_, _: &Settings, window, cx| crate::settings_dialog::open(window, cx)))
             .on_action(cx.listener(|this, _: &ImportSvd, window, cx| this.import_svd(None, window, cx)))
+            .on_action(cx.listener(|this, _: &ImportDump, window, cx| {
+                this.import_dump(None, window, cx);
+            }))
             .on_action(cx.listener(|this, _: &AddFromExpr, window, cx| {
                 let widest = this.state.values.iter().map(|value| value.width).max().unwrap_or(0).clamp(32, 512);
                 crate::value_dialogs::new_value_from_expression(cx.entity().downgrade(), widest, window, cx)

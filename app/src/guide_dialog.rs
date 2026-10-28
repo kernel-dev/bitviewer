@@ -35,9 +35,10 @@ macro_rules! images {
     };
 }
 
-const IMAGES: [(&str, &[u8]); 14] = images!(
+const IMAGES: [(&str, &[u8]); 15] = images!(
     "bits-selection.png",
     "compare.png",
+    "dump-import.png",
     "export-code.png",
     "export-editor.png",
     "export-struct.png",

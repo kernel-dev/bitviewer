@@ -31,6 +31,7 @@ $plan = [ordered]@{
   'locked-bits'    = @('uart.bitview', 1920, 1290)
   'settings'       = @('uart.bitview', 1920, 1290)
   'peripheral-diff' = @('uart.bitview', 1920, 1290)
+  'dump-import'    = @('uart.bitview', 1920, 1290)
 }
 if ($Scenes) { @($plan.Keys) | Where-Object { $Scenes -notcontains $_ } | ForEach-Object { $plan.Remove($_) } }
 

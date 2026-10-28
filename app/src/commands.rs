@@ -13,6 +13,7 @@ actions!(
         Save,
         SaveAs,
         ImportSvd,
+        ImportDump,
         Quit,
         Undo,
         Redo,
@@ -115,6 +116,7 @@ pub const COMMANDS: &[Command] = &[
     command!("file.save", File, "Save", ["Ctrl+S"], "", Save),
     command!("file.saveAs", File, "Save as…", ["Ctrl+Shift+S"], "", SaveAs),
     command!("file.importSvd", File, "Import CMSIS-SVD…", [], "svd cmsis register description peripheral arm stm32 nrf import", ImportSvd),
+    command!("file.importDump", File, "Import memory dump…", [], "dump memory hex srec bin gdb openocd read registers import", ImportDump),
     command!("file.quit", File, "Quit", [], "exit close", Quit),
     command!("edit.undo", Edit, "Undo", ["Ctrl+Z"], "", Undo),
     command!("edit.redo", Edit, "Redo", ["Ctrl+Y", "Ctrl+Shift+Z"], "", Redo),
@@ -198,7 +200,7 @@ pub fn bind_keys(cx: &mut App) {
 /// The menu bar: which commands each menu shows, in order ("sep" = separator,
 /// "recent" = the recent files submenu).
 pub const MENUS: &[(&str, &[&str])] = &[
-    ("File", &["file.new", "file.open", "recent", "file.importSvd", "sep", "file.save", "file.saveAs", "sep", "file.quit"]),
+    ("File", &["file.new", "file.open", "recent", "file.importSvd", "file.importDump", "sep", "file.save", "file.saveAs", "sep", "file.quit"]),
     (
         "Edit",
         &[
